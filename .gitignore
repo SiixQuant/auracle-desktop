@@ -1,0 +1,44 @@
+# Rust build artifacts
+src-tauri/target/
+src-tauri/Cargo.lock
+**/*.rs.bk
+
+# Tauri-generated context
+src-tauri/gen/
+
+# Tauri auto-updater + signing keys (NEVER commit private keys)
+*.key
+*.key.priv
+*.pem
+
+# macOS
+.DS_Store
+*.app/
+*.dmg
+
+# Windows
+*.exe
+*.msi
+
+# Linux
+*.deb
+*.rpm
+*.AppImage
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Node (in case the frontend grows a build step later)
+node_modules/
+dist/
+.cache/
+
+# Environment files (never commit, ever)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log

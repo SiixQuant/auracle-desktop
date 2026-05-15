@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Auracle Desktop",
+  "version": "0.1.0",
+  "identifier": "com.auracle.desktop",
+
+  "build": {
+    "frontendDist": "../src",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+
+  "app": {
+    "windows": [
+      {
+        "title": "Auracle Desktop",
+        "width": 900,
+        "height": 700,
+        "minWidth": 600,
+        "minHeight": 500,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "url": "index.html"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: https://github.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:1969 https://localhost https://api.github.com https://amused-commitment-production-fb48.up.railway.app"
+    },
+    "trayIcon": {
+      "iconPath": "icons/tray.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": true,
+      "tooltip": "Auracle Desktop"
+    }
+  },
+
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg", "msi", "deb", "rpm", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "Manage your Auracle algorithmic-trading stack",
+    "longDescription": "Auracle Desktop is a native launcher that installs and manages the Auracle Docker Compose stack — Houston (web UI + REST), the strategy scheduler, MCP server, JupyterLab, and TimescaleDB. One-click install, auto-update, system-tray status, and in-app diagnostics.",
+    "publisher": "Auracle / AuraPoint Capital LLC",
+    "copyright": "Copyright (c) 2026 AuraPoint Capital LLC",
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "frameworks": [],
+      "entitlements": "entitlements.plist"
+    },
+    "windows": {
+      "wix": {
+        "language": ["en-US"]
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": ["docker.io | docker-ce", "libssl3"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/SiixQuant/auracle-desktop/releases/latest/download/latest.json"
+      ],
+      "dialog": false,
+      "pubkey": "REPLACE_WITH_TAURI_UPDATER_ED25519_PUBLIC_KEY"
+    }
+  }
+}

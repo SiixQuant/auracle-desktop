@@ -1,0 +1,189 @@
+/* Auracle Desktop — minimal scaffolding stylesheet.
+ *
+ * Production launcher will wear the same brand tokens as
+ * Houston (CSS variables defined in auracle/houston/web/static/style.css).
+ * For the scaffold we ship a small inline palette so the launcher
+ * looks deliberate at first run before we wire shared tokens.
+ */
+
+:root {
+  --bg: #0f1115;
+  --bg-2: #161922;
+  --fg: #e8eaed;
+  --fg-2: #ffffff;
+  --muted: #9aa0a6;
+  --border: #262b36;
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --err: #ef4444;
+  --accent: #6366f1;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --t-xs: 11px;
+  --t-sm: 13px;
+  --t-base: 14px;
+  --t-lg: 18px;
+  --font-sys: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sys);
+  font-size: var(--t-base);
+  height: 100%;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-3) var(--s-4);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.logo-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background-color 0.3s;
+}
+
+.logo-dot.healthy  { background: var(--ok); }
+.logo-dot.degraded { background: var(--warn); }
+.logo-dot.down     { background: var(--err); }
+.logo-dot.starting { background: var(--accent); animation: pulse 1.5s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.version {
+  font-size: var(--t-xs);
+  color: var(--muted);
+  margin-left: var(--s-2);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--s-1);
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.tab:hover { color: var(--fg); background: rgba(255, 255, 255, 0.05); }
+.tab.active { color: var(--fg-2); background: rgba(99, 102, 241, 0.15); }
+
+main {
+  padding: var(--s-5);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+h1 { font-size: var(--t-lg); margin: 0 0 var(--s-4); }
+h2 { font-size: var(--t-base); margin: var(--s-4) 0 var(--s-2); color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-4);
+  margin-bottom: var(--s-3);
+}
+
+.row { display: flex; justify-content: space-between; align-items: center; padding: var(--s-2) 0; }
+.row + .row { border-top: 1px solid var(--border); }
+
+button.primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-4);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+button.primary:hover { filter: brightness(1.1); }
+button.primary:disabled { opacity: 0.5; cursor: wait; }
+
+button.ghost {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+button.ghost:hover { background: rgba(255, 255, 255, 0.04); }
+button.ghost.danger { color: var(--err); border-color: rgba(239, 68, 68, 0.3); }
+
+input[type="text"], input[type="password"] {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  width: 100%;
+}
+
+.muted { color: var(--muted); }
+.mono  { font-family: var(--font-mono); font-size: var(--t-xs); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: var(--t-xs);
+  font-weight: 500;
+}
+.badge.ok   { background: rgba(34, 197, 94, 0.15); color: var(--ok); }
+.badge.warn { background: rgba(245, 158, 11, 0.15); color: var(--warn); }
+.badge.err  { background: rgba(239, 68, 68, 0.15); color: var(--err); }
+
+pre.logs {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

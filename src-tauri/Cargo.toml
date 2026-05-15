@@ -1,0 +1,85 @@
+# Auracle Desktop Launcher — Tauri shell that wraps the Auracle
+# Docker Compose stack. Rust core surface is intentionally tiny:
+# wraps `docker compose` CLI, polls Houston's /healthz, manages
+# the system tray icon, and ships an auto-updater.
+
+[package]
+name = "auracle-desktop"
+version = "0.1.0"
+description = "Auracle Desktop Launcher — manages the Auracle algorithmic-trading stack"
+authors = ["Auracle <contact@aurapointcapital.com>"]
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/SiixQuant/auracle-desktop"
+rust-version = "1.77"
+
+[lib]
+# Tauri uses cdylib for mobile + dynamic linking on some targets.
+# rlib keeps the integration tests buildable.
+name = "auracle_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Core Tauri runtime. v2 is the current major (2025+). The features
+# enable: built-in updater, system tray, dialog API, shell command,
+# notification, OS-keychain access for license storage.
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"        # docker CLI invocation
+tauri-plugin-dialog = "2"       # native dialogs (confirm, file pickers)
+tauri-plugin-notification = "2" # native OS notifications
+tauri-plugin-updater = "2"      # signed auto-updater
+tauri-plugin-opener = "2"       # open URLs in default browser
+tauri-plugin-store = "2"        # persistent settings (auto-start, telemetry opt-in)
+
+# Async runtime. Tauri 2 ships its own tokio integration but we keep
+# tokio explicit for the long-running healthcheck poll.
+tokio = { version = "1", features = ["full"] }
+
+# Serialization for IPC payloads + Docker JSON output parsing.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP client for hitting Houston /healthz and the GitHub Releases
+# update manifest. reqwest with rustls-tls so we don't need OpenSSL
+# on the build host.
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Logging — file-rotating logs in the launcher's data dir so the
+# Diagnostics view can show the last N days when investigating
+# a customer's install issue.
+log = "0.4"
+env_logger = "0.11"
+
+# OS keychain (Keychain on macOS, Credential Manager on Windows,
+# Secret Service on Linux) for license-key storage. We never write
+# the plaintext license to disk — keychain only.
+keyring = "3"
+
+# Anyhow for ergonomic error propagation through commands. Tauri
+# commands return Result<T, String> so we map anyhow errors to
+# strings at the boundary.
+anyhow = "1"
+thiserror = "1"
+
+# Time formatting for log lines + healthcheck timestamps.
+chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+# Default features omit the built-in dev-tools surface. Enable in
+# CI for debug builds: cargo build --features devtools
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+devtools = ["tauri/devtools"]
+
+[profile.release]
+# Strip debug symbols + LTO for the smallest binary. The launcher
+# target is ~10-15 MB per the architecture plan; lto + opt-level=z
+# typically halve a Rust binary.
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "z"
+strip = true
