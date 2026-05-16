@@ -12,6 +12,8 @@
 //!   - `commands::healthcheck` — polls Houston's /healthz
 //!   - `commands::installer`   — first-time install bootstrap
 //!   - `commands::keychain`    — license-key storage in OS keychain
+//!   - `commands::preflight`   — port/disk/Docker/network checks
+//!                               run before `installer::run_first_install`
 //!   - `commands::tray`        — system tray icon + menu
 //!   - `commands::update`      — GitHub Releases update checker
 //!
@@ -27,6 +29,7 @@ use commands::{
     healthcheck as health_cmd,
     installer as installer_cmd,
     keychain as keychain_cmd,
+    preflight as preflight_cmd,
     tray as tray_cmd,
     update as update_cmd,
 };
@@ -75,6 +78,11 @@ pub fn run() {
             installer_cmd::is_installed,
             installer_cmd::run_first_install,
             installer_cmd::install_path,
+            // Pre-flight (T-02): port / disk / Docker / network
+            // gates run before run_first_install. Frontend
+            // surfaces results and only enables Install when
+            // zero critical checks fail.
+            preflight_cmd::preflight_check,
             // Keychain (license keys + secrets)
             keychain_cmd::license_get,
             keychain_cmd::license_set,

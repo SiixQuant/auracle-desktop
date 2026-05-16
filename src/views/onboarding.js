@@ -132,31 +132,93 @@ function renderStep2() {
   renderActions({ next: true, nextLabel: 'Next', skipLabel: 'Skip for Community tier' });
 }
 
-// ── Step 3: Run installer ───────────────────────────────────────────
+// ── Step 3: Pre-flight checks + Run installer ──────────────────────
 
 function renderStep3() {
   const body = document.getElementById('step-body');
   body.innerHTML = `
-    <h2 style="margin-top:0">Setting up Auracle</h2>
-    <p class="muted">Pulling Docker images and starting services. This typically takes 3–8 minutes on a fresh machine.</p>
-    <div style="margin:24px 0">
-      <div class="muted mono" style="font-size:11px;margin-bottom:8px" id="install-phase">starting…</div>
-      <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden">
-        <div id="install-bar" style="height:100%;width:0%;background:var(--accent);
-             transition:width 0.4s ease"></div>
+    <h2 style="margin-top:0">Pre-flight check</h2>
+    <p class="muted">Verifying your machine is ready before we pull anything. This takes a few seconds.</p>
+    <div id="preflight-results" style="margin:16px 0"></div>
+    <div id="preflight-actions" style="margin-top:12px"></div>
+    <div id="install-area" style="display:none">
+      <h2 style="margin-top:24px">Setting up Auracle</h2>
+      <p class="muted">Pulling Docker images and starting services. This typically takes 3–8 minutes on a fresh machine.</p>
+      <div style="margin:24px 0">
+        <div class="muted mono" style="font-size:11px;margin-bottom:8px" id="install-phase">starting…</div>
+        <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden">
+          <div id="install-bar" style="height:100%;width:0%;background:var(--accent);
+               transition:width 0.4s ease"></div>
+        </div>
       </div>
+      <div id="install-message" class="muted" style="font-size:13px;min-height:40px"></div>
+      <details style="margin-top:16px">
+        <summary class="muted" style="cursor:pointer;font-size:12px">Show installer log</summary>
+        <pre id="install-log" class="logs" style="margin-top:8px;font-size:10px;max-height:200px"></pre>
+      </details>
     </div>
-    <div id="install-message" class="muted" style="font-size:13px;min-height:40px"></div>
-    <details style="margin-top:16px">
-      <summary class="muted" style="cursor:pointer;font-size:12px">Show installer log</summary>
-      <pre id="install-log" class="logs" style="margin-top:8px;font-size:10px;max-height:200px"></pre>
-    </details>
   `;
   renderActions({ next: false, hideSkip: true });
+  runPreflightThenInstall();
+}
+
+function runPreflightThenInstall() {
+  const results = document.getElementById('preflight-results');
+  const actions = document.getElementById('preflight-actions');
+  results.innerHTML = '<div class="muted mono" style="font-size:11px">running checks…</div>';
+  actions.innerHTML = '';
+
+  invoke('preflight_check').then(report => {
+    renderPreflight(report);
+    if (report.can_install) {
+      // Auto-advance after a short pause so the user can see the
+      // green checkmarks before the screen swaps.
+      setTimeout(() => beginInstall(), 1200);
+    } else {
+      actions.innerHTML = `
+        <p class="muted" style="font-size:12px;margin:12px 0">
+          Fix the items above and re-check. The install can't run while critical checks are failing.
+        </p>
+        <button class="primary" id="recheck-btn">Re-check</button>
+      `;
+      document.getElementById('recheck-btn')?.addEventListener('click', runPreflightThenInstall);
+    }
+  }).catch(err => {
+    results.innerHTML = `<span class="err">Pre-flight check failed:</span> ${escapeHtml(String(err))}`;
+    actions.innerHTML = `<button class="primary" id="recheck-btn">Re-check</button>`;
+    document.getElementById('recheck-btn')?.addEventListener('click', runPreflightThenInstall);
+  });
+}
+
+function renderPreflight(report) {
+  const results = document.getElementById('preflight-results');
+  results.innerHTML = report.checks.map(c => {
+    const icon = c.passed ? '✓' : (c.level === 'warning' ? '!' : '✗');
+    const cls = c.passed ? 'ok' : (c.level === 'warning' ? 'warn' : 'err');
+    const rem = c.remediation
+      ? `<div class="muted" style="font-size:11px;margin-left:24px;margin-top:4px">${escapeHtml(c.remediation)}</div>`
+      : '';
+    return `
+      <div style="margin:8px 0">
+        <span class="badge ${cls}" style="display:inline-block;min-width:18px;text-align:center">${icon}</span>
+        <strong style="margin-left:6px">${escapeHtml(c.name)}</strong>
+        <div class="muted" style="font-size:12px;margin-left:24px">${escapeHtml(c.message)}</div>
+        ${rem}
+      </div>
+    `;
+  }).join('');
+}
+
+function beginInstall() {
+  document.getElementById('preflight-actions').innerHTML = '';
+  document.getElementById('install-area').style.display = 'block';
 
   // Save the license key from step 2 if the user entered one.
+  // (Length >= 16 is the loosest valid-key heuristic; the server
+  // validates the actual format. Anything shorter is almost
+  // certainly a typo / placeholder.)
   const inputVal = (document.getElementById('onboard-license')?.value || '').trim();
-  const savePromise = inputVal && inputVal.startsWith('akey_')
+  const savePromise = inputVal && inputVal.length >= 16
     ? invoke('license_set', { value: inputVal }).catch(() => {})
     : Promise.resolve();
 
@@ -175,7 +237,6 @@ function renderStep3() {
     });
   }
 
-  // Run the install (async).
   savePromise.then(() => invoke('run_first_install')).then(() => {
     document.getElementById('install-message').innerHTML =
       '<span class="ok">Auracle is running. Opening dashboard…</span>';
@@ -183,7 +244,6 @@ function renderStep3() {
       if (window.__TAURI__?.opener?.openUrl) {
         window.__TAURI__.opener.openUrl('http://localhost:1969/ui/setup');
       }
-      // Reload the launcher to drop into the regular Dashboard view.
       location.reload();
     }, 1500);
   }).catch(err => {

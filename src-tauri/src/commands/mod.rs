@@ -14,6 +14,7 @@ pub mod docker;
 pub mod healthcheck;
 pub mod installer;
 pub mod keychain;
+pub mod preflight;
 pub mod tray;
 pub mod update;
 
