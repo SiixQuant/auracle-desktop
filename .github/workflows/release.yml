@@ -54,7 +54,13 @@ jobs:
       matrix:
         include:
           - platform: "macos-latest"
-            target: "universal-apple-darwin"
+            # Universal Mac binary needs BOTH arch targets installed —
+            # 'universal-apple-darwin' is a Tauri-bundler concept that
+            # combines the two below; dtolnay/rust-toolchain doesn't
+            # accept it as a rustup target. Fix: comma-separate the
+            # actual rustup targets here, keep --target
+            # universal-apple-darwin in args for Tauri.
+            target: "aarch64-apple-darwin, x86_64-apple-darwin"
             args: "--target universal-apple-darwin"
           - platform: "ubuntu-22.04"
             target: ""
