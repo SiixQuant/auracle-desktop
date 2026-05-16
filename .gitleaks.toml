@@ -1,0 +1,119 @@
+# gitleaks config for the Auracle org.
+#
+# Scope: all 5 repos (auracle, auracle-desktop, auracle-forge-desktop,
+# auracle-installer, auracle-marketing). Pulled in by each repo's
+# gitleaks GH Actions workflow + by the local pre-commit hook.
+#
+# Strategy: use the bundled gitleaks rule set ("extend.useDefault") to
+# catch the common secret formats (AWS keys, Stripe live keys, GitHub
+# tokens, Slack webhooks, private keys in PEM blocks, etc.) and add
+# Auracle-specific patterns on top.
+#
+# When adding a new pattern: keep the regex tight enough that
+# real-content false positives are rare. Better to miss a low-entropy
+# format than to produce alert fatigue.
+
+title = "Auracle gitleaks config"
+
+[extend]
+# Inherit the bundled gitleaks default rules. Without this, the
+# extend.useDefault path drops every rule the gitleaks team ships.
+useDefault = true
+
+# ── Auracle-specific patterns ──────────────────────────────────────────
+
+[[rules]]
+id = "auracle-stripe-license-key"
+description = "Auracle Stripe-issued license key (akey_…)"
+# akey_ prefix + 32 url-safe chars. Real keys never appear in source —
+# they exist only in customer .env files and pending_license_emails DB.
+regex = '''akey_[A-Za-z0-9_-]{32}'''
+tags = ["auracle", "license-key"]
+
+# AUDIT 2026-05-16 (S4 fix): gitleaks 8.x uses the wasilibs go-re2
+# engine (RE2 syntax), which does NOT support Perl negative lookahead
+# `(?!...)`. Previous patterns excluded placeholder values inline
+# (`(?!replace-with-|your-|...)`) and panicked at config-load time.
+# Now: simple match + per-rule allowlists for known placeholder values.
+
+[[rules]]
+id = "auracle-houston-admin-key"
+description = "HOUSTON_ADMIN_KEY assignment"
+regex = '''(?i)HOUSTON_ADMIN_KEY\s*=\s*['"]?[A-Za-z0-9_-]{16,}'''
+tags = ["auracle", "admin-key"]
+[rules.allowlist]
+regexes = [
+    '''(?i)HOUSTON_ADMIN_KEY\s*=\s*['"]?(?:replace-with-|set-when-|your-|example-|placeholder)''',
+]
+
+[[rules]]
+id = "auracle-jupyter-token"
+description = "JUPYTER_TOKEN assignment with high-entropy value"
+regex = '''(?i)JUPYTER_TOKEN\s*=\s*['"]?[A-Za-z0-9_-]{24,}'''
+tags = ["auracle", "jupyter-token"]
+[rules.allowlist]
+regexes = [
+    '''(?i)JUPYTER_TOKEN\s*=\s*['"]?(?:replace-with-|set-when-|your-|example-|placeholder)''',
+]
+
+[[rules]]
+id = "auracle-mcp-token"
+description = "AURACLE_MCP_TOKEN assignment with high-entropy value"
+regex = '''(?i)AURACLE_MCP_TOKEN\s*=\s*['"]?[A-Za-z0-9_-]{24,}'''
+tags = ["auracle", "mcp-token"]
+[rules.allowlist]
+regexes = [
+    '''(?i)AURACLE_MCP_TOKEN\s*=\s*['"]?(?:replace-with-|set-when-|your-|example-|placeholder)''',
+]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key (sk-ant-…)"
+regex = '''sk-ant-[A-Za-z0-9_-]{20,}'''
+tags = ["api-key", "anthropic"]
+
+[[rules]]
+id = "openai-api-key-modern"
+description = "OpenAI API key (sk-proj-… or sk-…)"
+regex = '''sk-(?:proj-)?[A-Za-z0-9]{40,}'''
+tags = ["api-key", "openai"]
+
+# ── Allowlist — known-safe placeholders + test fixtures ────────────────
+
+[allowlist]
+description = "Paths + patterns that legitimately contain key-shaped strings"
+
+# Test fixtures + .env.example files are allowed to contain key-shaped
+# placeholders (the regexes above are tightened to skip "replace-with-",
+# "your-", "set-when-", etc. but allowlisting whole paths gives us a
+# second layer of defense if a new placeholder convention is added).
+paths = [
+    '''\.env\.example$''',
+    '''tests/fixtures/''',
+    '''tests/.*test.*\.py$''',
+    # Test JWTs / token strings inside test_license.py + similar.
+    '''tests/test_license.*\.py$''',
+    # Documentation that intentionally shows key formats by example.
+    '''docs/.*\.md$''',
+    '''README\.md$''',
+    # The bundled placeholder Ed25519 public key in license.py is
+    # constant + checked-in — it's the dev placeholder, not a secret.
+    # Hash-guard in license.py prevents the placeholder from being used
+    # in production builds.
+    '''auracle/license\.py$''',
+    # The marketing-site recover form contains an example key prefix in
+    # the response wording. Not a real key.
+    '''recover\.html$''',
+]
+
+regexes = [
+    # The dev placeholder public key for the Ed25519 licenser keypair.
+    # Hash-guarded by is_placeholder_pubkey() so it can never sign real
+    # tokens. Keep allowlisted so the guard's existence doesn't trip
+    # the secret scanner.
+    '''MCowBQYDK2VwAyEA/ucjEfO0cvUz\+H\+qSV9IzTQZw\+PvbZvPO6E36qQ2LF4=''',
+    # Placeholder values the installer writes to .env.example.
+    '''replace-with-[a-z-]+''',
+    '''set-when-you-have-[a-z-]+''',
+    '''your-[a-z-]+-(?:here|key)''',
+]

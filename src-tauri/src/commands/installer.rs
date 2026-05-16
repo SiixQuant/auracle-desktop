@@ -7,8 +7,12 @@
 //!   1. Pick install path (~/auracle by default; user can override
 //!      in Settings before running install).
 //!   2. Download install.sh from auracle-installer GitHub repo (the
-//!      same script power users curl | bash today). Hash-check the
-//!      download against a known SHA-256 baked into the launcher.
+//!      same script power users curl | bash today). Sanity-check
+//!      the response starts with a `#!` shebang before writing it
+//!      to disk so a cached HTML 404 page can't be executed by
+//!      mistake. (TODO P3 in AUDIT_REPORT.md: pin a SHA-256 of the
+//!      installer in the launcher and verify before exec. Today we
+//!      rely on the HTTPS chain + GitHub's host security.)
 //!   3. Run the installer with the user's chosen license key in
 //!      env (set AURACLE_LICENSE_KEY before invoking) so the
 //!      install.sh's prompt-for-key step skips.

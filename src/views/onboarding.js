@@ -156,8 +156,8 @@ function renderStep2() {
   const body = document.getElementById('step-body');
   body.innerHTML = `
     <h2 style="margin-top:0">License key</h2>
-    <p class="muted">Paste your <code>akey_…</code> license key from your Auracle purchase email. Stored securely in your OS keychain — never on disk.</p>
-    <input type="password" id="onboard-license" placeholder="akey_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+    <p class="muted">Paste your license key from your Auracle purchase email — accepts <code>akey_…</code> (Stripe), <code>polar_…</code> (legacy Polar), or a JWT starting with <code>eyJ…</code> (enterprise / offline). Stored securely in your OS keychain — never on disk.</p>
+    <input type="password" id="onboard-license" placeholder="akey_… or polar_… or eyJ…" autocomplete="off">
     <div id="license-feedback" class="muted mono" style="font-size:11px;margin-top:8px"></div>
     <p class="muted" style="font-size:12px;margin-top:24px">
       Don't have a key yet? Click <strong>Skip for Community tier</strong> below — you can add one anytime from Settings → License Key. Community gives you 1 strategy + 3 schedules + IBKR data.

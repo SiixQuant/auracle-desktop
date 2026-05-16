@@ -9,11 +9,13 @@ export function renderSettings(root) {
     <h2>License Key</h2>
     <div class="card">
       <p class="muted">
-        Paste your <code>akey_…</code> license key from your purchase
-        email. Stored securely in your OS keychain — never in plain
-        text on disk.
+        Paste your license key from your purchase email — accepts
+        <code>akey_…</code> (Stripe), <code>polar_…</code> (legacy
+        Polar), or a JWT starting with <code>eyJ…</code>
+        (enterprise / offline). Stored securely in your OS keychain
+        — never in plain text on disk.
       </p>
-      <input type="password" id="license-input" placeholder="akey_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+      <input type="password" id="license-input" placeholder="akey_… or polar_… or eyJ…" autocomplete="off">
       <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
         <button class="primary" id="license-save">Save</button>
         <button class="ghost danger" id="license-clear">Clear</button>
