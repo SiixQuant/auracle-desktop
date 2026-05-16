@@ -74,7 +74,7 @@
 
   "plugins": {
     "updater": {
-      "active": true,
+      "active": false,
       "endpoints": [
         "https://github.com/SiixQuant/auracle-desktop/releases/latest/download/latest.json"
       ],

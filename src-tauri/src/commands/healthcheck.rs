@@ -31,7 +31,7 @@ pub struct HealthSnapshot {
 }
 
 #[derive(Default)]
-struct HealthState(Mutex<HealthSnapshot>);
+pub struct HealthState(Mutex<HealthSnapshot>);
 
 const HEALTHZ_URL: &str = "http://localhost:1969/healthz";
 const POLL_INTERVAL_SECS: u64 = 30;
