@@ -36,15 +36,31 @@ pub fn license_get() -> Result<Option<String>, String> {
 #[tauri::command]
 pub fn license_set(value: String) -> Result<(), String> {
     let value = value.trim().to_string();
-    if !value.starts_with("akey_") {
+    // Reject empty and obvious non-key shapes (whitespace, < 16 chars)
+    // but accept any of the three formats Auracle understands — the
+    // license server decides validity, not the launcher:
+    //
+    //   akey_…  — Stripe-issued opaque (current primary path)
+    //   polar_… — legacy Polar key (deprecated but some early-access
+    //             customers still hold one)
+    //   eyJ…    — Ed25519 JWT (self-hosted-licenser path, used by
+    //             customers who run their own licenser instance or
+    //             by Enterprise customers with offline-capable keys)
+    //
+    // Forwarding any non-empty string to the server is fine; the
+    // /license/validate endpoint returns a clean "not_found" if the
+    // shape doesn't parse. The launcher's job is just to capture +
+    // store the string, not gate it.
+    if value.len() < 16 {
         return Err(
-            "license key must start with akey_ (got something else — paste from your purchase email)"
+            "license key looks too short — paste the full key from your purchase email"
                 .to_string(),
         );
     }
     let entry = Entry::new(SERVICE, ACCOUNT).map_err(to_error_string)?;
     entry.set_password(&value).map_err(to_error_string)?;
-    log::info!("license_set: stored akey_… in OS keychain");
+    let prefix = &value[..value.len().min(8)];
+    log::info!("license_set: stored license starting with '{}…' in OS keychain", prefix);
     Ok(())
 }
 
