@@ -145,3 +145,157 @@ jobs:
           releaseDraft: true
           prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') }}
           args: ${{ matrix.args }}
+
+      # ── Stable-name aliases for the marketing site ─────────────
+      # tauri-action uploads version-stamped filenames
+      # (Auracle.Desktop_0.1.3_universal.dmg). The marketing site
+      # links to /releases/latest/download/<file>, which requires
+      # the filename to NOT contain the version (otherwise marketing
+      # HTML needs editing every release).
+      #
+      # This step copies each platform's main installer to a short
+      # stable name and uploads it as an additional asset on the
+      # same release. The download.html links target these short
+      # names exclusively — no marketing-site edit needed per
+      # release. Sig files, .app.tar.gz, latest.json, and the
+      # original versioned installers are all left in place for
+      # power users / the auto-updater.
+      - name: Upload stable-name aliases (macOS)
+        if: matrix.platform == 'macos-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          cp "$DMG" "Auracle-Desktop-mac.dmg"
+          gh release upload "${{ github.ref_name }}" \
+            "Auracle-Desktop-mac.dmg" \
+            --repo "${{ github.repository }}" --clobber
+
+      - name: Upload stable-name aliases (Linux)
+        if: matrix.platform == 'ubuntu-22.04' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DEB=$(ls src-tauri/target/release/bundle/deb/*.deb | head -1)
+          RPM=$(ls src-tauri/target/release/bundle/rpm/*.rpm | head -1)
+          APP=$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -1)
+          cp "$DEB" "Auracle-Desktop-linux.deb"
+          cp "$RPM" "Auracle-Desktop-linux.rpm"
+          cp "$APP" "Auracle-Desktop-linux.AppImage"
+          gh release upload "${{ github.ref_name }}" \
+            "Auracle-Desktop-linux.deb" \
+            "Auracle-Desktop-linux.rpm" \
+            "Auracle-Desktop-linux.AppImage" \
+            --repo "${{ github.repository }}" --clobber
+
+      - name: Upload stable-name aliases (Windows)
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi/*.msi" | Select-Object -First 1
+          Copy-Item $msi.FullName "Auracle-Desktop-windows.msi"
+          gh release upload "${{ github.ref_name }}" `
+            "Auracle-Desktop-windows.msi" `
+            --repo "${{ github.repository }}" --clobber
+
+  # ── latest.json builder for the auto-updater ─────────────────
+  # Runs after all three platform builds complete. tauri-action
+  # generates per-platform .sig files but doesn't upload them to
+  # the release; this job downloads them, builds the latest.json
+  # manifest the Tauri updater fetches at runtime
+  # (https://github.com/.../releases/latest/download/latest.json),
+  # and uploads it alongside the binaries.
+  publish-updater:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for asset uploads to settle
+        run: sleep 30
+
+      - name: Build + upload latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Install tauri-cli for the sign subcommand
+          cargo install tauri-cli --version "^2" --locked
+
+          mkdir -p _sig && cd _sig
+
+          # tauri-action uploads the main installers + .app.tar.gz to
+          # the draft release but DROPS the .sig files. Easiest fix:
+          # re-download each installer (auth'd via gh) and sign it
+          # locally with the same key the workflow has access to.
+          # Result is byte-identical to what tauri-action discarded.
+          DMG_TARGZ="Auracle-Desktop-mac.dmg"
+          APP_TARGZ_NAME="Auracle.Desktop_universal.app.tar.gz"
+          MSI_NAME="Auracle-Desktop-windows.msi"
+          APPIMG_NAME="Auracle-Desktop-linux.AppImage"
+
+          for f in "$APP_TARGZ_NAME" "$MSI_NAME" "$APPIMG_NAME"; do
+            echo "Downloading $f..."
+            gh release download "$TAG" --repo "$REPO" --pattern "$f" --clobber
+          done
+
+          # Write signing key to a file
+          mkdir -p ~/.tauri
+          printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > ~/.tauri/key 2>/dev/null \
+            || printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > ~/.tauri/key
+          chmod 600 ~/.tauri/key
+
+          for f in "$APP_TARGZ_NAME" "$MSI_NAME" "$APPIMG_NAME"; do
+            echo "Signing $f..."
+            cargo tauri signer sign \
+              --private-key-path ~/.tauri/key \
+              --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+              "$f"
+          done
+
+          MAC_SIG=$(cat "${APP_TARGZ_NAME}.sig")
+          WIN_SIG=$(cat "${MSI_NAME}.sig")
+          LIN_SIG=$(cat "${APPIMG_NAME}.sig")
+
+          # Strip leading 'v' from tag for the version field
+          VERSION="${TAG#v}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          cat > latest.json <<EOF
+          {
+            "version": "${VERSION}",
+            "notes": "See the release page for changelog and per-platform install notes.",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "darwin-x86_64":  { "signature": "${MAC_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${APP_TARGZ_NAME}" },
+              "darwin-aarch64": { "signature": "${MAC_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${APP_TARGZ_NAME}" },
+              "linux-x86_64":   { "signature": "${LIN_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${APPIMG_NAME}" },
+              "windows-x86_64": { "signature": "${WIN_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${MSI_NAME}" }
+            }
+          }
+          EOF
+
+          gh release upload "$TAG" --repo "$REPO" \
+            latest.json \
+            "${APP_TARGZ_NAME}.sig" \
+            "${MSI_NAME}.sig" \
+            "${APPIMG_NAME}.sig" \
+            --clobber
+
+          # Promote the draft to published so /releases/latest/download
+          # actually resolves to this tag.
+          gh release edit "$TAG" --repo "$REPO" --draft=false
