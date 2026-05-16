@@ -1,0 +1,128 @@
+name: Release
+
+# Triggered on a version tag push (v0.1.0, v1.0.0-rc1, etc.).
+# Builds Auracle Desktop for macOS, Windows, and Linux + uploads
+# everything to a draft GitHub Release.
+#
+# ── Signing strategy (the v1 plan — UNSIGNED is fine) ────────────
+#
+# This workflow ships SIGNED artifacts when the secrets below are set,
+# and UNSIGNED artifacts when they're not. Users on unsigned builds see:
+#
+#   macOS:    "Auracle Desktop can't be opened because Apple cannot
+#             check it for malicious software." Fix: right-click →
+#             Open → confirm. One-time per install. Doc on /download.
+#   Windows:  "Windows protected your PC" SmartScreen warning. Click
+#             "More info" → "Run anyway". Reputation builds over time.
+#   Linux:    Usually no warning. Some distros may want gpg-signed
+#             .deb / .rpm — currently unsigned for both.
+#
+# The Auracle launch plan defers OS code-signing certs (~$500/yr) until
+# there are paying customers regularly using the desktop apps. The
+# updater key is FREE and SHOULD be generated via setup-updater-keys.sh
+# even on the unsigned path — without it, auto-update won't work and
+# customers have to manually re-download for every release.
+#
+# ── Required secrets ─────────────────────────────────────────────
+# TAURI_SIGNING_PRIVATE_KEY            Updater signing key (FREE — generate
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD   via scripts/setup-updater-keys.sh)
+#
+# ── Optional secrets (add when you procure certs) ────────────────
+# APPLE_CERTIFICATE                    base64 of .p12 from Apple Dev portal
+# APPLE_CERTIFICATE_PASSWORD           password protecting the .p12
+# APPLE_SIGNING_IDENTITY               "Developer ID Application: …"
+# APPLE_ID                             Apple ID email for notarization
+# APPLE_PASSWORD                       app-specific password for notarytool
+# APPLE_TEAM_ID                        10-char team identifier
+#
+# When any of those is unset the macOS build produces an UNSIGNED .dmg.
+# Users see Gatekeeper warning on first launch — documented on the
+# /download page so they know what to expect.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            target: "universal-apple-darwin"
+            args: "--target universal-apple-darwin"
+          - platform: "ubuntu-22.04"
+            target: ""
+            args: ""
+          - platform: "windows-latest"
+            target: ""
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install Linux deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            patchelf
+
+      - name: Build + bundle (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater signing — FREE, ALWAYS set this (generate via
+          # ./scripts/setup-updater-keys.sh). Without it, auto-update
+          # won't work and every release needs manual re-download.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # OS code signing — OPTIONAL. If unset → unsigned artifacts
+          # (users click through Gatekeeper / SmartScreen warnings).
+          # Add when you procure the certs (~$500/yr setup).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Auracle Desktop ${{ github.ref_name }}"
+          releaseBody: |
+            ## Install
+
+            See https://auracle-marketing.vercel.app/download for per-OS
+            install instructions, including the one-time "trust this
+            download" workaround on macOS / Windows (these builds are
+            currently unsigned — pre-paying-customer phase, see launch
+            plan).
+
+            ## Changes
+
+            See [CHANGELOG.md](https://github.com/SiixQuant/auracle-desktop/blob/main/CHANGELOG.md).
+          releaseDraft: true
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') }}
+          args: ${{ matrix.args }}
