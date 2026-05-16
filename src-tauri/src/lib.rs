@@ -65,6 +65,7 @@ pub fn run() {
             // Docker / stack management
             docker_cmd::docker_status,
             docker_cmd::docker_install_url,
+            docker_cmd::docker_install_landing_url,
             docker_cmd::stack_status,
             docker_cmd::stack_start,
             docker_cmd::stack_stop,

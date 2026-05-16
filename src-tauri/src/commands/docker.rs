@@ -131,22 +131,56 @@ fn detect_runtime(docker_info_summary: &str) -> String {
 }
 
 /// Get the right install / start URL for the user's OS + runtime.
-/// Docker Desktop's own download page picks the right artifact;
-/// alternative runtimes have their own homepages.
+///
+/// T-83 (2026-05-16): returns the DIRECT installer download URL
+/// rather than the marketing page when possible. The launcher's
+/// onboarding flow then triggers the download via the OS shell
+/// (Tauri opener plugin → user's default browser), shaving the
+/// "find the download button on docker.com" step from the install
+/// funnel. The download landing page is still surfaced as a
+/// fallback for the user to verify the source before running the
+/// installer.
+///
+/// Architecture-aware: returns the right binary for Apple Silicon
+/// vs Intel Mac via `cfg!(target_arch)`.
 #[tauri::command]
 pub fn docker_install_url() -> String {
-    // We default to Docker Desktop since it's the most common
-    // recommendation; power users on macOS can opt for OrbStack
-    // (faster + lower idle RAM) and the frontend's Settings page
-    // surfaces both options.
     if cfg!(target_os = "macos") {
-        "https://www.docker.com/products/docker-desktop/".to_string()
+        if cfg!(target_arch = "aarch64") {
+            // Apple Silicon (M-series) direct DMG download — Docker
+            // Desktop's official URL per
+            // https://docs.docker.com/desktop/install/mac-install/
+            "https://desktop.docker.com/mac/main/arm64/Docker.dmg".to_string()
+        } else {
+            // Intel Mac
+            "https://desktop.docker.com/mac/main/amd64/Docker.dmg".to_string()
+        }
     } else if cfg!(target_os = "windows") {
-        "https://www.docker.com/products/docker-desktop/".to_string()
+        // Windows 64-bit installer. Docker Desktop only supports
+        // x64 + ARM64 (Windows on Apple Silicon via Parallels).
+        if cfg!(target_arch = "aarch64") {
+            "https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe".to_string()
+        } else {
+            "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe".to_string()
+        }
     } else {
-        // Linux: Docker Desktop OR Docker Engine. Engine is the
-        // historical default; Desktop landed for Linux in 2022.
+        // Linux: prefer Docker Desktop's .deb for Ubuntu/Debian, but
+        // since we can't sniff the distro reliably from Rust without
+        // shell-out, fall back to the install-instructions page —
+        // the user picks deb/rpm/Arch/etc.
+        "https://docs.docker.com/desktop/install/linux-install/".to_string()
+    }
+}
+
+/// Returns the download page (vs direct binary URL) for the OS, so
+/// the launcher can surface "verify the source" alongside the direct
+/// download.
+#[tauri::command]
+pub fn docker_install_landing_url() -> String {
+    if cfg!(target_os = "linux") {
         "https://docs.docker.com/engine/install/".to_string()
+    } else {
+        "https://www.docker.com/products/docker-desktop/".to_string()
     }
 }
 

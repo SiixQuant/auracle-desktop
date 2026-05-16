@@ -70,13 +70,35 @@ function renderStep1() {
   invoke('docker_status').then(s => {
     const el = document.getElementById('docker-check');
     if (!s.installed) {
+      // T-83: deep-link to the direct Docker Desktop installer
+      // for the user's OS + arch (returned in s.install_url). Also
+      // expose the docker.com landing page as the "verify the
+      // source" path. After clicking download, the onboarding view
+      // polls every 5 seconds for Docker to appear so the user
+      // doesn't have to manually click "Check again."
       el.innerHTML = `
         <span class="badge err">not installed</span>
-        — install <a href="#" id="dl-docker">Docker Desktop</a> first, then come back.`;
+        — <a href="#" id="dl-docker">download Docker Desktop directly</a>
+        (<a href="#" id="dl-docker-page" style="font-size:11px">verify the source</a>),
+        then re-launch to continue. We'll auto-detect when it's installed.`;
       document.getElementById('dl-docker').addEventListener('click', async (e) => {
         e.preventDefault();
         if (window.__TAURI__?.opener?.openUrl) {
-          window.__TAURI__.opener.openUrl(s.install_url || 'https://www.docker.com/products/docker-desktop/');
+          window.__TAURI__.opener.openUrl(
+            s.install_url || 'https://www.docker.com/products/docker-desktop/');
+        }
+        // Begin polling for Docker availability
+        startDockerPoll();
+      });
+      document.getElementById('dl-docker-page').addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (window.__TAURI__?.opener?.openUrl) {
+          try {
+            const landingUrl = await invoke('docker_install_landing_url');
+            window.__TAURI__.opener.openUrl(landingUrl);
+          } catch {
+            window.__TAURI__.opener.openUrl('https://www.docker.com/products/docker-desktop/');
+          }
         }
       });
       renderActions({ next: false });
@@ -96,6 +118,26 @@ function renderStep1() {
       ${escapeHtml(s.version || 'docker')} (<strong>${escapeHtml(niceName)}</strong>)`;
     renderActions({ next: true });
   });
+}
+
+// T-83: poll docker_status every 5s after the user clicks the
+// direct-download link. Re-renders step 1 when Docker becomes
+// available — no manual "Check again" required.
+let _dockerPollTimer = null;
+function startDockerPoll() {
+  if (_dockerPollTimer) return;
+  _dockerPollTimer = setInterval(async () => {
+    try {
+      const s = await invoke('docker_status');
+      if (s.installed && s.running) {
+        clearInterval(_dockerPollTimer);
+        _dockerPollTimer = null;
+        renderStep1();   // re-renders with the "running" badge + enables Next
+      }
+    } catch {
+      // Transient errors during poll are fine; keep trying
+    }
+  }, 5000);
 }
 
 function runtimeName(r) {
