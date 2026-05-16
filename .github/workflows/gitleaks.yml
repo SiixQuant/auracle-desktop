@@ -33,14 +33,22 @@ jobs:
           # Full history so gitleaks scans all commits, not just diff.
           fetch-depth: 0
 
+      - name: Download canonical .gitleaks.toml from main auracle/ repo
+        # GITLEAKS_CONFIG expects a LOCAL FILE PATH, not a URL.
+        # We fetch the canonical config from the main auracle/ repo
+        # so every Auracle repo enforces the same patterns +
+        # allowlist (Auracle-specific akey_ / HOUSTON_ADMIN_KEY /
+        # JUPYTER_TOKEN matchers + allowlist for the dev placeholder
+        # Ed25519 pubkey in license.py + test fixtures).
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/SiixQuant/Auracle/main/.gitleaks.toml \
+            -o .gitleaks.toml
+          ls -la .gitleaks.toml
+
       - name: Run gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pull the canonical config from the main auracle/ repo.
-          # When the org pins a new gitleaks version OR adds a new
-          # Auracle-specific pattern, every repo picks it up on next
-          # CI run — no per-repo edits needed.
-          GITLEAKS_CONFIG: https://raw.githubusercontent.com/SiixQuant/Auracle/main/.gitleaks.toml
+          GITLEAKS_CONFIG: .gitleaks.toml
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
           GITLEAKS_ENABLE_COMMENTS: "true"
