@@ -1,0 +1,98 @@
+name: Release
+
+# Triggered on a version tag push (v0.1.0, v1.0.0-rc1, etc.).
+# Builds Auracle Desktop for macOS (universal), Windows (x64),
+# and Linux (.deb / .rpm / .AppImage) on the right runner per OS.
+# Each artifact is signed + uploaded to a GitHub Release.
+#
+# Required repo secrets (configure under Settings → Secrets):
+#   APPLE_CERTIFICATE              base64 of the .p12 from Apple Dev portal
+#   APPLE_CERTIFICATE_PASSWORD     password protecting the .p12
+#   APPLE_SIGNING_IDENTITY         "Developer ID Application: AuraPoint Capital LLC (TEAMID)"
+#   APPLE_ID                       Apple ID email used for notarization
+#   APPLE_PASSWORD                 app-specific password for notarytool
+#   APPLE_TEAM_ID                  10-char team identifier
+#   TAURI_SIGNING_PRIVATE_KEY      Ed25519 private key for the auto-updater
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  password protecting the above
+#   WINDOWS_CERT_PFX               base64 of the EV code-signing .pfx
+#   WINDOWS_CERT_PASSWORD          password for the .pfx
+#
+# To draft a release without signing, comment out the cert imports
+# and the auto-updater step. Unsigned macOS/Windows artifacts will
+# trip Gatekeeper / SmartScreen but are useful for internal testing.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            target: "universal-apple-darwin"
+            args: "--target universal-apple-darwin"
+          - platform: "ubuntu-22.04"
+            target: ""
+            args: ""
+          - platform: "windows-latest"
+            target: ""
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install Linux deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            patchelf
+
+      - name: Build + bundle (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Auto-updater signing — key generated via:
+          #   tauri signer generate -w ~/.tauri/auracle.key
+          # Public half goes into tauri.conf.json → updater.pubkey;
+          # private half goes into the secret below.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS code signing + notarization
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Auracle Desktop ${{ github.ref_name }}"
+          releaseBody: "See [CHANGELOG.md](https://github.com/SiixQuant/auracle-desktop/blob/main/CHANGELOG.md) for what's new."
+          releaseDraft: true
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') }}
+          args: ${{ matrix.args }}
