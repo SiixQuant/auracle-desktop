@@ -1,0 +1,46 @@
+# gitleaks — CI secret-scanning workflow.
+#
+# STASHED HERE pending T-17 (gh auth refresh -h github.com -s workflow).
+# Once activated:
+#
+#   git mv docs/ci-templates/gitleaks.yml .github/workflows/gitleaks.yml
+#   git commit -m "ci: activate gitleaks scanning"
+#   git push origin main
+#
+# The .gitleaks.toml CONFIG lives only in the main auracle/ repo.
+# This workflow references it via raw URL so all 5 repos enforce
+# the same patterns + allowlist.
+
+name: gitleaks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks scans all commits, not just diff.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pull the canonical config from the main auracle/ repo.
+          # When the org pins a new gitleaks version OR adds a new
+          # Auracle-specific pattern, every repo picks it up on next
+          # CI run — no per-repo edits needed.
+          GITLEAKS_CONFIG: https://raw.githubusercontent.com/SiixQuant/Auracle/main/.gitleaks.toml
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_COMMENTS: "true"

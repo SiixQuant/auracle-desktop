@@ -1,0 +1,28 @@
+# Dependabot — automatic dependency security updates for the
+# Auracle Desktop launcher.
+#
+# Same security-only posture as the main auracle/ repo: only PRs for
+# vulnerable dependencies, not routine version bumps. Keeps noise low.
+#
+# Coverage:
+#   - cargo — src-tauri/Cargo.toml (Rust deps for the launcher core)
+#   - github-actions — pinned action versions in .github/workflows/
+#                      (active once T-17 ships workflow scope)
+#
+# Why no npm — the frontend is plain HTML/JS, no package.json.
+# Why no docker — the launcher is a native binary, not a container.
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "security", "rust"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels: ["dependencies", "ci"]
