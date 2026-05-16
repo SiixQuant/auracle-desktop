@@ -107,18 +107,32 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
         std::fs::set_permissions(&script_path, perms).map_err(to_error_string)?;
     }
 
-    // WINDOWS: install.sh requires bash. The launcher shows a
-    // dedicated "Windows requires WSL2" screen on first-run when
-    // we detect cmd.exe is the only shell. For now we surface the
-    // limitation as a clear error rather than silently failing.
+    // WINDOWS: the launcher itself runs natively (.msi installs to
+    // Program Files); the Auracle Docker stack underneath the
+    // launcher requires Docker Desktop, which on Windows uses WSL2
+    // as its backend. install.sh runs in bash, which is provided by
+    // Git Bash (typically already installed via Git for Windows) OR
+    // WSL2's bash.exe.
+    //
+    // Check for bash availability before invoking. If neither Git
+    // Bash nor WSL2 bash is present, surface a clear instruction.
     #[cfg(windows)]
     {
-        return Err(
-            "Windows install requires WSL2. Open Auracle Desktop in WSL2, \
-             or install Docker Desktop with WSL2 backend and run install.sh \
-             manually for now. Native Windows installer ships in v1.1."
-                .into(),
-        );
+        use std::process::Command as StdCommand;
+        let bash_available = StdCommand::new("where")
+            .arg("bash")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !bash_available {
+            return Err(
+                "Bash not found on PATH. Auracle's install.sh requires bash, \
+                 typically provided by Git for Windows (https://git-scm.com/) \
+                 OR WSL2 (https://learn.microsoft.com/en-us/windows/wsl/install). \
+                 Install either + restart Auracle Desktop to continue."
+                    .into(),
+            );
+        }
     }
 
     // 2. Pull license key from keychain, set in env so installer
