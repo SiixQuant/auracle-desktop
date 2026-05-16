@@ -53,6 +53,52 @@ Backend: Rust + Tauri 2.x. Every privileged operation is a typed `#[tauri::comma
 
 ---
 
+## First-time install — trust this download
+
+Until the launcher has a steady customer base, builds are **unsigned**
+(no Apple Developer ID or Windows EV cert — those purchases come once
+the desktop apps justify the ~$500/yr setup). You'll see one warning
+per machine on first launch:
+
+### macOS
+
+> "Auracle Desktop can't be opened because Apple cannot check it for
+> malicious software."
+
+1. Click **Cancel** on the warning
+2. In Finder, right-click **Auracle Desktop.app** → **Open**
+3. Click **Open** on the confirmation
+
+Or skip the click-through:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Auracle Desktop.app"
+```
+
+### Windows
+
+> "Windows protected your PC."
+
+1. Click **More info** on the SmartScreen warning
+2. Click **Run anyway**
+
+Chrome may also flag the `.exe` as "not commonly downloaded." Click
+the arrow in the downloads bar → **Keep**.
+
+### Linux
+
+Usually no warning. AppImage needs to be marked executable:
+
+```bash
+chmod +x Auracle-Desktop-*.AppImage
+```
+
+Auto-updates ARE signed (free Ed25519 key, never expires) so subsequent
+versions install silently after the first install. Only the initial
+download needs the click-through.
+
+---
+
 ## Prerequisites
 
 | Tool | Version | Why |
