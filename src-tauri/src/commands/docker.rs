@@ -24,15 +24,19 @@ use super::to_error_string;
 use crate::commands::installer;
 
 /// Status of the Docker runtime on the user's machine.
+///
+/// `runtime` distinguishes Docker Desktop / OrbStack / Colima /
+/// Rancher Desktop — they all provide the `docker` CLI but their
+/// install URLs / lifecycle commands differ. The frontend uses
+/// this to show the right "install Docker" button per OS, OR
+/// "start <runtime>" if it's installed but not running.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DockerStatus {
-    /// True iff `docker --version` exits 0.
     pub installed: bool,
-    /// True iff `docker info` exits 0 (daemon is reachable).
     pub running: bool,
-    /// Free-form version string — e.g. "Docker version 27.0.3".
-    /// None when not installed.
     pub version: Option<String>,
+    pub runtime: String,        // "docker-desktop" | "orbstack" | "colima" | "rancher" | "engine" | "unknown"
+    pub install_url: String,    // OS+runtime-aware URL to install / start
 }
 
 /// Per-container status row in the stack overview.
@@ -65,6 +69,8 @@ pub async fn docker_status() -> Result<DockerStatus, String> {
             installed: false,
             running: false,
             version: None,
+            runtime: "unknown".to_string(),
+            install_url: docker_install_url(),
         });
     }
 
@@ -74,22 +80,74 @@ pub async fn docker_status() -> Result<DockerStatus, String> {
     // `docker info` exits non-zero when the daemon is unreachable —
     // even when the CLI is installed. Use that as the running
     // signal rather than parsing `ps` or talking to the socket.
-    let running = run_capture("docker", &["info"]).await.is_ok();
+    let info_out = run_capture("docker", &["info", "--format", "{{.OperatingSystem}}|{{.ServerVersion}}"]).await;
+    let running = info_out.is_ok();
+    let runtime = detect_runtime(info_out.as_deref().unwrap_or(""));
 
     Ok(DockerStatus {
         installed: true,
         running,
         version,
+        runtime,
+        install_url: docker_install_url(),
     })
 }
 
-/// OS-aware Docker Desktop install URL. The frontend's onboarding
-/// "Install Docker" button calls opener::open_url with this so we
-/// don't have to know which downloads link is current — Docker
-/// Desktop's own download page picks the right artifact.
+/// Inspect `docker info`'s OperatingSystem string to figure out
+/// which container runtime is in use. The frontend renders the
+/// right "open <X>" button per runtime instead of always saying
+/// "Docker Desktop" (which is wrong for OrbStack / Colima users).
+fn detect_runtime(docker_info_summary: &str) -> String {
+    let s = docker_info_summary.to_ascii_lowercase();
+    if s.contains("docker desktop") {
+        "docker-desktop".to_string()
+    } else if s.contains("orbstack") {
+        "orbstack".to_string()
+    } else if s.contains("colima") {
+        "colima".to_string()
+    } else if s.contains("rancher") {
+        "rancher".to_string()
+    } else if s.is_empty() {
+        // CLI present but daemon unreachable — we can still guess
+        // by checking for known CLI sibling binaries in PATH.
+        if std::process::Command::new("orb")
+            .arg("version")
+            .stdout(Stdio::null()).stderr(Stdio::null()).status()
+            .map(|s| s.success()).unwrap_or(false)
+        {
+            "orbstack".to_string()
+        } else if std::process::Command::new("colima")
+            .arg("version")
+            .stdout(Stdio::null()).stderr(Stdio::null()).status()
+            .map(|s| s.success()).unwrap_or(false)
+        {
+            "colima".to_string()
+        } else {
+            "unknown".to_string()
+        }
+    } else {
+        "engine".to_string()  // Linux Docker Engine, no Desktop wrapper
+    }
+}
+
+/// Get the right install / start URL for the user's OS + runtime.
+/// Docker Desktop's own download page picks the right artifact;
+/// alternative runtimes have their own homepages.
 #[tauri::command]
 pub fn docker_install_url() -> String {
-    "https://www.docker.com/products/docker-desktop/".to_string()
+    // We default to Docker Desktop since it's the most common
+    // recommendation; power users on macOS can opt for OrbStack
+    // (faster + lower idle RAM) and the frontend's Settings page
+    // surfaces both options.
+    if cfg!(target_os = "macos") {
+        "https://www.docker.com/products/docker-desktop/".to_string()
+    } else if cfg!(target_os = "windows") {
+        "https://www.docker.com/products/docker-desktop/".to_string()
+    } else {
+        // Linux: Docker Desktop OR Docker Engine. Engine is the
+        // historical default; Desktop landed for Linux in 2022.
+        "https://docs.docker.com/engine/install/".to_string()
+    }
 }
 
 #[tauri::command]

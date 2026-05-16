@@ -13,12 +13,14 @@ import { renderDashboard } from './views/dashboard.js';
 import { renderDiagnostics } from './views/diagnostics.js';
 import { renderLogs } from './views/logs.js';
 import { renderSettings } from './views/settings.js';
+import { renderOnboarding } from './views/onboarding.js';
 
 const VIEWS = {
   dashboard: renderDashboard,
   diagnostics: renderDiagnostics,
   logs: renderLogs,
   settings: renderSettings,
+  onboarding: renderOnboarding,
 };
 
 // Tauri's invoke API. In a non-Tauri context (e.g. opening
@@ -52,7 +54,27 @@ function showView(name) {
   renderer(root);
 }
 
-showView('dashboard');
+// First-run gate: if the stack isn't installed yet, force the
+// onboarding wizard regardless of which tab is active. The wizard
+// does its own navigation and reload()s when install completes,
+// dropping the user into the regular Dashboard view.
+async function bootstrapView() {
+  try {
+    const installed = await invoke('is_installed');
+    if (!installed) {
+      // Hide the tab nav during onboarding — the wizard owns the
+      // whole window during first-run.
+      document.querySelector('.tabs')?.style?.setProperty('display', 'none');
+      showView('onboarding');
+      return;
+    }
+  } catch (_) {
+    // Backend unavailable — fall through to dashboard so the user
+    // at least sees a (failing) status instead of a blank screen.
+  }
+  showView('dashboard');
+}
+bootstrapView();
 
 // Background: poll the Rust core's healthcheck snapshot every 5 s
 // to update the topbar status dot. The Rust side runs its OWN
