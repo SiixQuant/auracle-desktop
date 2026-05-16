@@ -105,26 +105,39 @@ jobs:
           # won't work and every release needs manual re-download.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # OS code signing — OPTIONAL. If unset → unsigned artifacts
-          # (users click through Gatekeeper / SmartScreen warnings).
-          # Add when you procure the certs (~$500/yr setup).
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # OS code signing — OPTIONAL.
+          #
+          # APPLE_* env vars must be UNSET (not empty string) for
+          # tauri-action to fall back to ad-hoc signing. Empty-string
+          # secrets cause `security import` to fail with "parameters
+          # were not valid". The lines below are commented out; when
+          # the operator buys Apple Developer ID + adds the secrets
+          # via `gh secret set`, uncomment to enable Developer-ID
+          # codesigning + notarization. Until then, ad-hoc signing
+          # applies (Gatekeeper warning shows "unidentified developer"
+          # instead of "damaged" — workable via right-click → Open
+          # OR `xattr -dr com.apple.quarantine` Terminal one-liner).
+          #
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Auracle Desktop ${{ github.ref_name }}"
+          # Only create a GitHub Release when triggered by a tag push.
+          # workflow_dispatch on main / a branch just builds artifacts
+          # (downloadable from the workflow run's Artifacts panel)
+          # without trying to create a release.
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Auracle Desktop {0}', github.ref_name) || '' }}
           releaseBody: |
             ## Install
 
-            See https://auracle-marketing.vercel.app/download for per-OS
-            install instructions, including the one-time "trust this
-            download" workaround on macOS / Windows (these builds are
-            currently unsigned — pre-paying-customer phase, see launch
-            plan).
+            See https://auracle-engine.com/download for per-OS install
+            instructions, including the one-time "trust this download"
+            workaround on macOS (these builds are ad-hoc signed but
+            not Apple-Developer-ID notarized yet).
 
             ## Changes
 
