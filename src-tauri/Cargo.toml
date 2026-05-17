@@ -5,7 +5,7 @@
 
 [package]
 name = "auracle-desktop"
-version = "0.2.3"
+version = "0.2.4"
 description = "Auracle Desktop Launcher — manages the Auracle algorithmic-trading stack"
 authors = ["Auracle <contact@aurapointcapital.com>"]
 edition = "2021"
