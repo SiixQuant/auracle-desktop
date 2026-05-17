@@ -94,36 +94,56 @@ async function renderLicenseSection() {
   }
 
   if (stored) {
-    // License is set — surface a one-line confirmation pill but
-    // don't take up the whole top of the page. Customers who want
-    // to change keys do it from Settings.
+    // License is set — confirmation pill with Change + Clear so
+    // customers can correct a wrong-key paste without hunting
+    // through Settings. The dashboard is the only place license
+    // lives in the launcher UI.
     wrap.innerHTML = `
       <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
         <div>
           <strong>License active</strong>
           <div class="muted mono" style="margin-top:2px">${escapeHtml(stored.slice(0, 16))}…</div>
         </div>
-        <span class="badge ok">activated</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge ok">activated</span>
+          <button class="ghost" id="dash-license-change">Change</button>
+          <button class="ghost danger" id="dash-license-clear">Clear</button>
+        </div>
       </div>
     `;
+    document.getElementById('dash-license-change').addEventListener('click', () => {
+      // Re-render as the activation card so the input is editable.
+      // We don't pre-fill the old key — license keys are secret and
+      // the textbox is type=password; leaving the field blank is
+      // safer than re-displaying.
+      renderActivationCard(wrap);
+    });
+    document.getElementById('dash-license-clear').addEventListener('click', async () => {
+      if (!confirm('Remove the stored license key? You can paste it again from your email anytime.')) return;
+      try {
+        await invoke('license_clear');
+        renderLicenseSection();
+      } catch (err) {
+        alert('Could not clear: ' + err);
+      }
+    });
     return;
   }
 
-  // No license stored — big welcoming activation card.
+  renderActivationCard(wrap);
+}
+
+function renderActivationCard(wrap) {
   wrap.innerHTML = `
     <div class="card">
       <h2 style="margin-top:0">Activate Auracle</h2>
       <p class="muted" style="margin:0 0 12px">
-        Paste your license key from your purchase email to activate.
-        Accepts <code>akey_…</code> (Stripe), <code>polar_…</code>
-        (legacy), or a JWT starting with <code>eyJ…</code>
-        (enterprise / offline). Stored in your OS keychain — never
-        on disk.
+        Paste the license key from your purchase email.
       </p>
       <input type="password" id="dash-license-input"
-             placeholder="akey_… or polar_… or eyJ…" autocomplete="off">
+             placeholder="akey_…" autocomplete="off">
       <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-        <button class="primary" id="dash-license-save">Save license key</button>
+        <button class="primary" id="dash-license-save">Save</button>
         <span id="dash-license-status" class="muted mono"></span>
       </div>
     </div>
@@ -140,8 +160,7 @@ async function renderLicenseSection() {
     try {
       await invoke('license_set', { value });
       status.textContent = 'Saved.';
-      // Re-render the license section so the activation card
-      // collapses into the one-line confirmation pill.
+      // Re-render so the activation card collapses to the pill.
       setTimeout(renderLicenseSection, 600);
     } catch (err) {
       status.textContent = 'Could not save: ' + err;
