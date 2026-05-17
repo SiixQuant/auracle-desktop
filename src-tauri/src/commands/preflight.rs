@@ -32,7 +32,7 @@ use super::to_error_string;
 pub struct PreflightCheck {
     pub name: String,
     pub passed: bool,
-    pub level: String,        // "critical" | "warning"
+    pub level: String, // "critical" | "warning"
     pub message: String,
     pub remediation: Option<String>,
 }
@@ -82,11 +82,12 @@ pub async fn preflight_check() -> Result<PreflightResult, String> {
         checks.push(check_port(*port));
     }
 
-    let can_install = checks
-        .iter()
-        .all(|c| c.passed || c.level != "critical");
+    let can_install = checks.iter().all(|c| c.passed || c.level != "critical");
 
-    Ok(PreflightResult { can_install, checks })
+    Ok(PreflightResult {
+        can_install,
+        checks,
+    })
 }
 
 // ─── Individual checks ─────────────────────────────────────────────────
@@ -243,8 +244,7 @@ fn check_disk_space(install_path_str: &str) -> PreflightCheck {
             level: "warning".to_string(),
             message: "Disk-space check not yet implemented on Windows.".to_string(),
             remediation: Some(
-                "Manually verify you have at least 10 GB free on the install drive."
-                    .to_string(),
+                "Manually verify you have at least 10 GB free on the install drive.".to_string(),
             ),
         }
     }

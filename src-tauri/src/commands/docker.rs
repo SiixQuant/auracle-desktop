@@ -35,8 +35,8 @@ pub struct DockerStatus {
     pub installed: bool,
     pub running: bool,
     pub version: Option<String>,
-    pub runtime: String,        // "docker-desktop" | "orbstack" | "colima" | "rancher" | "engine" | "unknown"
-    pub install_url: String,    // OS+runtime-aware URL to install / start
+    pub runtime: String, // "docker-desktop" | "orbstack" | "colima" | "rancher" | "engine" | "unknown"
+    pub install_url: String, // OS+runtime-aware URL to install / start
 }
 
 /// Per-container status row in the stack overview.
@@ -74,13 +74,23 @@ pub async fn docker_status() -> Result<DockerStatus, String> {
         });
     }
 
-    let version_out = run_capture("docker", &["--version"]).await.map_err(to_error_string)?;
+    let version_out = run_capture("docker", &["--version"])
+        .await
+        .map_err(to_error_string)?;
     let version = version_out.lines().next().map(|s| s.to_string());
 
     // `docker info` exits non-zero when the daemon is unreachable —
     // even when the CLI is installed. Use that as the running
     // signal rather than parsing `ps` or talking to the socket.
-    let info_out = run_capture("docker", &["info", "--format", "{{.OperatingSystem}}|{{.ServerVersion}}"]).await;
+    let info_out = run_capture(
+        "docker",
+        &[
+            "info",
+            "--format",
+            "{{.OperatingSystem}}|{{.ServerVersion}}",
+        ],
+    )
+    .await;
     let running = info_out.is_ok();
     let runtime = detect_runtime(info_out.as_deref().unwrap_or(""));
 
@@ -112,21 +122,27 @@ fn detect_runtime(docker_info_summary: &str) -> String {
         // by checking for known CLI sibling binaries in PATH.
         if std::process::Command::new("orb")
             .arg("version")
-            .stdout(Stdio::null()).stderr(Stdio::null()).status()
-            .map(|s| s.success()).unwrap_or(false)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
         {
             "orbstack".to_string()
         } else if std::process::Command::new("colima")
             .arg("version")
-            .stdout(Stdio::null()).stderr(Stdio::null()).status()
-            .map(|s| s.success()).unwrap_or(false)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
         {
             "colima".to_string()
         } else {
             "unknown".to_string()
         }
     } else {
-        "engine".to_string()  // Linux Docker Engine, no Desktop wrapper
+        "engine".to_string() // Linux Docker Engine, no Desktop wrapper
     }
 }
 
@@ -199,13 +215,9 @@ pub async fn stack_status() -> Result<StackStatus, String> {
     // line (NDJSON). Parse line-by-line so a malformed entry
     // doesn't drop the whole status — we'd rather show 5 healthy
     // containers + 1 "?" than a blank dashboard.
-    let raw = run_capture_in(
-        "docker",
-        &["compose", "ps", "--format", "json"],
-        &dir,
-    )
-    .await
-    .map_err(to_error_string)?;
+    let raw = run_capture_in("docker", &["compose", "ps", "--format", "json"], &dir)
+        .await
+        .map_err(to_error_string)?;
 
     let mut containers = Vec::new();
     for line in raw.lines() {
@@ -245,7 +257,10 @@ pub async fn stack_status() -> Result<StackStatus, String> {
     }
 
     let overall = derive_overall(&containers);
-    Ok(StackStatus { containers, overall })
+    Ok(StackStatus {
+        containers,
+        overall,
+    })
 }
 
 fn derive_overall(containers: &[StackContainer]) -> String {
@@ -253,12 +268,8 @@ fn derive_overall(containers: &[StackContainer]) -> String {
         return "down".to_string();
     }
     let any_down = containers.iter().any(|c| c.state != "running");
-    let any_unhealthy = containers
-        .iter()
-        .any(|c| c.health == "unhealthy");
-    let any_starting = containers
-        .iter()
-        .any(|c| c.health == "starting");
+    let any_unhealthy = containers.iter().any(|c| c.health == "unhealthy");
+    let any_starting = containers.iter().any(|c| c.health == "starting");
     if any_down {
         "degraded".to_string()
     } else if any_unhealthy {
@@ -309,9 +320,7 @@ pub async fn stack_restart_container(name: String) -> Result<(), String> {
     // container name (which would let it manipulate compose
     // services we don't own). The Auracle stack ships with a
     // fixed roster; reject anything else.
-    const ALLOWED: &[&str] = &[
-        "houston", "scheduler", "mcp", "jupyter", "db", "caddy",
-    ];
+    const ALLOWED: &[&str] = &["houston", "scheduler", "mcp", "jupyter", "db", "caddy"];
     if !ALLOWED.contains(&name.as_str()) {
         return Err(format!("unknown container: {name}"));
     }
@@ -361,11 +370,7 @@ async fn run_capture(bin: &str, args: &[&str]) -> anyhow::Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).to_string())
 }
 
-async fn run_capture_in(
-    bin: &str,
-    args: &[&str],
-    cwd: &PathBuf,
-) -> anyhow::Result<String> {
+async fn run_capture_in(bin: &str, args: &[&str], cwd: &PathBuf) -> anyhow::Result<String> {
     let out = Command::new(bin)
         .args(args)
         .current_dir(cwd)

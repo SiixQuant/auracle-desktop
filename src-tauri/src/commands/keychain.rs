@@ -53,14 +53,16 @@ pub fn license_set(value: String) -> Result<(), String> {
     // store the string, not gate it.
     if value.len() < 16 {
         return Err(
-            "license key looks too short — paste the full key from your purchase email"
-                .to_string(),
+            "license key looks too short — paste the full key from your purchase email".to_string(),
         );
     }
     let entry = Entry::new(SERVICE, ACCOUNT).map_err(to_error_string)?;
     entry.set_password(&value).map_err(to_error_string)?;
     let prefix = &value[..value.len().min(8)];
-    log::info!("license_set: stored license starting with '{}…' in OS keychain", prefix);
+    log::info!(
+        "license_set: stored license starting with '{}…' in OS keychain",
+        prefix
+    );
     Ok(())
 }
 

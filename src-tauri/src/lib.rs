@@ -25,21 +25,13 @@
 mod commands;
 
 use commands::{
-    docker as docker_cmd,
-    healthcheck as health_cmd,
-    installer as installer_cmd,
-    keychain as keychain_cmd,
-    preflight as preflight_cmd,
-    tray as tray_cmd,
-    update as update_cmd,
+    docker as docker_cmd, healthcheck as health_cmd, installer as installer_cmd,
+    keychain as keychain_cmd, preflight as preflight_cmd, tray as tray_cmd, update as update_cmd,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info"),
-    )
-    .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     tauri::Builder::default()
         // Plugin registration — must happen BEFORE invoke_handler.
@@ -76,15 +68,10 @@ pub fn run() {
             // Background poll is fire-and-forget; failures inside
             // are logged at the call site. Catch panics defensively
             // anyway so a poll thread panic can't bring down the UI.
-            if let Err(panic) = std::panic::catch_unwind(
-                std::panic::AssertUnwindSafe(|| {
-                    health_cmd::start_background_poll(app.handle().clone());
-                }),
-            ) {
-                log::error!(
-                    "background healthcheck poll failed to start: {:?}",
-                    panic
-                );
+            if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                health_cmd::start_background_poll(app.handle().clone());
+            })) {
+                log::error!("background healthcheck poll failed to start: {:?}", panic);
             }
             Ok(())
         })

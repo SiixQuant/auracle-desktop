@@ -29,9 +29,7 @@ pub fn current_version() -> String {
 }
 
 #[tauri::command]
-pub async fn check_for_update(
-    app: tauri::AppHandle,
-) -> Result<UpdateInfo, String> {
+pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
     use tauri_plugin_updater::UpdaterExt;
 
     let updater = app.updater().map_err(to_error_string)?;

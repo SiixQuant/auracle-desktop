@@ -80,10 +80,10 @@ pub fn install_path() -> Result<String, String> {
 /// event.listen('installer-progress', ...) and renders a stepper.
 #[derive(Debug, Clone, Serialize)]
 pub struct InstallerProgress {
-    pub phase: String,         // "download_script" | "run_installer" | "wait_healthy"
-    pub message: String,       // human-readable status line
-    pub percent: u8,           // 0-100 (best-effort)
-    pub line: Option<String>,  // raw subprocess output line, when relevant
+    pub phase: String,        // "download_script" | "run_installer" | "wait_healthy"
+    pub message: String,      // human-readable status line
+    pub percent: u8,          // 0-100 (best-effort)
+    pub line: Option<String>, // raw subprocess output line, when relevant
 }
 
 #[tauri::command]
@@ -94,19 +94,35 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     }
     log::info!("first install bootstrap into {}", path.display());
 
-    emit_progress(&app, "download_script", "Downloading installer script…", 5, None);
+    emit_progress(
+        &app,
+        "download_script",
+        "Downloading installer script…",
+        5,
+        None,
+    );
 
     // 1. Download install.sh into the install dir
     let script_path = path.join("install.sh");
-    download_installer(&script_path).await.map_err(to_error_string)?;
-    emit_progress(&app, "download_script", "Installer script downloaded.", 15, None);
+    download_installer(&script_path)
+        .await
+        .map_err(to_error_string)?;
+    emit_progress(
+        &app,
+        "download_script",
+        "Installer script downloaded.",
+        15,
+        None,
+    );
 
     // Make executable (chmod +x equivalent on Unix; no-op on Windows
     // where bash isn't available anyway — see WINDOWS note below).
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&script_path).map_err(to_error_string)?.permissions();
+        let mut perms = std::fs::metadata(&script_path)
+            .map_err(to_error_string)?
+            .permissions();
         perms.set_mode(0o755);
         std::fs::set_permissions(&script_path, perms).map_err(to_error_string)?;
     }
@@ -146,10 +162,12 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     let license = keychain::license_get().ok().flatten().unwrap_or_default();
 
     emit_progress(
-        &app, "run_installer",
+        &app,
+        "run_installer",
         "Running install.sh — pulling Docker images and starting services. \
          This usually takes 3–8 minutes on a fresh machine.",
-        20, None,
+        20,
+        None,
     );
 
     // 3. Spawn install.sh with stdout/stderr piped so we can
@@ -162,7 +180,9 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let mut child = cmd.spawn().map_err(|e| format!("install.sh spawn failed: {e}"))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("install.sh spawn failed: {e}"))?;
 
     // Drain stdout in a background task so the pipe doesn't fill.
     if let Some(stdout) = child.stdout.take() {
@@ -185,7 +205,10 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
         });
     }
 
-    let status = child.wait().await.map_err(|e| format!("install.sh wait: {e}"))?;
+    let status = child
+        .wait()
+        .await
+        .map_err(|e| format!("install.sh wait: {e}"))?;
     if !status.success() {
         return Err(format!(
             "install.sh exited with code {:?} — check the logs panel for details",
@@ -197,7 +220,13 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     // 4. Wait for /healthz to come up (max 120 s). The healthcheck
     //    poll runs continuously in the background; here we just
     //    block until it reports healthy.
-    emit_progress(&app, "wait_healthy", "Waiting for the Auracle stack to become healthy…", 85, None);
+    emit_progress(
+        &app,
+        "wait_healthy",
+        "Waiting for the Auracle stack to become healthy…",
+        85,
+        None,
+    );
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
@@ -214,18 +243,13 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     }
     Err(
         "Stack didn't reach healthy state within 2 minutes. Check Diagnostics → \
-         container logs to see what's stuck.".into(),
+         container logs to see what's stuck."
+            .into(),
     )
 }
 
 /// Helper: emit one InstallerProgress event to the main window.
-fn emit_progress(
-    app: &AppHandle,
-    phase: &str,
-    message: &str,
-    percent: u8,
-    line: Option<String>,
-) {
+fn emit_progress(app: &AppHandle, phase: &str, message: &str, percent: u8, line: Option<String>) {
     let _ = app.emit(
         "installer-progress",
         InstallerProgress {
