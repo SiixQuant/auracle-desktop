@@ -259,12 +259,21 @@ jobs:
             || printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > ~/.tauri/key
           chmod 600 ~/.tauri/key
 
+          # Bug observed in v0.1.3 + v0.1.5: cargo-tauri rejects
+          # `--private-key-path` when the TAURI_SIGNING_PRIVATE_KEY env
+          # var is ALSO set (the two are mutually exclusive per the
+          # cargo-tauri CLI parser, but the env-var path treats it as
+          # equivalent to `--private-key <inline>`). The job-level env
+          # block leaks TAURI_SIGNING_PRIVATE_KEY into this step. Fix:
+          # unset before invoking so only the explicit --private-key-path
+          # arg wins.
           for f in "$APP_TARGZ_NAME" "$MSI_NAME" "$APPIMG_NAME"; do
             echo "Signing $f..."
-            cargo tauri signer sign \
-              --private-key-path ~/.tauri/key \
-              --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
-              "$f"
+            env -u TAURI_SIGNING_PRIVATE_KEY \
+              cargo tauri signer sign \
+                --private-key-path ~/.tauri/key \
+                --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+                "$f"
           done
 
           MAC_SIG=$(cat "${APP_TARGZ_NAME}.sig")
