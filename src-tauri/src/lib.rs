@@ -54,9 +54,38 @@ pub fn run() {
         // Setup hook — fires once after the app launches. Used to
         // build the system-tray icon + start the background
         // healthcheck poll.
+        //
+        // CRASH-RESILIENCE (added 2026-05-17 after a customer crash
+        // report on v0.1.3): tray setup is treated as best-effort.
+        // Previously `tray_cmd::setup_tray(app)?` would propagate
+        // any tray-registration error up through the setup hook,
+        // causing Tauri to abort() inside
+        // _postDidFinishNotification — the whole app failed to
+        // launch because the menu-bar icon couldn't be created.
+        // The launcher's primary window is fully functional without
+        // a tray icon, so we now log + continue if tray setup
+        // fails. Same defensive treatment for the background
+        // healthcheck poll.
         .setup(|app| {
-            tray_cmd::setup_tray(app)?;
-            health_cmd::start_background_poll(app.handle().clone());
+            if let Err(e) = tray_cmd::setup_tray(app) {
+                log::error!(
+                    "tray setup failed — continuing without menu-bar \
+                     icon. Restart the app to retry. error: {e}"
+                );
+            }
+            // Background poll is fire-and-forget; failures inside
+            // are logged at the call site. Catch panics defensively
+            // anyway so a poll thread panic can't bring down the UI.
+            if let Err(panic) = std::panic::catch_unwind(
+                std::panic::AssertUnwindSafe(|| {
+                    health_cmd::start_background_poll(app.handle().clone());
+                }),
+            ) {
+                log::error!(
+                    "background healthcheck poll failed to start: {:?}",
+                    panic
+                );
+            }
             Ok(())
         })
         // Typed IPC commands. The frontend invokes via
