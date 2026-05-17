@@ -49,28 +49,39 @@ export function renderDashboard(root) {
     <div id="containers-section"></div>
   `;
 
-  document.getElementById('btn-open').addEventListener('click', () => {
-    invoke('current_health').then(h => {
-      const url = h?.state === 'healthy'
-        ? 'http://localhost:1969/ui/dashboard'
-        : 'http://localhost:1969/ui/setup';
-      if (window.__TAURI__?.opener?.openUrl) {
-        window.__TAURI__.opener.openUrl(url);
-      } else {
-        window.open(url, '_blank');
+  document.getElementById('btn-open').addEventListener('click', async () => {
+    // Two-mode open: embedded WebviewWindow (native feel) or
+    // external browser. Preference lives in view-mode.json; default
+    // is 'browser' for a fresh install (matches pre-v0.2.0 behavior).
+    let mode = 'browser';
+    try {
+      mode = await invoke('get_view_mode');
+    } catch (_) {
+      // Backend unavailable — fall through to the browser path.
+    }
+    if (mode === 'embedded') {
+      try {
+        await invoke('open_embedded_auracle');
+        return;
+      } catch (err) {
+        // Embedded window failed to spawn — fall through to browser
+        // so the customer still gets where they were going. Toast
+        // the underlying error so they know why the window didn't
+        // pop the way they expected.
+        console.warn('embedded open failed, falling back to browser:', err);
       }
-    }).catch(() => {
-      // Health check failed (no install yet). Try opening anyway —
-      // if Houston is up at the default port the browser will reach
-      // it; if not the user sees their normal "site unreachable"
-      // page, which is clearer than a Tauri error dialog.
-      const url = 'http://localhost:1969/ui/setup';
-      if (window.__TAURI__?.opener?.openUrl) {
-        window.__TAURI__.opener.openUrl(url);
-      } else {
-        window.open(url, '_blank');
-      }
-    });
+    }
+    // Browser path
+    let url = 'http://localhost:1969/ui/setup';
+    try {
+      const h = await invoke('current_health');
+      if (h?.state === 'healthy') url = 'http://localhost:1969/ui/dashboard';
+    } catch (_) {}
+    if (window.__TAURI__?.opener?.openUrl) {
+      window.__TAURI__.opener.openUrl(url);
+    } else {
+      window.open(url, '_blank');
+    }
   });
 
   renderLicenseSection();

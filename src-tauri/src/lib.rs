@@ -66,6 +66,7 @@ use tauri::Builder;
 use commands::{
     docker as docker_cmd, healthcheck as health_cmd, installer as installer_cmd,
     keychain as keychain_cmd, preflight as preflight_cmd, tray as tray_cmd, update as update_cmd,
+    view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -264,6 +265,10 @@ pub fn run() {
             update_cmd::check_for_update,
             update_cmd::install_update,
             update_cmd::current_version,
+            // View mode (browser vs embedded)
+            view_cmd::get_view_mode,
+            view_cmd::set_view_mode,
+            view_cmd::open_embedded_auracle,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

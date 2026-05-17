@@ -17,6 +17,7 @@ pub mod keychain;
 pub mod preflight;
 pub mod tray;
 pub mod update;
+pub mod view;
 
 /// Map any error type to a string suitable for returning across
 /// the Tauri IPC boundary. Logs the full debug representation so

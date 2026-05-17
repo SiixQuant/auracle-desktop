@@ -11,6 +11,36 @@ export function renderSettings(root) {
   root.innerHTML = `
     <h1>Settings</h1>
 
+    <h2>View Mode</h2>
+    <div class="card">
+      <p class="muted" style="margin:0 0 12px">
+        Choose how the Auracle dashboard opens when you click
+        <strong>Open Auracle</strong>.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="radio" name="view-mode" value="browser" id="vm-browser" style="margin-top:3px">
+          <div>
+            <div><strong>External browser</strong></div>
+            <div class="muted" style="font-size:13px">
+              Opens in your default browser. Lower memory, any
+              browser you want.
+            </div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="radio" name="view-mode" value="embedded" id="vm-embedded" style="margin-top:3px">
+          <div>
+            <div><strong>Embedded window</strong></div>
+            <div class="muted" style="font-size:13px">
+              Opens inside a second Auracle Desktop window. Feels
+              more like one app; costs a bit more RAM.
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+
     <h2>Installation</h2>
     <div class="card">
       <div class="row">
@@ -38,6 +68,26 @@ export function renderSettings(root) {
       <div id="update-result" class="muted mono" style="margin-top:8px"></div>
     </div>
   `;
+
+  // View mode — load current preference, wire up persistence
+  invoke('get_view_mode').then(mode => {
+    const el = document.querySelector(`input[name="view-mode"][value="${mode}"]`);
+    if (el) el.checked = true;
+  }).catch(() => {
+    document.getElementById('vm-browser').checked = true;
+  });
+  document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
+    radio.addEventListener('change', async (e) => {
+      if (!e.target.checked) return;
+      try {
+        await invoke('set_view_mode', { mode: e.target.value });
+      } catch (err) {
+        // Persistence failed — revert the radio so what the user
+        // sees matches what's actually saved.
+        console.warn('set_view_mode failed:', err);
+      }
+    });
+  });
 
   // Install path + Docker
   invoke('install_path').then(p => {
