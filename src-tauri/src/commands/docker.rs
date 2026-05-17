@@ -61,10 +61,32 @@ pub struct StackStatus {
     pub overall: String, // "healthy" | "degraded" | "down" | "starting"
 }
 
+/// Locate the docker binary. macOS apps launched from Finder / Dock
+/// inherit a minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`) — Docker
+/// CLI lives outside that, so a plain `Command::new("docker")` fails
+/// to spawn even when Docker Desktop is installed.
+///
+/// Returns the first path that successfully runs `docker --version`,
+/// or None when Docker really isn't installed.
+async fn resolve_docker_bin() -> Option<String> {
+    let candidates = [
+        "docker", // PATH (works in dev / when launched from terminal)
+        "/usr/local/bin/docker",
+        "/opt/homebrew/bin/docker",
+        "/Applications/Docker.app/Contents/Resources/bin/docker",
+        "/usr/bin/docker",
+    ];
+    for path in candidates {
+        if check_binary(path, &["--version"]).await {
+            return Some(path.to_string());
+        }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn docker_status() -> Result<DockerStatus, String> {
-    let installed = check_binary("docker", &["--version"]).await?;
-    if !installed {
+    let Some(bin) = resolve_docker_bin().await else {
         return Ok(DockerStatus {
             installed: false,
             running: false,
@@ -72,9 +94,9 @@ pub async fn docker_status() -> Result<DockerStatus, String> {
             runtime: "unknown".to_string(),
             install_url: docker_install_url(),
         });
-    }
+    };
 
-    let version_out = run_capture("docker", &["--version"])
+    let version_out = run_capture(&bin, &["--version"])
         .await
         .map_err(to_error_string)?;
     let version = version_out.lines().next().map(|s| s.to_string());
@@ -83,7 +105,7 @@ pub async fn docker_status() -> Result<DockerStatus, String> {
     // even when the CLI is installed. Use that as the running
     // signal rather than parsing `ps` or talking to the socket.
     let info_out = run_capture(
-        "docker",
+        &bin,
         &[
             "info",
             "--format",
@@ -344,15 +366,26 @@ pub async fn container_logs(name: String, tail: u32) -> Result<Vec<String>, Stri
 
 // ─── Internal subprocess helpers ────────────────────────────────────
 
-async fn check_binary(bin: &str, args: &[&str]) -> Result<bool, String> {
-    let status = Command::new(bin)
+/// Returns true iff `bin` is present AND running `bin <args>` exits 0.
+///
+/// Spawn failure (binary not found, permission denied, etc.) is
+/// treated as "not installed" — we return false rather than
+/// propagating an error. Previously this used `?` on the spawn
+/// result, which caused docker_status to surface a "spawning docker"
+/// error string when Docker wasn't on the launcher's restricted
+/// macOS-app PATH; the frontend then never resolved its promise
+/// and the Settings UI sat on "checking..." indefinitely.
+async fn check_binary(bin: &str, args: &[&str]) -> bool {
+    match Command::new(bin)
         .args(args)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
         .await
-        .map_err(|e| format!("spawning {bin}: {e}"))?;
-    Ok(status.success())
+    {
+        Ok(status) => status.success(),
+        Err(_) => false,
+    }
 }
 
 async fn run_capture(bin: &str, args: &[&str]) -> anyhow::Result<String> {

@@ -114,7 +114,16 @@ export function renderSettings(root) {
       });
     }
   });
-  invoke('docker_status').then(s => {
+  invoke('docker_status').catch(err => {
+    // Defense-in-depth: backend used to swallow spawn errors and
+    // never resolve, leaving the UI stuck on "checking..." forever.
+    // It's fixed in 0.2.2+ but a stuck label is worse than a wrong
+    // one, so render a fallback if the promise still rejects.
+    const el = document.getElementById('docker-status');
+    if (el) el.innerHTML = `<span class="badge err">check failed</span> — ${escapeHtml(String(err))}`;
+    return null;
+  }).then(s => {
+    if (!s) return;
     const el = document.getElementById('docker-status');
     if (!s.installed) {
       el.innerHTML = '<span class="badge err">not installed</span> — <a href="#" id="docker-install-link">install Docker Desktop</a>';
