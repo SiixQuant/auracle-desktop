@@ -1,14 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Auracle Desktop",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "identifier": "com.auracle.desktop",
 
   "build": {
     "frontendDist": "../src",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "",
-    "beforeBuildCommand": ""
+    "beforeBuildCommand": "",
+    "withGlobalTauri": true
   },
 
   "app": {
