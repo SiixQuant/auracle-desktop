@@ -13,7 +13,7 @@
 //!   - `commands::installer`   — first-time install bootstrap
 //!   - `commands::keychain`    — license-key storage in OS keychain
 //!   - `commands::preflight`   — port/disk/Docker/network checks
-//!                               run before `installer::run_first_install`
+//!     run before `installer::run_first_install`
 //!   - `commands::tray`        — system tray icon + menu
 //!   - `commands::update`      — GitHub Releases update checker
 //!

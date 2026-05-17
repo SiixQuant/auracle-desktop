@@ -270,9 +270,7 @@ fn derive_overall(containers: &[StackContainer]) -> String {
     let any_down = containers.iter().any(|c| c.state != "running");
     let any_unhealthy = containers.iter().any(|c| c.health == "unhealthy");
     let any_starting = containers.iter().any(|c| c.health == "starting");
-    if any_down {
-        "degraded".to_string()
-    } else if any_unhealthy {
+    if any_down || any_unhealthy {
         "degraded".to_string()
     } else if any_starting {
         "starting".to_string()

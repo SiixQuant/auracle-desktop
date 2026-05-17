@@ -3,7 +3,7 @@
 //! - macOS:   Keychain Services (Keychain.app)
 //! - Windows: Credential Manager
 //! - Linux:   Secret Service (libsecret) — works under GNOME, KDE,
-//!            and headless via `secret-tool` if available
+//!   and headless via `secret-tool` if available
 //!
 //! The license key is the only secret the launcher itself manages —
 //! everything else (Stripe MCP token, broker credentials, SMTP

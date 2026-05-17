@@ -172,11 +172,7 @@ fn check_disk_space(install_path_str: &str) -> PreflightCheck {
                 // wrap long device names onto a second line, in which
                 // case the data starts on the next line. We pick the
                 // last non-empty line and parse columns from it.
-                let data_line = s
-                    .lines()
-                    .filter(|l| !l.trim().is_empty())
-                    .last()
-                    .unwrap_or("");
+                let data_line = s.lines().rfind(|l| !l.trim().is_empty()).unwrap_or("");
                 let available_kb: Option<u64> = data_line
                     .split_whitespace()
                     .nth(3)
