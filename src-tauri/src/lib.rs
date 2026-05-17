@@ -21,57 +21,196 @@
 //! `Err` arm to the frontend's `.catch()` block. Internal anyhow
 //! errors get mapped via `to_error_string` so the frontend sees
 //! a clean message rather than a debug-format Rust error.
+//!
+//! CRASH RESILIENCE (v0.1.6 onward, see CRASH_RESILIENCE.md)
+//! --------------------------------------------------------
+//! Customer crash reports on v0.1.3 + v0.1.5 showed `abort() called`
+//! during `_postDidFinishNotification` with no symbols and no log
+//! output anywhere — purely a "app quit unexpectedly" dialog. Three
+//! defenses now address this. First, panic::set_hook writes the panic
+//! message + backtrace to ~/.auracle/desktop-crash.log before the
+//! default abort handler runs (future crashes leave breadcrumbs even
+//! when launched from Finder). Second, each plugin instantiation is
+//! wrapped in catch_unwind so a plugin constructor panic logs + the
+//! app continues with that plugin disabled (store / updater are the
+//! high-risk ones — they read from disk + network on init). Third,
+//! AURACLE_DESKTOP_SAFE_MODE=1 env var skips the store + updater
+//! plugins entirely (launch with `env AURACLE_DESKTOP_SAFE_MODE=1
+//! open -a "Auracle Desktop"` if a normal launch crashes).
 
 mod commands;
+
+use std::panic;
+use std::path::PathBuf;
+use std::sync::Once;
+
+use tauri::Builder;
 
 use commands::{
     docker as docker_cmd, healthcheck as health_cmd, installer as installer_cmd,
     keychain as keychain_cmd, preflight as preflight_cmd, tray as tray_cmd, update as update_cmd,
 };
 
+static PANIC_HOOK_INIT: Once = Once::new();
+
+/// Return the path where the launcher writes crash breadcrumbs.
+/// ~/.auracle/desktop-crash.log on Unix, %USERPROFILE%\.auracle\...
+/// on Windows. Best-effort — falls back to /tmp on resolution failure.
+fn crash_log_path() -> PathBuf {
+    let home = std::env::var("HOME")
+        .ok()
+        .or_else(|| std::env::var("USERPROFILE").ok())
+        .unwrap_or_else(|| "/tmp".to_string());
+    PathBuf::from(home)
+        .join(".auracle")
+        .join("desktop-crash.log")
+}
+
+/// Install a panic hook that writes the panic to a log file before
+/// the default hook runs (which then calls abort() and triggers the
+/// macOS crash reporter). The default hook still runs after ours, so
+/// stderr output is preserved for users running from terminal.
+fn install_panic_hook() {
+    PANIC_HOOK_INIT.call_once(|| {
+        let default = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            use std::io::Write;
+            let path = crash_log_path();
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
+            {
+                let when = chrono::Utc::now().to_rfc3339();
+                let _ = writeln!(
+                    f,
+                    "\n=== panic at {when} (auracle-desktop v{}) ===",
+                    env!("CARGO_PKG_VERSION")
+                );
+                let _ = writeln!(f, "{info}");
+                let bt = std::backtrace::Backtrace::force_capture();
+                let _ = writeln!(f, "backtrace:\n{bt}");
+                let _ = writeln!(f, "=== end panic ===");
+            }
+            // Then call the default hook so stderr / system crash
+            // reporter still get the panic output too.
+            default(info);
+        }));
+    });
+}
+
+/// True iff AURACLE_DESKTOP_SAFE_MODE env is set to a truthy value.
+/// When true, the store + updater plugins are skipped — emergency
+/// fallback for customers whose disk state crashes those plugins.
+fn safe_mode() -> bool {
+    matches!(
+        std::env::var("AURACLE_DESKTOP_SAFE_MODE")
+            .unwrap_or_default()
+            .to_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+/// Wrap a plugin constructor in `catch_unwind` so a panic during
+/// plugin init doesn't crash the app — logs + returns None, and
+/// the calling chain skips registering that plugin.
+fn try_plugin<P, F>(name: &str, build: F) -> Option<P>
+where
+    F: FnOnce() -> P + std::panic::UnwindSafe,
+{
+    match std::panic::catch_unwind(build) {
+        Ok(plugin) => {
+            log::info!("plugin loaded: {name}");
+            Some(plugin)
+        }
+        Err(payload) => {
+            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic payload".to_string()
+            };
+            log::error!("plugin {name} panicked during init — continuing without it. error: {msg}");
+            None
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // STEP 1: install the panic hook BEFORE anything else so we
+    // capture any panic that happens during builder setup / plugin
+    // init / window creation. Without this, customers see only the
+    // macOS "Auracle Desktop quit unexpectedly" dialog with no clue
+    // about what went wrong.
+    install_panic_hook();
+
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    tauri::Builder::default()
-        // Plugin registration — must happen BEFORE invoke_handler.
-        // Plugins extend the IPC surface; capabilities/default.json
-        // gates which permissions actually fire.
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        // Setup hook — fires once after the app launches. Used to
-        // build the system-tray icon + start the background
-        // healthcheck poll.
-        //
-        // CRASH-RESILIENCE (added 2026-05-17 after a customer crash
-        // report on v0.1.3): tray setup is treated as best-effort.
-        // Previously `tray_cmd::setup_tray(app)?` would propagate
-        // any tray-registration error up through the setup hook,
-        // causing Tauri to abort() inside
-        // _postDidFinishNotification — the whole app failed to
-        // launch because the menu-bar icon couldn't be created.
-        // The launcher's primary window is fully functional without
-        // a tray icon, so we now log + continue if tray setup
-        // fails. Same defensive treatment for the background
-        // healthcheck poll.
+    if safe_mode() {
+        log::warn!(
+            "AURACLE_DESKTOP_SAFE_MODE=1 — skipping store + updater plugins. \
+             Auto-update disabled until you remove the env var."
+        );
+    }
+
+    // STEP 2: build the plugin chain. Each plugin construction is
+    // wrapped in catch_unwind so a panic in one plugin's constructor
+    // doesn't kill the launcher. In safe mode, store + updater are
+    // skipped entirely (those touch disk + network on init).
+    let mut builder: Builder<tauri::Wry> = tauri::Builder::default();
+
+    if let Some(p) = try_plugin("shell", tauri_plugin_shell::init) {
+        builder = builder.plugin(p);
+    }
+    if let Some(p) = try_plugin("dialog", tauri_plugin_dialog::init) {
+        builder = builder.plugin(p);
+    }
+    if let Some(p) = try_plugin("notification", tauri_plugin_notification::init) {
+        builder = builder.plugin(p);
+    }
+    if let Some(p) = try_plugin("opener", tauri_plugin_opener::init) {
+        builder = builder.plugin(p);
+    }
+    if !safe_mode() {
+        if let Some(p) = try_plugin("store", || tauri_plugin_store::Builder::default().build()) {
+            builder = builder.plugin(p);
+        }
+        if let Some(p) = try_plugin("updater", || tauri_plugin_updater::Builder::new().build()) {
+            builder = builder.plugin(p);
+        }
+    }
+
+    let builder = builder
+        // Setup hook — fires once after the app launches. Tray +
+        // healthcheck poll are best-effort; failures are logged but
+        // don't crash the app (see CRASH RESILIENCE in module
+        // docstring).
         .setup(|app| {
-            if let Err(e) = tray_cmd::setup_tray(app) {
-                log::error!(
-                    "tray setup failed — continuing without menu-bar \
-                     icon. Restart the app to retry. error: {e}"
-                );
+            // catch_unwind handles a panic in setup_tray; Result Err
+            // handles a tray-registration error returned via `?`.
+            // Either way: log + continue. The main window still loads.
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                tray_cmd::setup_tray(app)
+            }));
+            match result {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    log::error!("tray setup returned error — continuing without menu-bar icon: {e}")
+                }
+                Err(panic) => {
+                    log::error!("tray setup panicked — continuing without menu-bar icon: {panic:?}")
+                }
             }
-            // Background poll is fire-and-forget; failures inside
-            // are logged at the call site. Catch panics defensively
-            // anyway so a poll thread panic can't bring down the UI.
             if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 health_cmd::start_background_poll(app.handle().clone());
             })) {
-                log::error!("background healthcheck poll failed to start: {:?}", panic);
+                log::error!("background healthcheck poll panicked: {panic:?}");
             }
             Ok(())
         })
@@ -107,7 +246,14 @@ pub fn run() {
             // Updates
             update_cmd::check_for_update,
             update_cmd::current_version,
-        ])
+        ]);
+
+    // STEP 3: run the event loop. If this panics, the panic hook
+    // installed in step 1 writes the message to disk before macOS
+    // shows the crash dialog. We use `.expect()` (not `?`) because
+    // there's nothing to recover to if the event loop itself can't
+    // start — but the panic hook gives us a paper trail.
+    builder
         .run(tauri::generate_context!())
         .expect("error while running Auracle Desktop");
 }
