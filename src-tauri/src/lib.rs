@@ -65,9 +65,8 @@ use tauri::Builder;
 
 use commands::{
     docker as docker_cmd, healthcheck as health_cmd, installer as installer_cmd,
-    keychain as keychain_cmd, preflight as preflight_cmd,
-    scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
-    view as view_cmd,
+    keychain as keychain_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
+    tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
