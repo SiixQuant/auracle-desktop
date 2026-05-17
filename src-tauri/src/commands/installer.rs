@@ -187,7 +187,7 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     // Drain stdout in a background task so the pipe doesn't fill.
     if let Some(stdout) = child.stdout.take() {
         let app_clone = app.clone();
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 emit_progress(&app_clone, "run_installer", "", 50, Some(line));
@@ -196,7 +196,7 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     }
     if let Some(stderr) = child.stderr.take() {
         let app_clone = app.clone();
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 log::warn!("installer stderr: {line}");

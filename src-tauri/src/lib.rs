@@ -27,16 +27,33 @@
 //! Customer crash reports on v0.1.3 + v0.1.5 showed `abort() called`
 //! during `_postDidFinishNotification` with no symbols and no log
 //! output anywhere — purely a "app quit unexpectedly" dialog. Three
-//! defenses now address this. First, panic::set_hook writes the panic
-//! message + backtrace to ~/.auracle/desktop-crash.log before the
-//! default abort handler runs (future crashes leave breadcrumbs even
-//! when launched from Finder). Second, each plugin instantiation is
-//! wrapped in catch_unwind so a plugin constructor panic logs + the
-//! app continues with that plugin disabled (store / updater are the
-//! high-risk ones — they read from disk + network on init). Third,
-//! AURACLE_DESKTOP_SAFE_MODE=1 env var skips the store + updater
-//! plugins entirely (launch with `env AURACLE_DESKTOP_SAFE_MODE=1
-//! open -a "Auracle Desktop"` if a normal launch crashes).
+//! defenses address this:
+//!
+//! 1. **panic::set_hook → ~/.auracle/desktop-crash.log** (THE ONE
+//!    THAT ACTUALLY MATTERS). Writes the panic message + backtrace
+//!    to disk before the default abort handler runs. This is what
+//!    diagnosed the v0.1.7 crash: a tokio::spawn call in setup()
+//!    panicking with "there is no reactor running" — invisible in
+//!    the macOS crash report because the offsets pointed at the Rust
+//!    panic machinery, not the originating call site. The log file
+//!    has the exact line number; CRITICAL infrastructure for any
+//!    future startup-path crash debugging.
+//!
+//! 2. **catch_unwind around plugin chain + setup hook** (COSMETIC
+//!    under release builds). Because Cargo.toml sets `panic = "abort"`
+//!    to keep the binary small + fast, panics on any thread call
+//!    abort() directly without unwinding the stack — meaning
+//!    catch_unwind has nothing to catch and is essentially a no-op
+//!    in release. We keep the wrappers because (a) they DO work in
+//!    debug builds where panic=unwind, useful for developers, and
+//!    (b) flipping the Cargo.toml setting later just turns them on.
+//!    Don't rely on them in release — rely on the panic hook + on
+//!    fixing the actual panic site.
+//!
+//! 3. **AURACLE_DESKTOP_SAFE_MODE=1** env var skips the store +
+//!    updater plugins entirely (launch with `env
+//!    AURACLE_DESKTOP_SAFE_MODE=1 open -a "Auracle Desktop"` if a
+//!    normal launch crashes and the panic log points at a plugin).
 
 mod commands;
 

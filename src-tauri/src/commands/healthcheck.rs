@@ -39,11 +39,21 @@ const POLL_INTERVAL_SECS: u64 = 30;
 /// Spawn the background poll task. Called once from `lib.rs::run()`'s
 /// setup hook. Idempotent — calling twice spawns two pollers, which
 /// would race; we manage the contract by only calling from setup.
+///
+/// CRITICAL: must use `tauri::async_runtime::spawn`, NOT `tokio::spawn`.
+/// `setup()` runs synchronously on the main thread BEFORE any tokio
+/// runtime is current on this thread — `tokio::spawn` panics with
+/// "there is no reactor running, must be called from the context of
+/// a Tokio 1.x runtime" and (because Cargo.toml sets `panic = "abort"`)
+/// the panic immediately aborts the process. Symptom: app icon bounces
+/// in dock for ~3s then disappears + macOS shows "quit unexpectedly".
+/// `tauri::async_runtime::spawn` finds Tauri's own multi-threaded
+/// runtime which is always set up before setup() is invoked.
 pub fn start_background_poll(app: AppHandle) {
     let state = Arc::new(HealthState::default());
     app.manage(state.clone());
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
             .build()
