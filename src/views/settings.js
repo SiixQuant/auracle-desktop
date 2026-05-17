@@ -137,21 +137,51 @@ export function renderSettings(root) {
     document.getElementById('version-line').textContent = `v${v}`;
   });
   document.getElementById('btn-check-update').addEventListener('click', async (e) => {
-    e.target.disabled = true;
-    e.target.textContent = 'Checking…';
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    const out = document.getElementById('update-result');
     try {
       const info = await invoke('check_for_update');
-      const out = document.getElementById('update-result');
-      if (info.available) {
-        out.innerHTML = `<span class="badge ok">v${escapeHtml(info.version)} available</span> — restart the launcher to apply.`;
-      } else {
+      if (!info.available) {
         out.textContent = `Up to date (v${info.current}).`;
+        btn.textContent = 'Check for Update';
+        btn.disabled = false;
+        return;
       }
+      // Update available — flip the button into a one-click installer.
+      // The label change is the affordance: same physical button, new
+      // intent. Avoids needing a second DOM element for the rare path.
+      out.innerHTML = `<span class="badge ok">v${escapeHtml(info.version)} available</span>`;
+      btn.textContent = `Download + Install v${info.version}`;
+      btn.disabled = false;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = 'Downloading…';
+        try {
+          await invoke('install_update');
+          // install_update calls app.restart() which never returns —
+          // we shouldn't reach this line. If we do, the IPC succeeded
+          // but the restart didn't fire; surface that.
+          out.textContent = 'Installed but restart did not fire — quit + relaunch manually.';
+        } catch (err) {
+          const msg = String(err);
+          // The IPC connection closes when the app restarts under us —
+          // that's the success path, not a failure. Recognize the
+          // connection-closed signature and treat as expected.
+          if (/closed|connection/i.test(msg)) {
+            out.textContent = 'Restarting on the new version…';
+          } else {
+            out.textContent = 'Install failed: ' + msg;
+            btn.disabled = false;
+            btn.textContent = 'Retry install';
+          }
+        }
+      };
     } catch (err) {
-      document.getElementById('update-result').textContent = 'Error: ' + err;
-    } finally {
-      e.target.disabled = false;
-      e.target.textContent = 'Check for Update';
+      out.textContent = 'Error: ' + err;
+      btn.disabled = false;
+      btn.textContent = 'Check for Update';
     }
   });
 }

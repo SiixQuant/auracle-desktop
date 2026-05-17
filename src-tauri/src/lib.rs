@@ -262,6 +262,7 @@ pub fn run() {
             keychain_cmd::license_clear,
             // Updates
             update_cmd::check_for_update,
+            update_cmd::install_update,
             update_cmd::current_version,
         ]);
 
