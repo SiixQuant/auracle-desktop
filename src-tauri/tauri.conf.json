@@ -8,11 +8,11 @@
     "frontendDist": "../src",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "",
-    "beforeBuildCommand": "",
-    "withGlobalTauri": true
+    "beforeBuildCommand": ""
   },
 
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Auracle Desktop",
