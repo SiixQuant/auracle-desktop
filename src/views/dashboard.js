@@ -1,30 +1,42 @@
-// Dashboard — the launcher's "home". Shows stack overall status
-// + a big "Open Auracle" button for the most-common action.
+// Dashboard — the launcher's home view.
 //
-// Refresh cadence: stack_status() every 5 s (cheap — wraps
-// `docker compose ps --format json`). Renders a per-container
-// row with state + health badges.
+// Three sections, rendered conditionally:
+//
+//   1. License activation card — only shown when no license key is
+//      stored in the OS keychain. This is the first thing a customer
+//      sees on first launch so they can't miss it.
+//
+//   2. Quick Actions — "Open Auracle" (always shown — opens the
+//      web UI in the default browser). Other actions only appear
+//      when there's something to act on.
+//
+//   3. Containers — only rendered if the launcher detects an
+//      installed stack (i.e. docker compose ps returns rows). When
+//      no install is present (the AURACLE_INSTALL_DIR is missing
+//      or empty), this section is silently omitted rather than
+//      showing a "Backend unavailable" error — the user doesn't
+//      need to know the launcher tried and failed when the answer
+//      is just "there's nothing installed here yet."
+//
+// Refresh cadence: stack status is polled every 5 s when the
+// section is visible. When the section is hidden, no polling
+// happens (saves a docker-compose-ps subprocess every 5 s on
+// customer machines without an install yet).
 
 import { invoke } from '../app.js';
 
 let pollHandle = null;
 
 export function renderDashboard(root) {
-  root.innerHTML = `
-    <h1>Auracle Stack</h1>
+  if (pollHandle) {
+    clearInterval(pollHandle);
+    pollHandle = null;
+  }
 
-    <div class="card" id="stack-summary">
-      <div class="row">
-        <div>
-          <div><strong id="overall-state">Loading…</strong></div>
-          <div class="muted mono" id="overall-detail">checking docker compose ps…</div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="ghost" id="btn-stop">Stop</button>
-          <button class="primary" id="btn-start">Start</button>
-        </div>
-      </div>
-    </div>
+  root.innerHTML = `
+    <h1>Auracle</h1>
+
+    <div id="license-section"></div>
 
     <h2>Quick Actions</h2>
     <div class="card">
@@ -32,16 +44,9 @@ export function renderDashboard(root) {
         <div>Open the Auracle dashboard in your browser</div>
         <button class="primary" id="btn-open">Open Auracle</button>
       </div>
-      <div class="row">
-        <div>Pull the latest images and recreate changed containers</div>
-        <button class="ghost" id="btn-pull">Pull Update</button>
-      </div>
     </div>
 
-    <h2>Containers</h2>
-    <div id="containers" class="card">
-      <div class="muted">Loading containers…</div>
-    </div>
+    <div id="containers-section"></div>
   `;
 
   document.getElementById('btn-open').addEventListener('click', () => {
@@ -49,10 +54,17 @@ export function renderDashboard(root) {
       const url = h?.state === 'healthy'
         ? 'http://localhost:1969/ui/dashboard'
         : 'http://localhost:1969/ui/setup';
-      // Tauri's opener plugin handles the platform-specific
-      // open-in-default-browser. Falls through silently when
-      // running in plain browser (the link won't work but
-      // the call won't crash).
+      if (window.__TAURI__?.opener?.openUrl) {
+        window.__TAURI__.opener.openUrl(url);
+      } else {
+        window.open(url, '_blank');
+      }
+    }).catch(() => {
+      // Health check failed (no install yet). Try opening anyway —
+      // if Houston is up at the default port the browser will reach
+      // it; if not the user sees their normal "site unreachable"
+      // page, which is clearer than a Tauri error dialog.
+      const url = 'http://localhost:1969/ui/setup';
       if (window.__TAURI__?.opener?.openUrl) {
         window.__TAURI__.opener.openUrl(url);
       } else {
@@ -61,94 +73,145 @@ export function renderDashboard(root) {
     });
   });
 
-  document.getElementById('btn-start').addEventListener('click', async (e) => {
-    e.target.disabled = true;
-    e.target.textContent = 'Starting…';
-    try {
-      await invoke('stack_start');
-      await refresh();
-    } catch (err) {
-      alert('Could not start stack: ' + err);
-    } finally {
-      e.target.disabled = false;
-      e.target.textContent = 'Start';
-    }
-  });
-
-  document.getElementById('btn-stop').addEventListener('click', async (e) => {
-    if (!confirm('Stop the Auracle stack? Live strategies will halt.')) return;
-    e.target.disabled = true;
-    e.target.textContent = 'Stopping…';
-    try {
-      await invoke('stack_stop');
-      await refresh();
-    } catch (err) {
-      alert('Could not stop stack: ' + err);
-    } finally {
-      e.target.disabled = false;
-      e.target.textContent = 'Stop';
-    }
-  });
-
-  document.getElementById('btn-pull').addEventListener('click', async (e) => {
-    e.target.disabled = true;
-    e.target.textContent = 'Pulling…';
-    try {
-      await invoke('stack_pull_update');
-      alert('Update pulled. Containers recreated.');
-      await refresh();
-    } catch (err) {
-      alert('Update failed: ' + err);
-    } finally {
-      e.target.disabled = false;
-      e.target.textContent = 'Pull Update';
-    }
-  });
-
-  refresh();
-  if (pollHandle) clearInterval(pollHandle);
-  pollHandle = setInterval(refresh, 5000);
+  renderLicenseSection();
+  renderContainersSection();
 }
 
-async function refresh() {
-  try {
-    const status = await invoke('stack_status');
-    const overall = status.overall || 'unknown';
-    document.getElementById('overall-state').textContent =
-      overall.charAt(0).toUpperCase() + overall.slice(1);
-    document.getElementById('overall-detail').textContent =
-      `${status.containers.length} container(s) tracked`;
+// ── License activation ──────────────────────────────────────────
 
-    const wrap = document.getElementById('containers');
-    if (status.containers.length === 0) {
-      wrap.innerHTML = `
-        <div class="muted">
-          No stack found. Run the first-time install from
-          Settings → Install to get started.
-        </div>`;
+async function renderLicenseSection() {
+  const wrap = document.getElementById('license-section');
+  if (!wrap) return;
+
+  let stored;
+  try {
+    stored = await invoke('license_get');
+  } catch (_) {
+    // Keychain access failed — likely first launch with no
+    // permission yet. Show the prompt so they can save one
+    // (which will trigger the keychain permission grant).
+    stored = null;
+  }
+
+  if (stored) {
+    // License is set — surface a one-line confirmation pill but
+    // don't take up the whole top of the page. Customers who want
+    // to change keys do it from Settings.
+    wrap.innerHTML = `
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <strong>License active</strong>
+          <div class="muted mono" style="margin-top:2px">${escapeHtml(stored.slice(0, 16))}…</div>
+        </div>
+        <span class="badge ok">activated</span>
+      </div>
+    `;
+    return;
+  }
+
+  // No license stored — big welcoming activation card.
+  wrap.innerHTML = `
+    <div class="card">
+      <h2 style="margin-top:0">Activate Auracle</h2>
+      <p class="muted" style="margin:0 0 12px">
+        Paste your license key from your purchase email to activate.
+        Accepts <code>akey_…</code> (Stripe), <code>polar_…</code>
+        (legacy), or a JWT starting with <code>eyJ…</code>
+        (enterprise / offline). Stored in your OS keychain — never
+        on disk.
+      </p>
+      <input type="password" id="dash-license-input"
+             placeholder="akey_… or polar_… or eyJ…" autocomplete="off">
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="primary" id="dash-license-save">Save license key</button>
+        <span id="dash-license-status" class="muted mono"></span>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('dash-license-save').addEventListener('click', async () => {
+    const input = document.getElementById('dash-license-input');
+    const status = document.getElementById('dash-license-status');
+    const value = input.value.trim();
+    if (!value) {
+      status.textContent = 'Paste a key first.';
       return;
     }
-    wrap.innerHTML = status.containers.map(c => `
-      <div class="row">
-        <div>
-          <div><strong>${escapeHtml(c.name)}</strong></div>
-          <div class="muted mono">state: ${escapeHtml(c.state)}${c.health ? ' · health: ' + escapeHtml(c.health) : ''}</div>
-        </div>
-        <div>
-          ${badgeFor(c)}
+    try {
+      await invoke('license_set', { value });
+      status.textContent = 'Saved.';
+      // Re-render the license section so the activation card
+      // collapses into the one-line confirmation pill.
+      setTimeout(renderLicenseSection, 600);
+    } catch (err) {
+      status.textContent = 'Could not save: ' + err;
+    }
+  });
+}
+
+// ── Containers ──────────────────────────────────────────────────
+
+async function renderContainersSection() {
+  const wrap = document.getElementById('containers-section');
+  if (!wrap) return;
+
+  // Initial probe — if the stack isn't installed or docker compose
+  // ps fails, omit the section entirely (no error dialog, no broken
+  // buttons). Customers see a clean dashboard until they install.
+  let initial;
+  try {
+    initial = await invoke('stack_status');
+  } catch (_) {
+    return; // section stays empty + invisible
+  }
+  if (!initial || !initial.containers || initial.containers.length === 0) {
+    return; // no containers tracked — no section needed
+  }
+
+  // Stack is real — render header + first paint.
+  wrap.innerHTML = `
+    <h2>Containers</h2>
+    <div id="containers" class="card"></div>
+  `;
+  paintContainers(initial);
+
+  // Start polling. Saved in module-level pollHandle so re-renders
+  // (e.g. tab switch back to dashboard) reset the timer cleanly.
+  pollHandle = setInterval(async () => {
+    try {
+      const status = await invoke('stack_status');
+      paintContainers(status);
+    } catch (_) {
+      // Transient docker-compose error — leave the previous paint
+      // up rather than blanking the section.
+    }
+  }, 5000);
+}
+
+function paintContainers(status) {
+  const wrap = document.getElementById('containers');
+  if (!wrap) return;
+  if (!status.containers || status.containers.length === 0) {
+    wrap.innerHTML = '<div class="muted">No containers running.</div>';
+    return;
+  }
+  wrap.innerHTML = status.containers.map(c => `
+    <div class="row">
+      <div>
+        <strong>${escapeHtml(c.name)}</strong>
+        <div class="muted mono" style="margin-top:2px">
+          state: ${escapeHtml(c.state)}${c.health ? ' · health: ' + escapeHtml(c.health) : ''}
         </div>
       </div>
-    `).join('');
-  } catch (err) {
-    document.getElementById('overall-state').textContent = 'Backend unavailable';
-    document.getElementById('overall-detail').textContent = String(err);
-  }
+      ${badgeFor(c)}
+    </div>
+  `).join('');
 }
 
 function badgeFor(c) {
-  if (c.state !== 'running') return '<span class="badge err">down</span>';
-  if (c.health === 'unhealthy') return '<span class="badge err">unhealthy</span>';
-  if (c.health === 'starting') return '<span class="badge warn">starting</span>';
+  if (c.state !== 'running')      return '<span class="badge err">down</span>';
+  if (c.health === 'unhealthy')   return '<span class="badge err">unhealthy</span>';
+  if (c.health === 'starting')    return '<span class="badge warn">starting</span>';
   return '<span class="badge ok">healthy</span>';
 }
 

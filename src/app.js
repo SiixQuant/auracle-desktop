@@ -10,15 +10,11 @@
 // can be exercised today.
 
 import { renderDashboard } from './views/dashboard.js';
-import { renderDiagnostics } from './views/diagnostics.js';
-import { renderLogs } from './views/logs.js';
 import { renderSettings } from './views/settings.js';
 import { renderOnboarding } from './views/onboarding.js';
 
 const VIEWS = {
   dashboard: renderDashboard,
-  diagnostics: renderDiagnostics,
-  logs: renderLogs,
   settings: renderSettings,
   onboarding: renderOnboarding,
 };
