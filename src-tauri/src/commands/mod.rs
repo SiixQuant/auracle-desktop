@@ -15,6 +15,7 @@ pub mod healthcheck;
 pub mod installer;
 pub mod keychain;
 pub mod preflight;
+pub mod scheduled_update;
 pub mod tray;
 pub mod update;
 pub mod view;

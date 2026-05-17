@@ -65,7 +65,8 @@ use tauri::Builder;
 
 use commands::{
     docker as docker_cmd, healthcheck as health_cmd, installer as installer_cmd,
-    keychain as keychain_cmd, preflight as preflight_cmd, tray as tray_cmd, update as update_cmd,
+    keychain as keychain_cmd, preflight as preflight_cmd,
+    scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
     view as view_cmd,
 };
 
@@ -229,6 +230,14 @@ pub fn run() {
                 health_cmd::start_background_poll(app.handle().clone());
             })) {
                 log::error!("background healthcheck poll panicked: {panic:?}");
+            }
+            // Mandatory weekly update on Sundays. See
+            // commands/scheduled_update.rs for the policy. Failure
+            // to schedule shouldn't block app launch — log + continue.
+            if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                scheduled_update_cmd::maybe_run_sunday_update(app.handle().clone());
+            })) {
+                log::error!("sunday update scheduler panicked: {panic:?}");
             }
             Ok(())
         })

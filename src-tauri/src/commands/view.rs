@@ -61,12 +61,50 @@ pub async fn set_view_mode(app: tauri::AppHandle, mode: String) -> Result<(), St
     Ok(())
 }
 
+/// Script injected into the embedded WebView before any page JS runs.
+///
+/// Two things it fixes vs a stock WebView pointing at Houston:
+///
+///   1. **`target="_blank"` links** — without this, clicking a link
+///      that opens in a new tab (the JupyterLab nav item is the
+///      canonical example) does nothing in Tauri's WebView, because
+///      there's no browser to open a tab in. Override every click
+///      so target="_blank" becomes a same-window navigation. The
+///      customer still gets to JupyterLab; just inside the existing
+///      embedded window. Browser-style back button works as expected.
+///
+///   2. **Anchors with rel="noopener"** — those usually also imply
+///      "open in new window." Same treatment.
+const EMBEDDED_INIT_SCRIPT: &str = r#"
+(function () {
+  // Capture-phase so we beat Houston's own click handlers.
+  document.addEventListener('click', function (e) {
+    var a = e.target;
+    while (a && a.tagName !== 'A') a = a.parentElement;
+    if (!a) return;
+    if (a.target === '_blank') {
+      // Force same-window navigation. Customer can use browser back
+      // to return to the previous page.
+      e.preventDefault();
+      e.stopPropagation();
+      window.location.href = a.href;
+    }
+  }, true);
+})();
+"#;
+
 /// Open the embedded Auracle window. Reuses an existing window if
 /// already open (focuses it); otherwise creates a fresh one.
 ///
 /// Frontend calls this only when `get_view_mode()` returned
 /// `embedded`. Browser mode is handled in JS via the opener plugin
 /// directly — no Rust round-trip needed.
+///
+/// Persistence: WebView state (cookies, localStorage) is kept in
+/// the platform-default app-data directory by Tauri. Session cookies
+/// from Houston's 30-day Max-Age login should therefore survive
+/// launcher restarts — customer doesn't have to re-enter credentials
+/// every time they reopen the launcher.
 #[tauri::command]
 pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(existing) = app.get_webview_window(EMBEDDED_LABEL) {
@@ -81,6 +119,7 @@ pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> 
         .min_inner_size(800.0, 600.0)
         .resizable(true)
         .decorations(true)
+        .initialization_script(EMBEDDED_INIT_SCRIPT)
         .build()
         .map_err(to_error_string)?;
     Ok(())
