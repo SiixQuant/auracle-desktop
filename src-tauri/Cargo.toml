@@ -67,6 +67,13 @@ thiserror = "1"
 # Time formatting for log lines + healthcheck timestamps.
 chrono = { version = "0.4", features = ["serde"] }
 
+# URL parsing — used by the IBKR-login command to validate the URL
+# passed from the frontend before handing it to the WebviewWindow
+# builder (which would otherwise accept a garbage string + spawn a
+# blank window). `url` is already a transitive dep of tauri/reqwest;
+# pinning it directly keeps the API surface stable for our code.
+url = "2"
+
 [features]
 # Default features omit the built-in dev-tools surface. Enable in
 # CI for debug builds: cargo build --features devtools

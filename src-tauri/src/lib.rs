@@ -64,9 +64,10 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    docker as docker_cmd, healthcheck as health_cmd, installer as installer_cmd,
-    keychain as keychain_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
-    tray as tray_cmd, update as update_cmd, view as view_cmd,
+    docker as docker_cmd, healthcheck as health_cmd, ibkr_login as ibkr_login_cmd,
+    installer as installer_cmd, keychain as keychain_cmd, preflight as preflight_cmd,
+    scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
+    view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -277,6 +278,9 @@ pub fn run() {
             view_cmd::get_view_mode,
             view_cmd::set_view_mode,
             view_cmd::open_embedded_auracle,
+            // IBKR Client Portal embedded login window
+            ibkr_login_cmd::open_ibkr_login,
+            ibkr_login_cmd::close_ibkr_login,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

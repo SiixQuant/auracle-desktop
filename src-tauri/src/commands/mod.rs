@@ -12,6 +12,7 @@
 
 pub mod docker;
 pub mod healthcheck;
+pub mod ibkr_login;
 pub mod installer;
 pub mod keychain;
 pub mod preflight;
