@@ -46,3 +46,27 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test --no-default-features
+
+  # Audit P1-4: scan the Rust dependency tree for CVEs published to
+  # the RustSec Advisory Database. cargo audit is the de-facto tool
+  # used by every serious Rust project. Fails the build on any
+  # unyanked HIGH/CRITICAL — informational + low advisories pass
+  # through (they show up in the log but don't block the merge).
+  cargo-audit:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        # Pinned so a breaking upstream release can't fail every
+        # build on this repo unannounced.
+        run: cargo install --locked --version 0.21.0 cargo-audit
+      - name: Run cargo audit
+        working-directory: src-tauri
+        # --deny=unmaintained,unsound,yanked also fails on the
+        # non-CVE advisory categories. Add --ignore RUSTSEC-XXXX-YYYY
+        # entries here (with rationale) for any advisory we've
+        # consciously accepted as not-applicable.
+        run: cargo audit --deny=unmaintained,unsound,yanked
