@@ -1,0 +1,15 @@
+# auracle-desktop code-ownership rules.
+#
+# Tauri launcher. The Rust + Tauri config holds the auto-update
+# pubkey, license-server URL, and IPC surface — all security-sensitive.
+
+# Default.
+* @SiixQuant
+
+# Security-sensitive surfaces — auto-updater signing config, embedded
+# Ed25519 pubkey, license-server URL, IPC command allowlist.
+/src-tauri/tauri.conf.json       @SiixQuant
+/src-tauri/src/commands/         @SiixQuant
+/src-tauri/Cargo.lock            @SiixQuant
+/src-tauri/Cargo.toml            @SiixQuant
+/.github/workflows/              @SiixQuant
