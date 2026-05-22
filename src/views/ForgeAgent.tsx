@@ -25,12 +25,16 @@ interface ForgeAgentProps {
   previewRefreshKey: number;
   pendingCode: string | null;
   setPendingCode: (code: string | null) => void;
+  /** Called when the agent's write_strategy tool succeeds, so Forge
+   *  can refresh the preview + auto-open the new file. */
+  onAgentWroteFile: (relPath: string) => void;
 }
 
 export default function ForgeAgent({
   activePath,
   previewRefreshKey,
   setPendingCode,
+  onAgentWroteFile,
 }: ForgeAgentProps) {
   return (
     <div className="forge-agent-shell">
@@ -38,6 +42,8 @@ export default function ForgeAgent({
         <ChatPanel
           activePath={activePath}
           onInsertCode={(code) => setPendingCode(code)}
+          useAgentTools
+          onAgentWroteFile={onAgentWroteFile}
         />
       </div>
       <div className="forge-col forge-col-agent-preview">

@@ -21,6 +21,8 @@ import {
   type ChatDonePayload,
   type ChatErrorPayload,
   type ChatMessage,
+  type ChatToolCallPayload,
+  type ChatToolResultPayload,
 } from "@/lib/tauri";
 
 interface ChatPanelProps {
@@ -28,18 +30,44 @@ interface ChatPanelProps {
   activePath: string | null;
   /** Set by Forge.tsx; Editor consumes it then resets to null. */
   onInsertCode: (code: string) => void;
+  /**
+   * When true, send dispatches to the agent loop (tool-use enabled).
+   * When false, sends to the plain streaming chat (text-only).
+   * Defaults to false to preserve existing Code-mode behavior.
+   */
+  useAgentTools?: boolean;
+  /**
+   * Optional callback when the agent successfully writes a file via
+   * write_strategy. Forge uses this to auto-refresh the preview pane.
+   */
+  onAgentWroteFile?: (relPath: string) => void;
+}
+
+interface UiToolCall {
+  tool_use_id: string;
+  name: string;
+  input_summary: string;
+  status: "running" | "success" | "error";
+  result_summary?: string;
 }
 
 interface UiMessage {
   role: "user" | "assistant";
   content: string;
+  /** Tool calls made during this assistant turn (agent mode only). */
+  toolCalls?: UiToolCall[];
   /** Code blocks extracted from the assistant message, if any. */
   codeBlocks?: string[];
   /** Last call's token counts — only on the most recent assistant turn. */
   usage?: { in: number; out: number };
 }
 
-export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) {
+export default function ChatPanel({
+  activePath,
+  onInsertCode,
+  useAgentTools = false,
+  onAgentWroteFile,
+}: ChatPanelProps) {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -106,12 +134,17 @@ export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) 
     let unlistenChunk: (() => void) | null = null;
     let unlistenDone: (() => void) | null = null;
     let unlistenError: (() => void) | null = null;
+    let unlistenToolCall: (() => void) | null = null;
+    let unlistenToolResult: (() => void) | null = null;
 
     const teardown = () => {
       try { unlistenChunk?.(); } catch {}
       try { unlistenDone?.(); } catch {}
       try { unlistenError?.(); } catch {}
+      try { unlistenToolCall?.(); } catch {}
+      try { unlistenToolResult?.(); } catch {}
       unlistenChunk = unlistenDone = unlistenError = null;
+      unlistenToolCall = unlistenToolResult = null;
     };
 
     const onChunk = (payload: ChatChunkPayload) => {
@@ -162,6 +195,81 @@ export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) 
       teardown();
     };
 
+    // Tool-event handlers (only relevant in agent mode, but cheap
+    // to register either way — they just never fire for plain chat).
+    const onToolCall = (payload: ChatToolCallPayload) => {
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (last.role !== "assistant") return prev;
+        const newCall: UiToolCall = {
+          tool_use_id: payload.tool_use_id,
+          name: payload.name,
+          input_summary: payload.input_summary,
+          status: "running",
+        };
+        next[next.length - 1] = {
+          ...last,
+          toolCalls: [...(last.toolCalls ?? []), newCall],
+        };
+        return next;
+      });
+    };
+
+    const onToolResult = (payload: ChatToolResultPayload) => {
+      // Side effect: if the agent successfully wrote a file, tell
+      // the parent so it can refresh the preview pane + (optionally)
+      // open the file. Done via the prop so this component doesn't
+      // need to know about Forge's state shape.
+      if (
+        payload.ok &&
+        payload.name === "write_strategy" &&
+        onAgentWroteFile
+      ) {
+        // The rel_path lives in input_summary because of how the
+        // Rust summarize_tool_input is written for write_strategy.
+        // (Same field the activity card title shows.)
+        // Walk the toolCalls list to find the matching tool_use_id
+        // and grab its input_summary deterministically rather than
+        // relying on the prior-render's contents.
+        setMessages((prev) => {
+          if (prev.length === 0) return prev;
+          const last = prev[prev.length - 1];
+          const call = last.toolCalls?.find(
+            (c) => c.tool_use_id === payload.tool_use_id,
+          );
+          if (call?.input_summary) {
+            // setMessages callback should be pure but onAgentWroteFile
+            // is a stable callback from the parent — calling here is
+            // safe + ensures it fires once per result.
+            setTimeout(() => onAgentWroteFile(call.input_summary), 0);
+          }
+          return prev;
+        });
+      }
+
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (last.role !== "assistant" || !last.toolCalls) return prev;
+        next[next.length - 1] = {
+          ...last,
+          toolCalls: last.toolCalls.map((c) =>
+            c.tool_use_id === payload.tool_use_id
+              ? {
+                  ...c,
+                  status: payload.ok ? "success" : "error",
+                  result_summary: payload.result_summary,
+                }
+              : c,
+          ),
+        };
+        return next;
+      });
+    };
+
     try {
       unlistenChunk = await onEvent<ChatChunkPayload>(
         "forge-chat-chunk",
@@ -175,7 +283,23 @@ export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) 
         "forge-chat-error",
         onError,
       );
-      await cmd.forgeChatStream(apiMessages);
+      unlistenToolCall = await onEvent<ChatToolCallPayload>(
+        "forge-chat-tool-call",
+        onToolCall,
+      );
+      unlistenToolResult = await onEvent<ChatToolResultPayload>(
+        "forge-chat-tool-result",
+        onToolResult,
+      );
+
+      // Mode-aware dispatch. Agent mode runs the tool-use loop;
+      // plain chat just streams text. Cancel works for both via
+      // the shared CHAT_CANCEL handle on the Rust side.
+      if (useAgentTools) {
+        await cmd.forgeAgentRun(apiMessages);
+      } else {
+        await cmd.forgeChatStream(apiMessages);
+      }
     } catch (err) {
       // Synchronous failure from the invoke (e.g. no API key set
       // raises a typed Err on the Rust side before any events fire).
@@ -347,16 +471,30 @@ function MessageBubble({
 }) {
   const isUser = message.role === "user";
   const blocks = message.codeBlocks ?? [];
+  const tools = message.toolCalls ?? [];
+  const hasContent = message.content.trim().length > 0;
 
   return (
     <div className={`forge-msg ${isUser ? "user" : "assistant"}`}>
       <div className="forge-msg-role">{isUser ? "you" : "claude"}</div>
+      {/* Tool calls render above the text so the user sees the
+       *  agent's actions in the order they happened. Each renders
+       *  as a small activity card with status pill. */}
+      {tools.length > 0 && (
+        <div className="forge-msg-tools">
+          {tools.map((t) => (
+            <ToolCallCard key={t.tool_use_id} call={t} />
+          ))}
+        </div>
+      )}
       <div className="forge-msg-content">
-        {streaming ? (
-          <div className="muted">thinking…</div>
-        ) : (
+        {streaming && !hasContent ? (
+          <div className="muted">
+            {tools.length > 0 ? "working…" : "thinking…"}
+          </div>
+        ) : hasContent ? (
           renderContent(message.content, blocks, onInsertCode)
-        )}
+        ) : null}
       </div>
       {message.usage && (
         <div className="forge-msg-meta mono">
@@ -366,6 +504,41 @@ function MessageBubble({
     </div>
   );
 }
+
+function ToolCallCard({ call }: { call: UiToolCall }) {
+  const friendlyName = TOOL_LABELS[call.name] ?? call.name;
+  const icon =
+    call.status === "running" ? "○" : call.status === "success" ? "✓" : "✗";
+  return (
+    <div className={`forge-tool-card status-${call.status}`}>
+      <div className="forge-tool-card-head">
+        <span className="forge-tool-icon">{icon}</span>
+        <span className="forge-tool-name">{friendlyName}</span>
+        {call.input_summary && (
+          <span className="forge-tool-input mono" title={call.input_summary}>
+            {call.input_summary}
+          </span>
+        )}
+      </div>
+      {call.result_summary && (
+        <div className="forge-tool-result mono">{call.result_summary}</div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Human-readable labels for each tool. Keep in sync with the Rust
+ * agent_tool_catalog() — adding a tool there means adding its
+ * label here.
+ */
+const TOOL_LABELS: Record<string, string> = {
+  list_strategies: "List strategies",
+  read_strategy: "Read",
+  write_strategy: "Write",
+  list_templates: "List templates",
+  run_backtest: "Run backtest",
+};
 
 /**
  * Render assistant text with fenced ```python blocks pulled out as

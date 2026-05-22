@@ -157,6 +157,17 @@ export const cmd = {
   /** Cancel the currently-running stream. No-op if nothing is streaming. */
   forgeChatCancel: () => invoke<void>("forge_chat_cancel"),
 
+  /**
+   * Run the full agent loop (Anthropic tool-use). Returns immediately;
+   * progress arrives via the same chunk/done/error events as the plain
+   * chat stream, PLUS two extra events:
+   *   - forge-chat-tool-call   when Claude requests a tool
+   *   - forge-chat-tool-result when the tool finishes (success or error)
+   * Cancels are honored between iterations via forgeChatCancel.
+   */
+  forgeAgentRun: (messages: ChatMessage[]) =>
+    invoke<void>("forge_agent_run", { messages }),
+
   // Model selection
   forgeAvailableModels: () => invoke<string[]>("forge_available_models"),
   forgeGetModel: () => invoke<string>("forge_get_model"),
@@ -233,6 +244,26 @@ export interface ChatDonePayload {
 
 export interface ChatErrorPayload {
   message: string;
+}
+
+/** Emitted at the start of an agent tool call. */
+export interface ChatToolCallPayload {
+  tool_use_id: string;
+  name: string;
+  /** Short label (e.g. the rel_path for write_strategy) for the UI card title. */
+  input_summary: string;
+  /** Full input args as JSON — UI can show in a disclosure. */
+  input: unknown;
+}
+
+/** Emitted when an agent tool call finishes (success or error). */
+export interface ChatToolResultPayload {
+  tool_use_id: string;
+  name: string;
+  /** One-line summary of the result. */
+  result_summary: string;
+  /** False when the tool errored — UI uses this for the pill color. */
+  ok: boolean;
 }
 
 // ── Strategy lifecycle ──────────────────────────────────────────

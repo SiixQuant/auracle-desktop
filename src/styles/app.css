@@ -452,6 +452,88 @@ pre.logs {
   background: var(--bg);
 }
 
+/* ── Agent tool-call cards ──────────────────────────────────── */
+
+.forge-msg-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.forge-tool-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  background: var(--surface);
+  font-size: 12px;
+  transition: border-color 0.15s;
+}
+
+.forge-tool-card.status-running {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.05);
+}
+.forge-tool-card.status-success {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.05);
+}
+.forge-tool-card.status-error {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.forge-tool-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.forge-tool-icon {
+  width: 14px;
+  display: inline-block;
+  font-weight: 700;
+  text-align: center;
+  font-size: 11px;
+}
+.forge-tool-card.status-running .forge-tool-icon {
+  color: var(--warn);
+  animation: forge-tool-spin 1.2s linear infinite;
+}
+.forge-tool-card.status-success .forge-tool-icon { color: var(--ok); }
+.forge-tool-card.status-error   .forge-tool-icon { color: var(--err); }
+
+@keyframes forge-tool-spin {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+.forge-tool-name {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.forge-tool-input {
+  color: var(--fg-dim);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.forge-tool-result {
+  margin-top: 4px;
+  padding-left: 22px;
+  font-size: 11px;
+  color: var(--fg-dim);
+  word-break: break-word;
+}
+.forge-tool-card.status-error .forge-tool-result {
+  color: var(--err);
+}
+
 .forge-col {
   border-right: 1px solid var(--line);
   min-width: 0;

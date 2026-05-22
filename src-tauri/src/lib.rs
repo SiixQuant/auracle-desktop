@@ -291,6 +291,7 @@ pub fn run() {
             forge_cmd::forge_chat,
             forge_cmd::forge_chat_stream,
             forge_cmd::forge_chat_cancel,
+            forge_cmd::forge_agent_run,
             forge_cmd::forge_available_models,
             forge_cmd::forge_get_model,
             forge_cmd::forge_set_model,

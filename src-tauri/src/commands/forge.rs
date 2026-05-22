@@ -1371,3 +1371,558 @@ async fn run_stream(
     );
     Ok(())
 }
+
+// ── Agent loop with tool use (Phase 5b) ────────────────────────
+//
+// Anthropic's Messages API supports tool use: send a `tools` array
+// in the request body, Claude can respond with `tool_use` content
+// blocks instead of (or alongside) text. The host executes the
+// tool, sends the result back as a `tool_result` block in the next
+// turn, and Claude continues until it returns plain text with
+// `stop_reason == "end_turn"`.
+//
+// We expose 5 tools for Phase 5b:
+//   * list_strategies   — enumerate the strategy directory
+//   * read_strategy     — read a file's contents
+//   * write_strategy    — create or overwrite a file
+//   * list_templates    — show available template ids
+//   * run_backtest      — kick off via Houston REST + return run_id
+//
+// Loop guards:
+//   * Max 12 iterations per agent run. Anthropic occasionally goes
+//     into oscillation; capping protects against infinite billing.
+//   * Cancel-check between iterations via the same CHAT_CANCEL
+//     handle the streaming chat uses. UI's Stop button works here too.
+//
+// Non-streaming for simplicity: each iteration is a full
+// request/response. The UI shows tool-call cards via the
+// forge-chat-tool-call + forge-chat-tool-result events as they
+// happen, then the final assistant text appears as one chunk at
+// the end. Phase 5c can add token-level streaming of the final
+// turn if responsiveness becomes an issue.
+
+const MAX_AGENT_ITERATIONS: usize = 12;
+
+#[derive(Serialize, Clone)]
+struct ChatToolCallPayload<'a> {
+    /// Stable id Claude assigned to this tool_use block; used to
+    /// correlate with the matching result event.
+    tool_use_id: &'a str,
+    name: &'a str,
+    /// Short, human-readable summary of the input args (e.g.
+    /// `momentum.py` for write_strategy). Falls back to a JSON
+    /// preview when no obvious single field stands out.
+    input_summary: String,
+    /// Full input as parsed JSON — frontend can render it in a
+    /// disclosure for power users without re-fetching.
+    input: serde_json::Value,
+}
+
+#[derive(Serialize, Clone)]
+struct ChatToolResultPayload<'a> {
+    tool_use_id: &'a str,
+    name: &'a str,
+    /// Brief one-line summary of the result. Frontend renders this
+    /// as the activity-card subline.
+    result_summary: String,
+    /// Whether the tool succeeded or errored. UI uses this for the
+    /// pill color (green vs red).
+    ok: bool,
+}
+
+/// Static tool catalog. Serialized into the Anthropic request body
+/// on every agent_loop call.
+fn agent_tool_catalog() -> serde_json::Value {
+    serde_json::json!([
+        {
+            "name": "list_strategies",
+            "description": "List every strategy file in the user's strategies directory. \
+                            Returns each file's rel_path (forward-slash separated relative \
+                            to the strategies root), kind (py or notebook), size in bytes, \
+                            and last-modified timestamp. Use this to discover what already \
+                            exists before creating new files.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "read_strategy",
+            "description": "Read the full contents of a strategy file. Use this to inspect \
+                            existing code before modifying it.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "rel_path": {
+                        "type": "string",
+                        "description": "Path relative to the strategies directory, e.g. \
+                                       'momentum.py' or 'drafts/test.py'."
+                    }
+                },
+                "required": ["rel_path"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "write_strategy",
+            "description": "Create a new strategy file or overwrite an existing one with the \
+                            given contents. The file path must end in .py or .ipynb. The \
+                            strategies sandbox enforces no-parent-dir escape so paths like \
+                            '../../etc/passwd' are rejected.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "rel_path": {
+                        "type": "string",
+                        "description": "Where to write the file, e.g. 'rsi_test.py' or \
+                                       'drafts/momentum_v2.py'. Subdirectories are auto-created."
+                    },
+                    "contents": {
+                        "type": "string",
+                        "description": "The complete file contents. Always import from \
+                                       auracle.backtest, define a Strategy subclass, end with \
+                                       a run_backtest call so the user can execute the cell."
+                    }
+                },
+                "required": ["rel_path", "contents"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "list_templates",
+            "description": "List the built-in strategy templates available. Useful when you \
+                            want to base a new strategy on a known pattern (MA crossover, RSI \
+                            mean-reversion, momentum) instead of writing from scratch.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "run_backtest",
+            "description": "Kick off a backtest for the given strategy via Houston's REST API. \
+                            Returns the run_id when Houston is online. When Houston is offline \
+                            or doesn't expose the endpoint yet, returns an explanatory error — \
+                            you should then tell the user to run the backtest manually from \
+                            the Houston UI (URL is included in the error message).",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "rel_path": {
+                        "type": "string",
+                        "description": "Strategy file to backtest, same format as for read/write."
+                    }
+                },
+                "required": ["rel_path"],
+                "additionalProperties": false
+            }
+        }
+    ])
+}
+
+/// Dispatch a tool call by name. Returns (result_string, ok).
+/// result_string is sent back to Claude as the tool_result content;
+/// ok controls the UI pill color.
+async fn execute_agent_tool(
+    app: &AppHandle,
+    name: &str,
+    input: &serde_json::Value,
+) -> (String, bool) {
+    match name {
+        "list_strategies" => match forge_list_strategies(app.clone()).await {
+            Ok(files) => (
+                serde_json::to_string(&files).unwrap_or_else(|_| "[]".to_string()),
+                true,
+            ),
+            Err(e) => (format!("error: {e}"), false),
+        },
+        "read_strategy" => {
+            let Some(rel_path) = input.get("rel_path").and_then(|v| v.as_str()) else {
+                return ("error: rel_path required".to_string(), false);
+            };
+            match forge_read_file(app.clone(), rel_path.to_string()).await {
+                Ok(s) => (s, true),
+                Err(e) => (format!("error: {e}"), false),
+            }
+        }
+        "write_strategy" => {
+            let Some(rel_path) = input.get("rel_path").and_then(|v| v.as_str()) else {
+                return ("error: rel_path required".to_string(), false);
+            };
+            let Some(contents) = input.get("contents").and_then(|v| v.as_str()) else {
+                return ("error: contents required".to_string(), false);
+            };
+            // write_strategy via the agent intentionally allows
+            // overwriting (different policy from forge_new_file's
+            // create-only) — the agent is the user's delegate and
+            // they expect "write this" to mean "save it, replacing
+            // whatever is there." We go through forge_write_file
+            // (not forge_new_file) for exactly this reason.
+            match forge_write_file(
+                app.clone(),
+                rel_path.to_string(),
+                contents.to_string(),
+            )
+            .await
+            {
+                Ok(()) => (
+                    format!("wrote {} bytes to {rel_path}", contents.len()),
+                    true,
+                ),
+                Err(e) => (format!("error: {e}"), false),
+            }
+        }
+        "list_templates" => match forge_available_templates().await {
+            Ok(list) => (
+                serde_json::to_string(&list).unwrap_or_else(|_| "[]".to_string()),
+                true,
+            ),
+            Err(e) => (format!("error: {e}"), false),
+        },
+        "run_backtest" => {
+            let Some(rel_path) = input.get("rel_path").and_then(|v| v.as_str()) else {
+                return ("error: rel_path required".to_string(), false);
+            };
+            run_backtest_via_houston(rel_path).await
+        }
+        _ => (format!("unknown tool: {name}"), false),
+    }
+}
+
+/// POST /api/forge/strategies/{rel_path}/backtest — fail-open path
+/// when Houston isn't reachable or hasn't implemented the endpoint
+/// yet. Returns a clear instruction for the agent to relay to the
+/// user in that case (so the conversation stays useful even with
+/// the stack offline).
+async fn run_backtest_via_houston(rel_path: &str) -> (String, bool) {
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return (format!("http client setup failed: {e}"), false),
+    };
+
+    let url = format!(
+        "{HOUSTON_BASE_URL}/api/forge/strategies/{}/backtest",
+        urlencoding::encode(rel_path)
+    );
+    let manual_url = format!(
+        "{HOUSTON_BASE_URL}/ui/backtests/new?strategy={}",
+        urlencoding::encode(rel_path)
+    );
+
+    match client.post(&url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let body = resp.text().await.unwrap_or_default();
+            (format!("backtest queued: {body}"), true)
+        }
+        Ok(resp) => (
+            format!(
+                "houston rejected the request (HTTP {}). The strategy is saved; the user can \
+                 run a backtest manually at: {manual_url}",
+                resp.status()
+            ),
+            false,
+        ),
+        Err(_) => (
+            format!(
+                "houston is offline or the backtest endpoint is not implemented yet. The \
+                 strategy is saved; tell the user to start the Auracle stack and visit: \
+                 {manual_url}"
+            ),
+            false,
+        ),
+    }
+}
+
+/// Short human-readable summary of a tool's input. Used for the
+/// activity-card title in the UI.
+fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
+    match name {
+        "list_strategies" | "list_templates" => String::new(),
+        "read_strategy" | "write_strategy" | "run_backtest" => input
+            .get("rel_path")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| "?".to_string()),
+        _ => input.to_string(),
+    }
+}
+
+/// Short summary of a tool result. Capped at ~120 chars so the
+/// activity-card subline doesn't dominate the chat.
+fn summarize_tool_result(result: &str, ok: bool) -> String {
+    if !ok {
+        return result.chars().take(180).collect();
+    }
+    // Heuristic: if the result is JSON, count items or show field
+    // names; otherwise truncate. The agent often returns JSON for
+    // list_* tools.
+    if result.trim().starts_with('[') {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(result) {
+            if let Some(arr) = v.as_array() {
+                return format!("{} items", arr.len());
+            }
+        }
+    }
+    let single_line: String = result.chars().take(120).collect();
+    single_line.replace('\n', " ")
+}
+
+#[tauri::command]
+pub async fn forge_agent_run(
+    app: AppHandle,
+    messages: Vec<ChatMessage>,
+) -> Result<(), String> {
+    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
+        .map_err(to_error_string)?;
+    let api_key = match entry.get_password() {
+        Ok(v) => v,
+        Err(keyring::Error::NoEntry) => {
+            return Err(
+                "Anthropic API key not set — open Settings → Forge and paste your key (sk-ant-…)"
+                    .to_string(),
+            );
+        }
+        Err(e) => return Err(to_error_string(e)),
+    };
+
+    for m in &messages {
+        if m.role != "user" && m.role != "assistant" {
+            return Err(format!(
+                "invalid chat role {:?} — must be 'user' or 'assistant'",
+                m.role
+            ));
+        }
+    }
+    if messages.is_empty() {
+        return Err("empty chat — provide at least one user message".to_string());
+    }
+
+    // Drain any stale cancel permit, same as forge_chat_stream.
+    let cancel = CHAT_CANCEL.clone();
+    cancel.notify_waiters();
+    let _drain = cancel.notified();
+
+    let app2 = app.clone();
+    let cancel_for_task = cancel.clone();
+    tokio::spawn(async move {
+        if let Err(e) =
+            run_agent_loop(app2.clone(), api_key, messages, cancel_for_task).await
+        {
+            let _ = app2.emit("forge-chat-error", ChatErrorPayload { message: &e });
+        }
+    });
+    Ok(())
+}
+
+async fn run_agent_loop(
+    app: AppHandle,
+    api_key: String,
+    initial_messages: Vec<ChatMessage>,
+    cancel: Arc<Notify>,
+) -> Result<(), String> {
+    let model = resolve_model(&app);
+    let tools = agent_tool_catalog();
+
+    // Anthropic messages history. Each item is a JSON object so we
+    // can store both plain strings (early turns) AND structured
+    // content blocks (later turns with tool_use / tool_result).
+    let mut messages: Vec<serde_json::Value> = initial_messages
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "role": m.role,
+                "content": m.content,
+            })
+        })
+        .collect();
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(180))
+        .build()
+        .map_err(to_error_string)?;
+
+    let mut total_in: u32 = 0;
+    let mut total_out: u32 = 0;
+    let mut final_text = String::new();
+    let mut response_model = model.clone();
+
+    for iteration in 0..MAX_AGENT_ITERATIONS {
+        // Cancel between iterations — gives the user a deterministic
+        // stop point even during a multi-turn agent run.
+        if iteration > 0 {
+            // tokio::select can't observe a Notify that already
+            // happened; we use try_notify-equivalent semantics by
+            // polling with a zero-duration timeout.
+            tokio::select! {
+                _ = cancel.notified() => {
+                    let _ = app.emit("forge-chat-done", ChatDonePayload {
+                        model: &response_model,
+                        full_text: &final_text,
+                        usage_in: total_in,
+                        usage_out: total_out,
+                    });
+                    return Ok(());
+                }
+                _ = tokio::time::sleep(std::time::Duration::from_millis(1)) => {}
+            }
+        }
+
+        let body = serde_json::json!({
+            "model": model,
+            "max_tokens": 4096,
+            "system": SYSTEM_PROMPT,
+            "tools": tools,
+            "messages": messages,
+        });
+
+        let resp = client
+            .post(ANTHROPIC_API_URL)
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("network error: {e}"))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_else(|_| "(no body)".into());
+            return Err(format!("Anthropic API {status}: {text}"));
+        }
+
+        let parsed: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("decode failed: {e}"))?;
+
+        if let Some(m) = parsed.get("model").and_then(|v| v.as_str()) {
+            response_model = m.to_string();
+        }
+        if let Some(u) = parsed.get("usage") {
+            if let Some(n) = u.get("input_tokens").and_then(|v| v.as_u64()) {
+                total_in += n as u32;
+            }
+            if let Some(n) = u.get("output_tokens").and_then(|v| v.as_u64()) {
+                total_out += n as u32;
+            }
+        }
+
+        let stop_reason = parsed.get("stop_reason").and_then(|v| v.as_str()).unwrap_or("");
+        let content = parsed
+            .get("content")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        // Collect any text blocks into final_text (the agent's
+        // user-facing message) + dispatch any tool_use blocks.
+        let mut tool_results: Vec<serde_json::Value> = Vec::new();
+        for block in &content {
+            let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            match block_type {
+                "text" => {
+                    if let Some(t) = block.get("text").and_then(|v| v.as_str()) {
+                        // For non-final turns Claude usually narrates
+                        // what it's about to do; we append everything
+                        // and the UI sees the cumulative final_text
+                        // on done.
+                        if !final_text.is_empty() {
+                            final_text.push_str("\n\n");
+                        }
+                        final_text.push_str(t);
+                    }
+                }
+                "tool_use" => {
+                    let tool_use_id = block
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("toolu_unknown")
+                        .to_string();
+                    let tool_name = block
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let tool_input = block
+                        .get("input")
+                        .cloned()
+                        .unwrap_or(serde_json::json!({}));
+
+                    let input_summary = summarize_tool_input(&tool_name, &tool_input);
+                    let _ = app.emit(
+                        "forge-chat-tool-call",
+                        ChatToolCallPayload {
+                            tool_use_id: &tool_use_id,
+                            name: &tool_name,
+                            input_summary,
+                            input: tool_input.clone(),
+                        },
+                    );
+
+                    let (result_str, ok) =
+                        execute_agent_tool(&app, &tool_name, &tool_input).await;
+                    let result_summary = summarize_tool_result(&result_str, ok);
+
+                    let _ = app.emit(
+                        "forge-chat-tool-result",
+                        ChatToolResultPayload {
+                            tool_use_id: &tool_use_id,
+                            name: &tool_name,
+                            result_summary,
+                            ok,
+                        },
+                    );
+
+                    tool_results.push(serde_json::json!({
+                        "type": "tool_result",
+                        "tool_use_id": tool_use_id,
+                        "content": result_str,
+                        "is_error": !ok,
+                    }));
+                }
+                _ => {} // ignore unknown block types
+            }
+        }
+
+        // If Claude stopped for a non-tool reason OR returned no
+        // tool_use blocks, we're done.
+        if stop_reason != "tool_use" || tool_results.is_empty() {
+            let _ = app.emit(
+                "forge-chat-done",
+                ChatDonePayload {
+                    model: &response_model,
+                    full_text: &final_text,
+                    usage_in: total_in,
+                    usage_out: total_out,
+                },
+            );
+            return Ok(());
+        }
+
+        // Otherwise: append the assistant turn (with its tool_use
+        // blocks) + a synthetic user turn carrying the tool_results,
+        // then loop. Anthropic's tool-use protocol requires the
+        // tool_results to come from the "user" role.
+        messages.push(serde_json::json!({
+            "role": "assistant",
+            "content": content,
+        }));
+        messages.push(serde_json::json!({
+            "role": "user",
+            "content": tool_results,
+        }));
+    }
+
+    // Exhausted max iterations without a final turn.
+    Err(format!(
+        "agent loop hit the {MAX_AGENT_ITERATIONS}-iteration cap without finishing. \
+         Partial result: {} tokens out.",
+        total_out
+    ))
+}

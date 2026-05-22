@@ -122,6 +122,17 @@ export default function Forge() {
           previewRefreshKey={previewRefreshKey}
           pendingCode={pendingCode}
           setPendingCode={setPendingCode}
+          onAgentWroteFile={(relPath) => {
+            // Open the file in the preview (Source tab will load
+            // its contents) + bump the preview refresh so an
+            // existing-file overwrite re-fetches.
+            setActivePath(relPath);
+            setPreviewRefreshKey((k) => k + 1);
+            // Also refresh strategy states from Houston so any
+            // newly-created file picks up the right lifecycle pill
+            // on the next mode-switch to Code.
+            setTreeRefreshKey((k) => k + 1);
+          }}
         />
       ) : (
         <div className="forge-shell">
