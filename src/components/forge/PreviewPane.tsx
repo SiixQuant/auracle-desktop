@@ -24,6 +24,7 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useState } from "react";
 
+import WidgetRenderer from "@/components/forge/dashboard/WidgetRenderer";
 import {
   cmd,
   onEvent,
@@ -350,48 +351,125 @@ function DashboardTab({
   );
 }
 
-// Phase 0 placeholder. Phase 1 replaces this with the real
-// WidgetRenderer — kpi_grid / data_table / line_chart / etc.
+// Renders a dashboard's widgets via WidgetRenderer. Layout modes:
+//
+//   "grid" — CSS Grid using each widget's spec.grid.{x,y,w,h}.
+//            Auto-flow falls back if a widget omits its grid coords.
+//   "rows" — Vertically stacked, each widget full-width.
+//   "tabs" — One tab per widget (each widget is a separate page).
+//
+// "refresh nonce" wires a single "Refresh all" button into every
+// child widget's effect deps so the user can force a fresh fetch
+// without waiting for the next interval tick.
 function DashboardView({ spec }: { spec: Dashboard }) {
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [activeTab, setActiveTab] = useState(0);
+
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>{spec.title}</h2>
-        <div className="muted mono" style={{ fontSize: 11, marginTop: 4 }}>
-          {spec.widgets.length} widget{spec.widgets.length === 1 ? "" : "s"} ·
-          refreshing every {spec.refresh_interval_seconds}s · layout: {spec.layout}
-        </div>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div
-        className="muted"
         style={{
-          padding: 12,
-          background: "var(--bg-alt)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          marginBottom: 12,
-          fontSize: 12,
+          padding: "10px 16px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
-        Widget rendering lands in Phase 1 — for now this is the spec the
-        agent saved. The dashboard JSON below describes what the rendered
-        view will look like.
+        <div>
+          <h2 style={{ margin: 0, fontSize: 16 }}>{spec.title}</h2>
+          <div className="muted mono" style={{ fontSize: 11, marginTop: 2 }}>
+            {spec.widgets.length} widget{spec.widgets.length === 1 ? "" : "s"} ·
+            refresh {spec.refresh_interval_seconds}s · layout {spec.layout}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => setRefreshNonce((n) => n + 1)}
+          style={{ fontSize: 12 }}
+        >
+          Refresh all
+        </button>
       </div>
-      <pre
-        className="mono"
-        style={{
-          margin: 0,
-          padding: 12,
-          background: "var(--bg-alt)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          fontSize: 11,
-          lineHeight: 1.5,
-          overflow: "auto",
-        }}
-      >
-        {JSON.stringify(spec, null, 2)}
-      </pre>
+
+      {spec.layout === "tabs" && spec.widgets.length > 0 ? (
+        <>
+          <div
+            style={{
+              display: "flex",
+              borderBottom: "1px solid var(--border)",
+              overflowX: "auto",
+            }}
+          >
+            {spec.widgets.map((w, i) => (
+              <button
+                key={w.id}
+                type="button"
+                onClick={() => setActiveTab(i)}
+                style={{
+                  padding: "8px 14px",
+                  background:
+                    activeTab === i ? "var(--bg-alt)" : "transparent",
+                  border: "none",
+                  borderBottom:
+                    activeTab === i
+                      ? "2px solid var(--accent)"
+                      : "2px solid transparent",
+                  color: activeTab === i ? "var(--fg)" : "var(--fg-dim)",
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                {w.title || w.type}
+              </button>
+            ))}
+          </div>
+          <div style={{ flex: 1, padding: 12, overflow: "auto" }}>
+            {spec.widgets[activeTab] && (
+              <WidgetRenderer
+                widget={spec.widgets[activeTab]!}
+                refreshNonce={refreshNonce}
+                refreshIntervalSeconds={spec.refresh_interval_seconds}
+              />
+            )}
+          </div>
+        </>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            overflow: "auto",
+            padding: 12,
+            display: spec.layout === "grid" ? "grid" : "flex",
+            flexDirection: spec.layout === "rows" ? "column" : undefined,
+            gap: 12,
+            gridTemplateColumns:
+              spec.layout === "grid" ? "repeat(12, 1fr)" : undefined,
+            gridAutoRows: spec.layout === "grid" ? "minmax(80px, auto)" : undefined,
+            alignContent: spec.layout === "grid" ? "start" : undefined,
+          }}
+        >
+          {spec.widgets.map((w) => {
+            const gridStyle =
+              spec.layout === "grid" && w.grid
+                ? {
+                    gridColumn: `${w.grid.x + 1} / span ${w.grid.w}`,
+                    gridRow: `${w.grid.y + 1} / span ${w.grid.h}`,
+                  }
+                : undefined;
+            return (
+              <div key={w.id} style={gridStyle}>
+                <WidgetRenderer
+                  widget={w}
+                  refreshNonce={refreshNonce}
+                  refreshIntervalSeconds={spec.refresh_interval_seconds}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

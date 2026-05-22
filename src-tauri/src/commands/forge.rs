@@ -1750,6 +1750,64 @@ fn agent_tool_catalog() -> serde_json::Value {
     ])
 }
 
+/// One-shot tool invocation surface for the frontend.
+///
+/// Dashboards need to fetch their data on their own refresh schedule
+/// without going through the agent loop. Rather than reimplementing
+/// every broker / Houston call as a separate Tauri command, we expose
+/// the same dispatcher the agent uses. The frontend hits this with
+/// `forgeInvokeTool(name, args)`, gets back the same `(result, ok)`
+/// shape Claude sees, and renders accordingly.
+///
+/// Trust model: the frontend already runs in the same trust boundary
+/// as the agent (both originate from the user). The dispatcher's
+/// input validation (slug shapes, ticker whitelist, etc.) does the
+/// real defensive work; this command is just a typed entry point.
+///
+/// Returns `{ result: String, ok: bool }`. `result` is the same
+/// string Claude would receive as tool_result content.
+#[derive(Debug, Serialize)]
+pub struct ToolInvocationResult {
+    pub result: String,
+    pub ok: bool,
+}
+
+#[tauri::command]
+pub async fn forge_invoke_tool(
+    app: AppHandle,
+    name: String,
+    args: serde_json::Value,
+) -> Result<ToolInvocationResult, String> {
+    // Soft guard: only allow tools that are advertised to the agent
+    // OR explicitly opted in for dashboard use. Today every tool the
+    // agent has is safe for dashboards too; if a future tool is
+    // side-effecting (e.g. place_order), it should NOT be invokable
+    // from a dashboard refresh loop. Keep this allow-list narrow.
+    const DASHBOARD_INVOKABLE: &[&str] = &[
+        // File ops
+        "list_strategies",
+        "read_strategy",
+        "list_templates",
+        "list_dashboards",
+        "read_dashboard",
+        // Broker / data read tools (dispatch arms exist; safe even
+        // when not advertised because they only ever GET).
+        "get_account_summary",
+        "get_open_positions",
+        "get_recent_fills",
+        "list_connected_brokers",
+        "list_universes",
+        "get_historical_bars",
+    ];
+    if !DASHBOARD_INVOKABLE.contains(&name.as_str()) {
+        return Err(format!(
+            "tool {name:?} is not invokable from the dashboard refresh path"
+        ));
+    }
+    let (result, ok) = execute_agent_tool(&app, &name, &args).await;
+    Ok(ToolInvocationResult { result, ok })
+}
+
 /// Dispatch a tool call by name. Returns (result_string, ok).
 /// result_string is sent back to Claude as the tool_result content;
 /// ok controls the UI pill color.

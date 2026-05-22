@@ -339,6 +339,10 @@ pub fn run() {
             dash_cmd::forge_save_dashboard,
             dash_cmd::forge_delete_dashboard,
             dash_cmd::forge_open_dashboard,
+            // One-shot agent-tool invocation for the dashboard refresh
+            // path. Allow-listed in the command itself; safe for
+            // read-only tools only.
+            forge_cmd::forge_invoke_tool,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

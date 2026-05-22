@@ -212,7 +212,17 @@ export const cmd = {
     invoke<void>("forge_delete_dashboard", { slug }),
   forgeOpenDashboard: (slug: string) =>
     invoke<void>("forge_open_dashboard", { slug }),
+  /** One-shot dispatch of an agent tool from the frontend (used by
+   *  the dashboard widget refresh loop). Returns the same string the
+   *  agent would see as tool_result content. */
+  forgeInvokeTool: (name: string, args: Record<string, unknown>) =>
+    invoke<ToolInvocationResult>("forge_invoke_tool", { name, args }),
 };
+
+export interface ToolInvocationResult {
+  result: string;
+  ok: boolean;
+}
 
 // ── Forge types ─────────────────────────────────────────────────
 
