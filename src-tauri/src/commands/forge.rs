@@ -767,17 +767,37 @@ pub fn anthropic_key_set(app: AppHandle, value: String) -> Result<(), String> {
         );
     }
 
-    // secret_store::put encapsulates insert + Stronghold.save() and
-    // returns Err on every failure mode the old verify-after-save
-    // dance was protecting against (disk-full, permission-denied,
-    // encryption failure). The previous verify path was a paranoia
-    // hold-over from the keyring era — keyring could silently fail
-    // set, so we read it back to make sure. Stronghold's API contract
-    // is "put returned Ok ⇒ value is in the snapshot," and the
-    // cached in-memory client makes that fact trivially true on the
-    // next get. Re-locking the global vault mutex just to verify the
-    // same in-memory map was free overhead on every save.
-    secret_store::put(&app, VAULT_KEY_ANTHROPIC, &v)
+    secret_store::put(&app, VAULT_KEY_ANTHROPIC, &v)?;
+
+    // Verify-after-save. Restored after the "save succeeds but key
+    // not readable" regression: an earlier commit dropped this
+    // assuming Stronghold's `put returned Ok ⇒ value is in the snapshot`
+    // contract was sufficient. It is — but a SEPARATE bug
+    // (load_client returning ClientAlreadyLoaded after caching the
+    // vault, then create_client overwriting the in-memory store with
+    // a fresh empty one) was silently destroying the just-saved
+    // value, and removing the verify is what let that ship to the
+    // user. The cascade fix in secret_store::open_client makes the
+    // destroy-on-overwrite path impossible, but verify-after-save
+    // catches OTHER failure modes too — filesystem permission glitches,
+    // disk-full mid-write, snapshot file collisions between processes —
+    // and now costs ~1ms (cached vault + lowered work factor) instead
+    // of seconds. Cheap insurance against any future cache or client-
+    // lifecycle regression that would otherwise reach a user.
+    match secret_store::get(&app, VAULT_KEY_ANTHROPIC) {
+        Ok(Some(ref stored)) if stored == &v => Ok(()),
+        Ok(_) => Err(
+            "Saved but the vault returned a different value when re-read. \
+             This usually means a filesystem permission or disk-full issue. \
+             Workaround: set ANTHROPIC_API_KEY in your shell / .env — \
+             Forge reads the env var first."
+                .to_string(),
+        ),
+        Err(e) => Err(format!(
+            "Saved but vault verify-read failed: {e}. \
+             Workaround: set ANTHROPIC_API_KEY in your shell / .env."
+        )),
+    }
 }
 
 #[tauri::command]

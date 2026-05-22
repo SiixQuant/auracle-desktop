@@ -40,6 +40,18 @@ tauri-plugin-store = "2"        # persistent settings (auto-start, telemetry opt
 # derived password. See secret_store.rs for the threat model + why
 # we picked this over keyring crate.
 tauri-plugin-stronghold = "2"
+# Direct dep on iota_stronghold so secret_store.rs can call
+# `engine::snapshot::try_set_encrypt_work_factor(0)` at startup.
+# The plugin re-exports a thin wrapper but not the snapshot module;
+# we need the inner crate to disable scrypt key-strengthening on
+# snapshot writes. Safe to disable because our snapshot password is
+# a 256-bit SHA-256-derived key, not a user-typed weak password —
+# scrypt strengthening only buys security on the latter (and on
+# slow hardware it was costing 1–40s per save). Mirrors what
+# iota_stronghold's own test suite does. Pin to the same version
+# tauri-plugin-stronghold 2.3.x picks transitively so we share one
+# copy of the crate (no duplicate symbols, no version skew).
+iota_stronghold = "2.1"
 
 # Async runtime. Tauri 2 ships its own tokio integration but we keep
 # tokio explicit for the long-running healthcheck poll.

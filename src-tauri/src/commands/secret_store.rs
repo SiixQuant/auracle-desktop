@@ -59,6 +59,7 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use iota_stronghold::Client;
 use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
@@ -104,6 +105,42 @@ static VAULT: Lazy<Mutex<Option<Stronghold>>> = Lazy::new(|| Mutex::new(None));
 /// on macOS). Once per process is enough.
 static CACHED_PASSWORD: Lazy<Mutex<Option<String>>> =
     Lazy::new(|| Mutex::new(None));
+
+/// Disables scrypt-based key strengthening on snapshot writes.
+///
+/// iota_stronghold's default `ENCRYPT_WORK_FACTOR` is the "recommended
+/// minimum" for protecting **low-entropy passwords** (user-typed
+/// strings). The age crate underneath runs scrypt with parameters
+/// targeting "~1 second" on typical hardware — but scrypt is RAM-
+/// bound and grows exponentially, so on a busy/memory-pressured Mac
+/// the same call routinely hits 30–60 seconds. That's what was
+/// freezing the API-key-save spinner for 40s.
+///
+/// Our snapshot password is **not** a user-typed weak string. It's
+/// SHA-256(machine_uid || install_uuid || version-prefix) — a 256-bit
+/// uniform pseudo-random key with >200 bits of entropy from the
+/// inputs alone. scrypt strengthening on top of that is wasted
+/// compute: an attacker who can guess our SHA-256 output can also
+/// guess any scrypt-strengthened derivative of it. work_factor=0
+/// keeps every other layer (ChaCha20-Poly1305 AEAD, age framing,
+/// machine-derived password) untouched while removing the only
+/// part that wasn't buying us anything.
+///
+/// Mirrors what iota_stronghold's own integration tests do — see
+/// iota_stronghold-2.1.0/src/tests/interface_tests.rs:197.
+///
+/// Note: this only changes ENCRYPTION (saves). DECRYPTION (loads)
+/// always accepts any factor up to RECOMMENDED_MAXIMUM_DECRYPT_WORK_FACTOR,
+/// so existing snapshots written under the old high factor still
+/// open fine on first launch after this fix lands.
+static WORK_FACTOR_LOWERED: Lazy<()> = Lazy::new(|| {
+    if let Err(e) = iota_stronghold::engine::snapshot::try_set_encrypt_work_factor(0) {
+        log::warn!(
+            "secret_store: could not lower stronghold work factor — \
+             vault saves will stay slow. err={e:?}"
+        );
+    }
+});
 
 // ── Password derivation ─────────────────────────────────────────
 
@@ -166,6 +203,11 @@ fn with_vault<F, R>(app: &AppHandle, f: F) -> Result<R, String>
 where
     F: FnOnce(&Stronghold) -> Result<R, String>,
 {
+    // Force the work-factor lazy before we touch Stronghold so the
+    // very first save in a process benefits from the lowered factor.
+    // Cheap (one atomic write the first time, no-op every other call).
+    Lazy::force(&WORK_FACTOR_LOWERED);
+
     let mut guard = VAULT.lock().unwrap();
 
     if guard.is_none() {
@@ -193,6 +235,8 @@ fn with_vault_or_default<F, R>(app: &AppHandle, default: R, f: F) -> Result<R, S
 where
     F: FnOnce(&Stronghold) -> Result<R, String>,
 {
+    Lazy::force(&WORK_FACTOR_LOWERED);
+
     let mut guard = VAULT.lock().unwrap();
 
     if guard.is_none() {
@@ -214,6 +258,54 @@ where
     f(guard.as_ref().unwrap())
 }
 
+/// Resolve the auracle-desktop Stronghold client across all three
+/// possible states it might be in. Critical helper — the naive
+/// "load_client OR create_client" pattern silently destroys data
+/// once we cache the Stronghold instance across calls. See the
+/// long comment below for the gory details.
+///
+/// State table:
+///
+///   | what's where               | get_client | load_client | create |
+///   |----------------------------|------------|-------------|--------|
+///   | First save ever            | Err        | Err         | Ok ✓   |
+///   | Snapshot has it, cold proc | Err        | Ok ✓        | n/a    |
+///   | Already in memory (cached) | Ok ✓       | AlreadyLoaded | DESTROY |
+///
+/// The "DESTROY" cell is the bug. iota_stronghold's `create_client`
+/// does an unconditional `clients.insert(id, Client::default())` —
+/// inserting OVERWRITES any existing client with a fresh empty one,
+/// silently losing every key already saved this session. Combined
+/// with `load_client` returning `ClientAlreadyLoaded` on the second
+/// call (because the cache kept the same Stronghold alive), the
+/// previous put/get code was calling `create_client` on every call
+/// after the first — wiping its own data.
+///
+/// Cascade in priority order:
+///
+///   1. `get_client` — pure in-memory map lookup. Works for every
+///                     call after the first per process, regardless
+///                     of whether the first call was a load or a
+///                     create. Returns the same Client object whose
+///                     Store mutations propagate via Arc'd state.
+///   2. `load_client` — pulls the client out of the just-loaded
+///                      snapshot into the in-memory map. Used on
+///                      the first call of a fresh process when the
+///                      snapshot has data for our client id.
+///   3. `create_client` — only used when nothing exists anywhere.
+///                        First save ever on a clean install.
+fn open_client(stronghold: &Stronghold) -> Result<Client, String> {
+    if let Ok(c) = stronghold.get_client(CLIENT_BYTES) {
+        return Ok(c);
+    }
+    if let Ok(c) = stronghold.load_client(CLIENT_BYTES) {
+        return Ok(c);
+    }
+    stronghold
+        .create_client(CLIENT_BYTES)
+        .map_err(to_error_string)
+}
+
 // ── Public API ──────────────────────────────────────────────────
 //
 // All three ops go through with_vault so they share the cached
@@ -222,19 +314,14 @@ where
 
 pub fn put(app: &AppHandle, key: &str, value: &str) -> Result<(), String> {
     with_vault(app, |stronghold| {
-        let client = match stronghold.load_client(CLIENT_BYTES) {
-            Ok(c) => c,
-            Err(_) => stronghold
-                .create_client(CLIENT_BYTES)
-                .map_err(to_error_string)?,
-        };
+        let client = open_client(stronghold)?;
         let store = client.store();
         store
             .insert(key.as_bytes().to_vec(), value.as_bytes().to_vec(), None)
             .map_err(to_error_string)?;
-        // save() encrypts + writes the snapshot. The actual disk
-        // cost — unavoidable for a write op, but our vault is
-        // small (a few keys = few KB) so this is ~10-50ms.
+        // save() encrypts + writes the snapshot. With WORK_FACTOR_LOWERED
+        // active this is dominated by the actual disk write + ChaCha20
+        // pass — typically a handful of ms for our small vault.
         stronghold.save().map_err(to_error_string)?;
         Ok(())
     })
@@ -242,9 +329,16 @@ pub fn put(app: &AppHandle, key: &str, value: &str) -> Result<(), String> {
 
 pub fn get(app: &AppHandle, key: &str) -> Result<Option<String>, String> {
     with_vault_or_default(app, None, |stronghold| {
-        let client = match stronghold.load_client(CLIENT_BYTES) {
+        // On read, the "no client anywhere" path means "key not set".
+        // We deliberately don't auto-create on read — it would be the
+        // wrong default for a function that returns Option<String> and
+        // would silently bloat the vault with empty clients.
+        let client = match stronghold.get_client(CLIENT_BYTES) {
             Ok(c) => c,
-            Err(_) => return Ok(None),
+            Err(_) => match stronghold.load_client(CLIENT_BYTES) {
+                Ok(c) => c,
+                Err(_) => return Ok(None),
+            },
         };
         let store = client.store();
         let bytes = match store.get(key.as_bytes()) {
@@ -259,9 +353,14 @@ pub fn get(app: &AppHandle, key: &str) -> Result<Option<String>, String> {
 
 pub fn delete(app: &AppHandle, key: &str) -> Result<(), String> {
     with_vault_or_default(app, (), |stronghold| {
-        let client = match stronghold.load_client(CLIENT_BYTES) {
+        // Same read-style cascade — never auto-create on a delete
+        // request. If there's no client, there's nothing to delete.
+        let client = match stronghold.get_client(CLIENT_BYTES) {
             Ok(c) => c,
-            Err(_) => return Ok(()),
+            Err(_) => match stronghold.load_client(CLIENT_BYTES) {
+                Ok(c) => c,
+                Err(_) => return Ok(()),
+            },
         };
         let store = client.store();
         let _ = store.delete(key.as_bytes()).map_err(to_error_string);
