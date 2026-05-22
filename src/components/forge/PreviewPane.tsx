@@ -151,88 +151,100 @@ function SourceView({ path, refreshKey }: { path: string; refreshKey: number }) 
 
 // ── Backtest tab ─────────────────────────────────────────────────
 //
-// Two states:
+// Probes Houston's status to decide what to render:
 //
-//   1. "Run a backtest" CTA — until the user clicks Run, we don't
-//      know which run_id to render. Forge's deep-link opens Houston
-//      in a new window/browser tab; the customer flips back to
-//      Forge afterward and the iframe path renders.
+//   * Houston offline       → "Start the Auracle stack" message
+//   * Houston online        → "Run Backtest" CTA (opens Houston's
+//                              new-backtest form pre-filled with
+//                              this strategy)
 //
-//   2. Iframe to http://localhost:1969/ui/backtests/recent — once
-//      Houston knows a recent run exists for this strategy, we
-//      embed the results inline. The "recent" route is a stable
-//      Houston URL that always picks the most recent run for a
-//      given strategy (per the planned Houston endpoints in
-//      docs/HOUSTON-FORGE-API.md).
+// The earlier iteration tried to iframe Houston's per-strategy
+// recent-run URL inline, but that route doesn't exist yet — Houston
+// served its own 404 page inside the iframe, which my onError
+// handler couldn't detect (a load is a load). Cleaner: a small
+// probe via the connect-src-allowed REST origin, and we route to
+// Houston for actual results until the planned
+// /api/forge/strategies/{rel_path}/runs endpoint lands (then we
+// render results inline). Spec lives in docs/HOUSTON-FORGE-API.md.
 
 function BacktestView({ path }: { path: string }) {
-  const [showIframe, setShowIframe] = useState(false);
-  const [iframeError, setIframeError] = useState(false);
+  const [houstonStatus, setHoustonStatus] = useState<
+    "checking" | "online" | "offline"
+  >("checking");
 
-  // Auto-attempt iframe load on tab open. If Houston isn't running,
-  // we'll catch the error event and fall back to the CTA.
+  // One small healthcheck probe per path change — much cheaper than
+  // iframing a heavyweight page and the failure mode is unambiguous.
+  // /healthz is a Houston route we know exists across all versions.
   useEffect(() => {
-    setIframeError(false);
-    setShowIframe(true);
+    let cancelled = false;
+    setHoustonStatus("checking");
+    const controller = new AbortController();
+    fetch("http://localhost:1969/healthz", {
+      signal: controller.signal,
+      mode: "no-cors", // we just need to know it responded, not the body
+    })
+      .then(() => {
+        if (!cancelled) setHoustonStatus("online");
+      })
+      .catch(() => {
+        if (!cancelled) setHoustonStatus("offline");
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [path]);
 
   const params = new URLSearchParams({ strategy: path });
-  const iframeUrl = `http://localhost:1969/ui/backtests/recent?${params}`;
   const newRunUrl = `http://localhost:1969/ui/backtests/new?${params}`;
 
-  if (!showIframe || iframeError) {
-    return (
-      <div
-        className="forge-empty"
-        style={{ padding: 32, textAlign: "center" }}
-      >
-        <p style={{ margin: 0, color: "var(--fg-dim)", fontSize: 14 }}>
-          {iframeError
-            ? "Houston is offline — start the Auracle stack to see backtest results here."
-            : "No backtest run yet for this strategy."}
-        </p>
-        <button
-          type="button"
-          className="primary"
-          style={{ marginTop: 16 }}
-          onClick={() => openInBrowser(newRunUrl)}
-        >
-          Run Backtest in Houston
-        </button>
-        <p
-          className="muted"
-          style={{ fontSize: 12, marginTop: 12 }}
-        >
-          After a run completes, switch tabs to come back — the
-          embed will pick up the most recent run automatically.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <iframe
-      title={`Backtest results for ${path}`}
-      src={iframeUrl}
-      className="forge-preview-iframe"
-      // CSP in tauri.conf.json permits http://localhost:1969 in
-      // connect-src; for iframe embeds frame-src would need to be
-      // widened too. We deliberately leave frame-src 'none' as the
-      // default for security; the load handler below detects the
-      // CSP block and falls back to the CTA.
-      onError={() => setIframeError(true)}
-      onLoad={(e) => {
-        // Sniff the loaded URL — when CSP blocks the embed, the
-        // iframe gets stuck on about:blank and contentWindow access
-        // throws. We use the error path in that case.
-        try {
-          const win = (e.target as HTMLIFrameElement).contentWindow;
-          if (!win || !win.location) setIframeError(true);
-        } catch {
-          // Cross-origin access errors are EXPECTED for a working
-          // iframe; that's actually a sign of success. Ignore.
-        }
-      }}
-    />
+    <div className="forge-empty" style={{ padding: 32, textAlign: "center" }}>
+      {houstonStatus === "checking" && (
+        <p className="muted mono" style={{ margin: 0, fontSize: 12 }}>
+          probing houston…
+        </p>
+      )}
+
+      {houstonStatus === "offline" && (
+        <>
+          <p style={{ margin: 0, color: "var(--fg-dim)", fontSize: 14 }}>
+            Houston isn&apos;t running. Start the Auracle stack to
+            run backtests + see results here.
+          </p>
+          <p
+            className="muted mono"
+            style={{ fontSize: 11, marginTop: 12 }}
+          >
+            cd ~/auracle && docker compose up -d
+          </p>
+        </>
+      )}
+
+      {houstonStatus === "online" && (
+        <>
+          <p style={{ margin: 0, color: "var(--fg-dim)", fontSize: 14 }}>
+            Run a backtest in Houston to see results.
+          </p>
+          <button
+            type="button"
+            className="primary"
+            style={{ marginTop: 16 }}
+            onClick={() => openInBrowser(newRunUrl)}
+          >
+            Run Backtest in Houston
+          </button>
+          <p
+            className="muted"
+            style={{ fontSize: 11, marginTop: 16, lineHeight: 1.6 }}
+          >
+            Inline backtest results land here once Houston ships
+            the <code>/api/forge/strategies/{"{rel_path}"}/runs</code> endpoint
+            (see <code>docs/HOUSTON-FORGE-API.md</code>). Until
+            then, results live in Houston&apos;s UI.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
