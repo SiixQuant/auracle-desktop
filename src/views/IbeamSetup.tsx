@@ -407,27 +407,42 @@ function CredentialsForm({
       <div className="muted" style={{ fontSize: 11, marginBottom: 4, lineHeight: 1.5 }}>
         Credentials are stored encrypted in the launcher&apos;s Stronghold
         vault and only injected into the container at start time via
-        a short-lived tempfile.
+        a short-lived tempfile. After this one-time entry every restart
+        — daily IBKR re-auth, machine reboot, app relaunch — reads
+        from the vault automatically.
       </div>
+      {/*
+        autoComplete attributes are deliberate. Standard W3C values that
+        every password manager (1Password, Bitwarden, Apple Passwords,
+        Chrome, Firefox) recognizes — they'll offer to autofill the form
+        if the user has an IBKR entry saved. The wrapping <form> + name
+        attributes give password managers enough hints to scope correctly.
+        For password creation / first-time entry, 'current-password' (not
+        'new-password') is right because IBKR sets the password elsewhere
+        and we're just storing the existing one.
+      */}
       <input
+        name="username"
         type="text"
         placeholder="IBKR username"
-        autoComplete="off"
+        autoComplete="username"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
         disabled={busy}
         style={{ fontSize: 13 }}
       />
       <input
+        name="password"
         type="password"
         placeholder="IBKR password"
-        autoComplete="off"
+        autoComplete="current-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         disabled={busy}
         style={{ fontSize: 13 }}
       />
       <input
+        name="account-id"
         type="text"
         placeholder="Account ID (e.g. DU1234567 or U1234567)"
         autoComplete="off"
