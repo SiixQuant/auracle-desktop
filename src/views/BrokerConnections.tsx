@@ -236,6 +236,15 @@ function BrokerRow({
   broker: BrokerStatus;
   onRefresh: () => void;
 }) {
+  // IBKR row delegates ALL action surface to the IbeamSetup sub-card
+  // below — that card owns the install/start/stop/restart/logs flow.
+  // Suppressing BrokerDetail + BrokerActions for IBKR prevents
+  // doubled-up "Gateway didn't respond" + "Get gateway" controls
+  // that say the same thing the ibeam card already says, just less
+  // actionably. Other brokers (Alpaca, Tradier, Hyperliquid) still
+  // render the full original action surface.
+  const isIbkr = broker.id === "ibkr";
+
   return (
     <div
       style={{
@@ -252,17 +261,11 @@ function BrokerRow({
           <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
             {broker.description}
           </div>
-          <BrokerDetail broker={broker} />
+          {!isIbkr && <BrokerDetail broker={broker} />}
         </div>
-        <BrokerActions broker={broker} onRefresh={onRefresh} />
+        {!isIbkr && <BrokerActions broker={broker} onRefresh={onRefresh} />}
       </div>
-      {/* The ibeam supervisor sub-card only renders under IBKR. It
-       *  handles the persistent-session story: install + manage the
-       *  voyz/ibeam Docker container that auto-reauths the gateway
-       *  whenever IBKR's daily session timeout fires. */}
-      {broker.id === "ibkr" && (
-        <IbeamSetup onStateChange={onRefresh} />
-      )}
+      {isIbkr && <IbeamSetup onStateChange={onRefresh} />}
     </div>
   );
 }

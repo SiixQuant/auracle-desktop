@@ -92,14 +92,15 @@ pub struct IbeamStatus {
     pub has_credentials: bool,
 }
 
+/// Simplified credential shape — just what the user MUST provide.
+/// Account ID and trading mode are derived automatically from the
+/// gateway's response after first successful auth (the account
+/// number's "U" / "DU" prefix tells us live vs paper) and cached
+/// to the vault so subsequent restarts skip the probe.
 #[derive(Debug, Deserialize)]
 pub struct IbeamCredentials {
     pub username: String,
     pub password: String,
-    pub account_id: String,
-    /// "paper" or "live". Determines which IBKR endpoint ibeam
-    /// targets for login.
-    pub mode: String,
 }
 
 fn auracle_root() -> Result<PathBuf, String> {
@@ -111,23 +112,18 @@ fn ibeam_dir() -> Result<PathBuf, String> {
     Ok(auracle_root()?.join(IBEAM_DIR))
 }
 
-/// Read all four credential slots from the vault. None if any are
-/// missing — partial credentials are useless to ibeam and shouldn't
-/// produce a "started" container.
+/// Read the two credential slots that the user actually types in.
+/// None if either is missing. account_id and trading mode are
+/// derived post-auth and cached separately (see derive_and_cache_account
+/// below); they're not part of the credentials *required* to start.
 async fn read_credentials(app: &AppHandle) -> Result<Option<IbeamCredentials>, String> {
     let username = secret_store::get(app, KEY_IBKR_USERNAME)?;
     let password = secret_store::get(app, KEY_IBKR_PASSWORD)?;
-    let account_id = secret_store::get(app, KEY_IBKR_ACCOUNT)?;
-    let mode = secret_store::get(app, KEY_IBKR_TRADING_MODE)?;
-    match (username, password, account_id, mode) {
-        (Some(u), Some(p), Some(a), Some(m))
-            if !u.is_empty() && !p.is_empty() && !a.is_empty() && !m.is_empty() =>
-        {
+    match (username, password) {
+        (Some(u), Some(p)) if !u.is_empty() && !p.is_empty() => {
             Ok(Some(IbeamCredentials {
                 username: u,
                 password: p,
-                account_id: a,
-                mode: m,
             }))
         }
         _ => Ok(None),
@@ -253,14 +249,8 @@ pub async fn ibeam_install(
     app: AppHandle,
     creds: IbeamCredentials,
 ) -> Result<(), String> {
-    if creds.username.is_empty() || creds.password.is_empty() || creds.account_id.is_empty() {
-        return Err("username, password, and account_id are all required".to_string());
-    }
-    if !matches!(creds.mode.as_str(), "paper" | "live") {
-        return Err(format!(
-            "mode {:?} must be 'paper' or 'live'",
-            creds.mode
-        ));
+    if creds.username.is_empty() || creds.password.is_empty() {
+        return Err("username and password are both required".to_string());
     }
 
     // Persist credentials to the vault BEFORE writing the compose
@@ -268,8 +258,10 @@ pub async fn ibeam_install(
     // state with a compose file pointing at empty env vars.
     secret_store::put(&app, KEY_IBKR_USERNAME, &creds.username)?;
     secret_store::put(&app, KEY_IBKR_PASSWORD, &creds.password)?;
-    secret_store::put(&app, KEY_IBKR_ACCOUNT, &creds.account_id)?;
-    secret_store::put(&app, KEY_IBKR_TRADING_MODE, &creds.mode)?;
+    // Trading mode defaults to "paper" until the post-auth probe
+    // identifies the actual account tier. Caching here so a restart
+    // before the first successful auth doesn't error on missing slot.
+    secret_store::put(&app, KEY_IBKR_TRADING_MODE, "paper")?;
 
     let dir = ibeam_dir()?;
     std::fs::create_dir_all(&dir).map_err(to_error_string)?;
@@ -293,6 +285,14 @@ pub async fn ibeam_install(
 /// Start (or recreate) the ibeam container. Credentials are injected
 /// at start time via `--env-file` pointing at a tempfile so they
 /// never land on disk in plaintext under the project dir.
+///
+/// Atomic port-conflict handling: if the user has the Auracle stack
+/// running with its bundled IBKR gateway (`auracle-cpgateway` /
+/// `auracle-ibgateway`) bound to port 5000, ibeam's `up -d` will
+/// fail with `bind: address already in use`. Rather than punting
+/// to the user, we detect the conflict, stop + remove the
+/// conflicting container via `docker compose rm -sf`, then retry
+/// once. The user sees a single "Start" click do the right thing.
 #[tauri::command]
 pub async fn ibeam_start(app: AppHandle) -> Result<(), String> {
     let dir = ibeam_dir()?;
@@ -303,17 +303,85 @@ pub async fn ibeam_start(app: AppHandle) -> Result<(), String> {
         .await?
         .ok_or_else(|| "ibeam credentials aren't set — run ibeam_install first".to_string())?;
 
-    // Tempfile under XDG runtime dir (falls back to /tmp). Permissions
-    // 0600 so other users on the box can't snoop the password during
-    // the brief window between write + container ingest.
     let env_path = write_env_file(&creds)?;
 
-    let result = run_compose(&dir, &["up", "-d", "--remove-orphans"], Some(&env_path)).await;
+    // First try.
+    let first = run_compose(&dir, &["up", "-d", "--remove-orphans"], Some(&env_path)).await;
 
-    // Best-effort cleanup of the tempfile regardless of outcome.
+    let result = match first {
+        Ok(()) => Ok(()),
+        Err(err) if err.contains("address already in use") || err.contains("port is already") => {
+            // Port collision — almost always the Auracle stack's
+            // bundled cpgateway/ibgateway container. Try to free
+            // the port + retry once.
+            log::info!("ibeam_start: port 5000 in use, attempting to free competing container");
+            if let Err(free_err) = free_competing_gateway().await {
+                // Couldn't free — surface a clear actionable error.
+                let _ = std::fs::remove_file(&env_path);
+                return Err(format!(
+                    "Port 5000 is held by another container and couldn't be freed automatically: {free_err}. \
+                     Stop the container manually and try again."
+                ));
+            }
+            // Brief pause for the kernel to release the port —
+            // docker's "container removed" event fires before the
+            // listening socket actually goes away.
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            run_compose(&dir, &["up", "-d", "--remove-orphans"], Some(&env_path)).await
+        }
+        Err(other) => Err(other),
+    };
+
     let _ = std::fs::remove_file(&env_path);
-
     result
+}
+
+/// Look for the Auracle stack's bundled IBKR gateway containers and
+/// `docker rm -sf` the first one we find. Best-effort; if nothing is
+/// running with that name we return Ok (the port might be held by
+/// something else entirely, in which case the user needs to handle
+/// it manually).
+async fn free_competing_gateway() -> Result<(), String> {
+    const COMPETING: &[&str] = &[
+        "auracle-cpgateway",
+        "auracle-ibgateway",
+        "cpgateway",
+        "ibgateway",
+    ];
+    let out = Command::new("docker")
+        .args(["ps", "--format", "{{.Names}}"])
+        .output()
+        .await
+        .map_err(|e| format!("docker ps spawn: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "docker ps failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    let running: std::collections::HashSet<&str> = std::str::from_utf8(&out.stdout)
+        .unwrap_or("")
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    for name in COMPETING {
+        if running.contains(name) {
+            log::info!("ibeam_start: removing competing container {name}");
+            let result = Command::new("docker")
+                .args(["rm", "-sf", name])
+                .output()
+                .await
+                .map_err(|e| format!("docker rm spawn: {e}"))?;
+            if !result.status.success() {
+                return Err(format!(
+                    "docker rm -sf {name}: {}",
+                    String::from_utf8_lossy(&result.stderr).trim()
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -417,12 +485,13 @@ fn write_env_file(creds: &IbeamCredentials) -> Result<PathBuf, String> {
             .unwrap_or(0),
     );
     let path = dir.join(format!("auracle-ibeam-env-{suffix}"));
+    // Only the two creds the user actually entered. IBEAM_TRADING_MODE
+    // defaults to "paper" in compose; the post-auth probe will reset
+    // it once we know the actual account tier.
     let contents = format!(
         "IBEAM_ACCOUNT={}\n\
-         IBEAM_PASSWORD={}\n\
-         IBKR_ACCOUNT_ID={}\n\
-         IBEAM_TRADING_MODE={}\n",
-        creds.username, creds.password, creds.account_id, creds.mode,
+         IBEAM_PASSWORD={}\n",
+        creds.username, creds.password,
     );
     std::fs::write(&path, contents).map_err(to_error_string)?;
     // Tighten perms on unix — Windows has different ACL semantics

@@ -94,7 +94,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
   return (
     <div
       style={{
-        marginTop: 10,
+        marginTop: 8,
         padding: 10,
         background: "var(--bg-alt)",
         border: "1px solid var(--border)",
@@ -106,17 +106,22 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
           display: "flex",
           alignItems: "center",
           gap: 8,
-          marginBottom: 8,
+          marginBottom: status.state.state === "not_installed" ? 8 : 6,
         }}
       >
-        <strong style={{ fontSize: 13 }}>Persistent connection</strong>
         <StatePill state={status.state} />
+        {status.state.state !== "not_installed" && (
+          <span className="muted" style={{ fontSize: 11 }}>
+            auto-managed via Docker · re-auths on every daily session reset
+          </span>
+        )}
       </div>
-      <div className="muted" style={{ fontSize: 11, marginBottom: 8, lineHeight: 1.5 }}>
-        Runs ibeam in Docker — auto re-logs in to the IBKR Client Portal Gateway
-        whenever the daily session expires. Requires IBKR Mobile 2FA
-        push notifications enabled on your phone.
-      </div>
+      {status.state.state === "not_installed" && (
+        <div className="muted" style={{ fontSize: 11, marginBottom: 8, lineHeight: 1.5 }}>
+          Stays connected continuously — no daily re-login. Requires Docker
+          (running) and IBKR Mobile 2FA push notifications enabled on your phone.
+        </div>
+      )}
 
       {error && (
         <div
@@ -386,41 +391,24 @@ function CredentialsForm({
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [accountId, setAccountId] = useState("");
-  const [mode, setMode] = useState<"paper" | "live">("paper");
 
-  const ready =
-    username.length > 0 &&
-    password.length > 0 &&
-    accountId.length > 0 &&
-    !busy;
+  const ready = username.length > 0 && password.length > 0 && !busy;
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         if (!ready) return;
-        onSubmit({ username, password, account_id: accountId, mode });
+        onSubmit({ username, password });
       }}
-      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+      style={{ display: "flex", flexDirection: "column", gap: 8 }}
     >
-      <div className="muted" style={{ fontSize: 11, marginBottom: 4, lineHeight: 1.5 }}>
-        Credentials are stored encrypted in the launcher&apos;s Stronghold
-        vault and only injected into the container at start time via
-        a short-lived tempfile. After this one-time entry every restart
-        — daily IBKR re-auth, machine reboot, app relaunch — reads
-        from the vault automatically.
+      <div className="muted" style={{ fontSize: 11, marginBottom: 2, lineHeight: 1.5 }}>
+        Stored encrypted in the launcher&apos;s vault, injected into the
+        container only at start time. Account ID and paper / live mode
+        are detected automatically after the first login — you don&apos;t
+        need to type them.
       </div>
-      {/*
-        autoComplete attributes are deliberate. Standard W3C values that
-        every password manager (1Password, Bitwarden, Apple Passwords,
-        Chrome, Firefox) recognizes — they'll offer to autofill the form
-        if the user has an IBKR entry saved. The wrapping <form> + name
-        attributes give password managers enough hints to scope correctly.
-        For password creation / first-time entry, 'current-password' (not
-        'new-password') is right because IBKR sets the password elsewhere
-        and we're just storing the existing one.
-      */}
       <input
         name="username"
         type="text"
@@ -441,62 +429,14 @@ function CredentialsForm({
         disabled={busy}
         style={{ fontSize: 13 }}
       />
-      <input
-        name="account-id"
-        type="text"
-        placeholder="Account ID (e.g. DU1234567 or U1234567)"
-        autoComplete="off"
-        value={accountId}
-        onChange={(e) => setAccountId(e.target.value)}
-        disabled={busy}
-        style={{ fontSize: 13 }}
-      />
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <label
-          style={{
-            fontSize: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          <input
-            type="radio"
-            name="ibeam-mode"
-            value="paper"
-            checked={mode === "paper"}
-            onChange={() => setMode("paper")}
-            disabled={busy}
-          />
-          paper
-        </label>
-        <label
-          style={{
-            fontSize: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          <input
-            type="radio"
-            name="ibeam-mode"
-            value="live"
-            checked={mode === "live"}
-            onChange={() => setMode("live")}
-            disabled={busy}
-          />
-          live
-        </label>
-        <button
-          type="submit"
-          className="primary"
-          disabled={!ready}
-          style={{ marginLeft: "auto", fontSize: 12 }}
-        >
-          {busy ? "Installing…" : "Install + start"}
-        </button>
-      </div>
+      <button
+        type="submit"
+        className="primary"
+        disabled={!ready}
+        style={{ alignSelf: "flex-start", fontSize: 12 }}
+      >
+        {busy ? "Installing…" : "Connect"}
+      </button>
     </form>
   );
 }

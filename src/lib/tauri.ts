@@ -308,9 +308,6 @@ export interface IbeamStatus {
 export interface IbeamCredentials {
   username: string;
   password: string;
-  account_id: string;
-  /** "paper" | "live" */
-  mode: string;
 }
 
 export interface ToolInvocationResult {

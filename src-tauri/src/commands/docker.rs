@@ -350,13 +350,18 @@ pub async fn stack_restart_container(name: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Stop a single compose service in the Auracle stack. Currently used
-/// by the Broker Connections card to take over IBKR session management
-/// from Houston: the stack ships an `ibgateway` / `cpgateway` service
-/// that runs the IBKR Client Portal Gateway with no auto-reauth, and
-/// that conflicts on port 5000 with the launcher-managed ibeam
-/// container. Stopping the Houston-side service lets ibeam own the
-/// session.
+/// Stop a single compose service in the Auracle stack AND remove the
+/// container so it can't auto-restart. The service is left in the
+/// compose file — bringing up the stack again with `stack_start`
+/// will recreate it — but until then the port is permanently free
+/// for whatever wants to bind it (in practice: the launcher-managed
+/// ibeam container that wants port 5000).
+///
+/// `stop` alone wasn't enough — `restart: unless-stopped` (the
+/// default policy for Auracle's stack services) brings the container
+/// right back on the next docker event. `rm -sf` does stop + force
+/// remove in one shot, which produces a port that actually stays
+/// free.
 ///
 /// Same trust model as stack_restart_container: short whitelist, no
 /// arbitrary service names from the frontend.
@@ -367,7 +372,10 @@ pub async fn stack_stop_service(name: String) -> Result<(), String> {
     if !ALLOWED.contains(&name.as_str()) {
         return Err(format!("service not in stop-allow-list: {name}"));
     }
-    run_in("docker", &["compose", "stop", &name], &dir)
+    // `compose rm -sf <svc>` is stop + force-remove in one call.
+    // Idempotent: returns success even if the service was already
+    // stopped or already removed.
+    run_in("docker", &["compose", "rm", "-sf", &name], &dir)
         .await
         .map_err(to_error_string)?;
     Ok(())
