@@ -543,6 +543,11 @@ const TOOL_LABELS: Record<string, string> = {
   write_strategy: "Write",
   list_templates: "List templates",
   run_backtest: "Run backtest",
+  list_dashboards: "List dashboards",
+  read_dashboard: "Read dashboard",
+  save_dashboard: "Save dashboard",
+  delete_dashboard: "Delete dashboard",
+  open_dashboard: "Open dashboard",
 };
 
 /**

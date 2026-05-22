@@ -94,6 +94,15 @@ static CHAT_CANCEL: Lazy<Arc<Notify>> = Lazy::new(|| Arc::new(Notify::new()));
 /// an empty result so the UI can render a "no strategies yet"
 /// state, and the operator can pick a different directory in
 /// Settings → Forge.
+/// Public wrapper so sibling modules (dashboards.rs, eventually the
+/// dashboard refresh loop) can derive paths from the same configured
+/// root without re-implementing the lookup logic.
+pub(crate) fn resolve_strategies_dir_public(
+    app: &tauri::AppHandle,
+) -> Result<PathBuf, String> {
+    resolve_strategies_dir(app)
+}
+
 fn resolve_strategies_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if let Ok(store) = app.store(STORE_FILE) {
         if let Some(v) = store.get(KEY_STRATEGIES_DIR).and_then(|v| v.as_str().map(String::from)) {
@@ -1641,6 +1650,103 @@ fn agent_tool_catalog() -> serde_json::Value {
         // blocks — see git history for the full text) in the same
         // release that ships the Houston endpoints. Spec lives in
         // docs/HOUSTON-FORGE-API.md.
+
+        // ── Dashboard tools (CVForge-class visual analytics) ───────
+        // These manage persistent JSON dashboard specs that the
+        // frontend's WidgetRenderer draws as KPI cards, tables,
+        // charts, etc. The agent uses them when the user asks for
+        // anything visual ("show me", "build me a dashboard",
+        // "render", "plot", "scan for"). Always prefer building a
+        // dashboard over dumping numbers into chat — the user sees
+        // it inline and can come back to it tomorrow with fresh data.
+        {
+            "name": "list_dashboards",
+            "description": "List every saved dashboard with its slug, title, widget count, and \
+                            last-updated timestamp. Use this before creating a new dashboard to \
+                            check if a similar one already exists you can iterate on instead.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "read_dashboard",
+            "description": "Read the full JSON spec of a saved dashboard. Use this when the \
+                            user asks to modify an existing dashboard — read it first so your \
+                            update preserves widgets they care about.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "description": "The dashboard's slug, e.g. 'positions-overview'."
+                    }
+                },
+                "required": ["slug"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "save_dashboard",
+            "description": "Create a new dashboard or overwrite an existing one with a fresh \
+                            spec. After saving, the dashboard is immediately visible in the \
+                            file tree and the preview pane will switch to it (call \
+                            open_dashboard explicitly if you want to be sure). The spec is a \
+                            JSON object with these top-level fields: slug (lowercase a-z/0-9/-, \
+                            1-64 chars, used as the filename), title (human-readable label), \
+                            layout ('grid'|'rows'|'tabs'), refresh_interval_seconds (5-3600), \
+                            widgets (array, max 32). Each widget has: id (string, unique \
+                            within the dashboard), type ('kpi_grid'|'data_table'|'line_chart'|\
+                            'bar_chart'|'candlestick_chart'|'option_chain_table'|\
+                            'iv_surface_3d'|'payoff_diagram'|'scanner_table'|'notes_md'), \
+                            title (optional string), data_source ({tool: string, args: object} \
+                            — the tool name must be one of the broker/data tools you have \
+                            access to, OR a literal data injection via tool='inline' with \
+                            args={data: ...}), grid ({x,y,w,h} for grid layout, omit for rows). \
+                            Widget-type-specific fields go at the top level alongside the \
+                            wrapper fields — see the per-widget guidance in your system prompt.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "dashboard": {
+                        "type": "object",
+                        "description": "The complete dashboard spec. created_at/updated_at \
+                                        are stamped server-side; you can omit them."
+                    }
+                },
+                "required": ["dashboard"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "delete_dashboard",
+            "description": "Soft-delete a dashboard (moves it to .archive/ so the user can \
+                            recover if they change their mind). Use only when the user \
+                            explicitly asks to delete one.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "slug": {"type": "string"}
+                },
+                "required": ["slug"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "open_dashboard",
+            "description": "Switch the preview pane to display a specific dashboard. Call \
+                            after save_dashboard when the user should immediately see what \
+                            you built, or when the user asks to view a saved dashboard.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "slug": {"type": "string"}
+                },
+                "required": ["slug"],
+                "additionalProperties": false
+            }
+        }
     ])
 }
 
@@ -1760,6 +1866,88 @@ async fn execute_agent_tool(
             ))
             .await
         }
+        // ── Dashboard tools ────────────────────────────────────────
+        // Thin wrappers over the dashboards module's Tauri commands.
+        // We don't go through Tauri's invoke layer for these — the
+        // module functions are async and take AppHandle, same as we
+        // do here. Direct calls avoid one IPC roundtrip.
+        "list_dashboards" => match super::dashboards::forge_list_dashboards(app.clone()).await {
+            Ok(list) => (
+                serde_json::to_string(&list).unwrap_or_else(|_| "[]".to_string()),
+                true,
+            ),
+            Err(e) => (format!("error: {e}"), false),
+        },
+        "read_dashboard" => {
+            let Some(slug) = input.get("slug").and_then(|v| v.as_str()) else {
+                return ("error: slug required".to_string(), false);
+            };
+            match super::dashboards::forge_read_dashboard(app.clone(), slug.to_string()).await {
+                Ok(dash) => (
+                    serde_json::to_string(&dash).unwrap_or_else(|_| "{}".to_string()),
+                    true,
+                ),
+                Err(e) => (format!("error: {e}"), false),
+            }
+        }
+        "save_dashboard" => {
+            let Some(dash_val) = input.get("dashboard") else {
+                return ("error: dashboard required".to_string(), false);
+            };
+            // Deserialize into the typed Dashboard. The agent often
+            // omits created_at / updated_at; default to empty strings
+            // so the command can stamp them server-side.
+            let mut value = dash_val.clone();
+            if let Some(obj) = value.as_object_mut() {
+                obj.entry("created_at".to_string())
+                    .or_insert_with(|| serde_json::Value::String(String::new()));
+                obj.entry("updated_at".to_string())
+                    .or_insert_with(|| serde_json::Value::String(String::new()));
+                obj.entry("refresh_interval_seconds".to_string())
+                    .or_insert_with(|| serde_json::Value::from(30));
+                obj.entry("layout".to_string())
+                    .or_insert_with(|| serde_json::Value::String("grid".to_string()));
+                obj.entry("widgets".to_string())
+                    .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+            }
+            let dash: super::dashboards::Dashboard = match serde_json::from_value(value) {
+                Ok(d) => d,
+                Err(e) => {
+                    return (
+                        format!("error: dashboard spec doesn't match the schema: {e}"),
+                        false,
+                    )
+                }
+            };
+            match super::dashboards::forge_save_dashboard(app.clone(), dash).await {
+                Ok(summary) => (
+                    format!(
+                        "saved dashboard {:?} ({} widgets) — call open_dashboard to show it",
+                        summary.slug, summary.widget_count
+                    ),
+                    true,
+                ),
+                Err(e) => (format!("error: {e}"), false),
+            }
+        }
+        "delete_dashboard" => {
+            let Some(slug) = input.get("slug").and_then(|v| v.as_str()) else {
+                return ("error: slug required".to_string(), false);
+            };
+            match super::dashboards::forge_delete_dashboard(app.clone(), slug.to_string()).await {
+                Ok(()) => (format!("archived dashboard {slug:?}"), true),
+                Err(e) => (format!("error: {e}"), false),
+            }
+        }
+        "open_dashboard" => {
+            let Some(slug) = input.get("slug").and_then(|v| v.as_str()) else {
+                return ("error: slug required".to_string(), false);
+            };
+            match super::dashboards::forge_open_dashboard(app.clone(), slug.to_string()).await {
+                Ok(()) => (format!("preview switched to dashboard {slug:?}"), true),
+                Err(e) => (format!("error: {e}"), false),
+            }
+        }
         _ => (format!("unknown tool: {name}"), false),
     }
 }
@@ -1818,12 +2006,24 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
         // No-arg tools — the tool name alone is informative enough.
         "list_strategies"
         | "list_templates"
+        | "list_dashboards"
         | "get_account_summary"
         | "get_open_positions"
         | "list_connected_brokers"
         | "list_universes" => String::new(),
         "read_strategy" | "write_strategy" | "run_backtest" => input
             .get("rel_path")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| "?".to_string()),
+        "read_dashboard" | "delete_dashboard" | "open_dashboard" => input
+            .get("slug")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| "?".to_string()),
+        "save_dashboard" => input
+            .get("dashboard")
+            .and_then(|d| d.get("slug"))
             .and_then(|v| v.as_str())
             .map(String::from)
             .unwrap_or_else(|| "?".to_string()),

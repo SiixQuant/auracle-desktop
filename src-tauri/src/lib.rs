@@ -64,8 +64,9 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    docker as docker_cmd, forge as forge_cmd, healthcheck as health_cmd,
-    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
+    dashboards as dash_cmd, docker as docker_cmd, forge as forge_cmd,
+    healthcheck as health_cmd, ibkr_login as ibkr_login_cmd,
+    installer as installer_cmd, keychain as keychain_cmd,
     mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
     scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
     view as view_cmd,
@@ -330,6 +331,14 @@ pub fn run() {
             mcp_cmd::mcp_sidecar_status,
             mcp_cmd::mcp_sidecar_start,
             mcp_cmd::mcp_sidecar_stop,
+            // Dashboards — persistent, agent-authored visual
+            // analytics. See commands/dashboards.rs.
+            dash_cmd::forge_dashboards_dir,
+            dash_cmd::forge_list_dashboards,
+            dash_cmd::forge_read_dashboard,
+            dash_cmd::forge_save_dashboard,
+            dash_cmd::forge_delete_dashboard,
+            dash_cmd::forge_open_dashboard,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

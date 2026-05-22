@@ -1,42 +1,109 @@
-// PreviewPane — right side of the agent layout.
+// PreviewPane — the right column of the agent layout.
 //
-// Two tabs:
+// Three tabs:
 //
-//   Source — read-only syntax-highlighted view of the currently
-//            active strategy. Always works, even with Houston offline.
-//            Auto-refreshes when the agent edits the file (via the
-//            refreshKey prop bumped from Forge.tsx).
+//   Dashboard — agent-authored persistent visual analytics. The
+//               default tab once the user has any dashboard saved.
+//               Switches automatically when the agent calls
+//               open_dashboard. Phase 0 shows the JSON spec; Phase 1
+//               swaps in the WidgetRenderer for real visualizations.
 //
-//   Backtest — iframe to Houston's backtest UI for this strategy.
-//              Requires Houston to be running at http://localhost:1969.
-//              Empty state with a Run-Backtest CTA when no run yet.
+//   Source    — read-only syntax-highlighted view of the currently
+//               active strategy file. Always works, even with the
+//               Auracle stack offline. Auto-refreshes via refreshKey.
 //
-// Mirrors CVForge's preview pane (which shows the rendered HTML
-// dashboard as the agent builds it). For trading strategies, the
-// equivalent "rendered output" is the backtest equity curve +
-// metrics + trade list, served by Houston.
+//   Backtest  — iframe to Houston's backtest UI for this strategy.
+//               Probes Houston's health; renders an offline message
+//               or a Run-Backtest CTA depending on state.
+//
+// Tab selection precedence: explicit user click > agent's open_dashboard
+// event > defaultTab heuristic (Dashboard if any exist, else Source).
 
 import { python } from "@codemirror/lang-python";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useState } from "react";
 
-import { cmd, openInBrowser } from "@/lib/tauri";
+import {
+  cmd,
+  onEvent,
+  openInBrowser,
+  type Dashboard,
+  type DashboardSummary,
+} from "@/lib/tauri";
 
 interface PreviewPaneProps {
-  /** Path of the strategy being previewed; null = empty state. */
+  /** Path of the strategy being previewed; null = empty Source state. */
   activePath: string | null;
-  /** Bumped by the parent when the file content may have changed,
-   *  e.g. after the agent applies an edit or the user saves. */
+  /** Bumped by the parent when the file content may have changed. */
   refreshKey: number;
 }
 
-type Tab = "source" | "backtest";
+type Tab = "dashboard" | "source" | "backtest";
 
 export default function PreviewPane({ activePath, refreshKey }: PreviewPaneProps) {
   const [tab, setTab] = useState<Tab>("source");
+  const [dashboards, setDashboards] = useState<DashboardSummary[] | null>(null);
+  const [activeDashboard, setActiveDashboard] = useState<string | null>(null);
 
-  if (!activePath) {
+  // Initial dashboard list fetch. Done once per mount; refreshed
+  // implicitly when the agent saves/deletes via the open-event hook.
+  useEffect(() => {
+    let cancelled = false;
+    cmd
+      .forgeListDashboards()
+      .then((list) => {
+        if (cancelled) return;
+        setDashboards(list);
+        // If the user landed here with no active source file BUT has
+        // dashboards saved, default the tab to Dashboard so it's the
+        // first thing they see — mirrors CVForge's "your saved work
+        // is waiting" philosophy.
+        if (!activePath && list.length > 0) {
+          setTab("dashboard");
+          setActiveDashboard(list[0]!.slug);
+        }
+      })
+      .catch(() => setDashboards([]));
+    return () => {
+      cancelled = true;
+    };
+    // intentionally only on mount; tab logic shouldn't fight the user
+    // every time activePath flips
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Subscribe to the agent's "open this dashboard" event. When the
+  // agent calls open_dashboard via the tool surface, the backend
+  // emits "forge-dashboard-open" with the slug; we auto-switch tabs.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    onEvent<string>("forge-dashboard-open", (slug) => {
+      setTab("dashboard");
+      setActiveDashboard(slug);
+      // Refresh the list too — the slug may be new.
+      cmd.forgeListDashboards().then(setDashboards).catch(() => {});
+    }).then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
+  // If the user opens a strategy file, nudge toward Source — but
+  // don't fight them: only auto-switch if we were on the Dashboard
+  // empty state, not if they explicitly picked Backtest or Dashboard.
+  useEffect(() => {
+    if (activePath && tab === "dashboard" && !activeDashboard) {
+      setTab("source");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePath]);
+
+  // Empty state: no source file AND no dashboards yet. The CTA points
+  // the user at the chat — typing a prompt is the only way forward.
+  if (!activePath && (!dashboards || dashboards.length === 0)) {
     return (
       <div className="forge-panel">
         <div className="forge-panel-head">
@@ -44,9 +111,22 @@ export default function PreviewPane({ activePath, refreshKey }: PreviewPaneProps
         </div>
         <div className="forge-empty" style={{ padding: 32, textAlign: "center" }}>
           <p style={{ margin: 0, color: "var(--fg-dim)", fontSize: 14 }}>
-            Open a strategy or ask the agent to create one. The preview
-            will render here as the file changes.
+            Ask the agent to build a dashboard or a strategy. Examples:
           </p>
+          <ul
+            className="muted"
+            style={{
+              textAlign: "left",
+              maxWidth: 380,
+              margin: "16px auto 0",
+              fontSize: 13,
+              lineHeight: 1.7,
+            }}
+          >
+            <li>“Build me a dashboard with my IBKR positions and account summary”</li>
+            <li>“Show me a line chart of SPY closes for the last 90 days”</li>
+            <li>“Write an RSI mean-reversion strategy on liquid US ETFs”</li>
+          </ul>
         </div>
       </div>
     );
@@ -58,8 +138,25 @@ export default function PreviewPane({ activePath, refreshKey }: PreviewPaneProps
         <div className="forge-preview-tabs">
           <button
             type="button"
+            className={`forge-preview-tab ${tab === "dashboard" ? "active" : ""}`}
+            onClick={() => setTab("dashboard")}
+          >
+            Dashboard
+            {dashboards && dashboards.length > 0 && (
+              <span
+                className="muted mono"
+                style={{ marginLeft: 6, fontSize: 11 }}
+              >
+                {dashboards.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
             className={`forge-preview-tab ${tab === "source" ? "active" : ""}`}
             onClick={() => setTab("source")}
+            disabled={!activePath}
+            style={!activePath ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
           >
             Source
           </button>
@@ -67,19 +164,234 @@ export default function PreviewPane({ activePath, refreshKey }: PreviewPaneProps
             type="button"
             className={`forge-preview-tab ${tab === "backtest" ? "active" : ""}`}
             onClick={() => setTab("backtest")}
+            disabled={!activePath}
+            style={!activePath ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
           >
             Backtest
           </button>
         </div>
-        <span className="forge-panel-sub" title={activePath}>
-          {activePath}
+        <span className="forge-panel-sub" title={activePath ?? ""}>
+          {tab === "dashboard"
+            ? activeDashboard
+              ? `dashboard · ${activeDashboard}`
+              : "dashboards"
+            : activePath ?? ""}
         </span>
       </div>
 
-      {tab === "source" && (
+      {tab === "dashboard" && (
+        <DashboardTab
+          dashboards={dashboards ?? []}
+          activeSlug={activeDashboard}
+          onSelect={(slug) => setActiveDashboard(slug)}
+          onRefresh={() => {
+            cmd.forgeListDashboards().then(setDashboards).catch(() => {});
+          }}
+        />
+      )}
+      {tab === "source" && activePath && (
         <SourceView path={activePath} refreshKey={refreshKey} />
       )}
-      {tab === "backtest" && <BacktestView path={activePath} />}
+      {tab === "backtest" && activePath && <BacktestView path={activePath} />}
+    </div>
+  );
+}
+
+// ── Dashboard tab ────────────────────────────────────────────────
+//
+// Phase 0: shows a sidebar list + a JSON pretty-print of the active
+// dashboard's spec. Phase 1 swaps the JSON view for the
+// WidgetRenderer (KPI cards, tables, charts).
+
+function DashboardTab({
+  dashboards,
+  activeSlug,
+  onSelect,
+  onRefresh,
+}: {
+  dashboards: DashboardSummary[];
+  activeSlug: string | null;
+  onSelect: (slug: string) => void;
+  onRefresh: () => void;
+}) {
+  const [spec, setSpec] = useState<Dashboard | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!activeSlug) {
+      setSpec(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    cmd
+      .forgeReadDashboard(activeSlug)
+      .then((d) => {
+        if (!cancelled) {
+          setSpec(d);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(String(err));
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSlug]);
+
+  if (dashboards.length === 0) {
+    return (
+      <div className="forge-empty" style={{ padding: 32, textAlign: "center" }}>
+        <p style={{ margin: 0, color: "var(--fg-dim)", fontSize: 14 }}>
+          No dashboards yet. Ask the agent to build one — e.g.
+          <br />
+          <em>“give me a dashboard with my open positions and SPY P&amp;L over 90 days”</em>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <aside
+        style={{
+          width: 200,
+          borderRight: "1px solid var(--border)",
+          overflowY: "auto",
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            padding: "8px 12px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: 11,
+            textTransform: "uppercase",
+            color: "var(--fg-dim)",
+            letterSpacing: 0.5,
+          }}
+        >
+          <span>Saved</span>
+          <button
+            type="button"
+            className="ghost"
+            onClick={onRefresh}
+            style={{ padding: "2px 6px", fontSize: 11 }}
+            title="Refresh list"
+          >
+            ↻
+          </button>
+        </div>
+        {dashboards.map((d) => (
+          <button
+            key={d.slug}
+            type="button"
+            onClick={() => onSelect(d.slug)}
+            className={activeSlug === d.slug ? "active" : ""}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              padding: "8px 12px",
+              background:
+                activeSlug === d.slug ? "var(--accent-bg)" : "transparent",
+              border: "none",
+              borderBottom: "1px solid var(--border)",
+              color: "var(--fg)",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontWeight: 500 }}>{d.title}</div>
+            <div
+              className="muted mono"
+              style={{ fontSize: 10, marginTop: 2 }}
+            >
+              {d.widget_count}w · {d.refresh_interval_seconds}s
+            </div>
+          </button>
+        ))}
+      </aside>
+      <main style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
+        {!activeSlug && (
+          <div
+            className="forge-empty muted mono"
+            style={{ padding: 20 }}
+          >
+            Pick a dashboard from the list.
+          </div>
+        )}
+        {activeSlug && loading && (
+          <div className="forge-empty muted mono" style={{ padding: 20 }}>
+            loading…
+          </div>
+        )}
+        {activeSlug && error && (
+          <div
+            className="forge-empty muted mono"
+            style={{ padding: 20, color: "var(--err)" }}
+          >
+            {error}
+          </div>
+        )}
+        {activeSlug && spec && !loading && !error && (
+          <DashboardView spec={spec} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+// Phase 0 placeholder. Phase 1 replaces this with the real
+// WidgetRenderer — kpi_grid / data_table / line_chart / etc.
+function DashboardView({ spec }: { spec: Dashboard }) {
+  return (
+    <div style={{ padding: 16 }}>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>{spec.title}</h2>
+        <div className="muted mono" style={{ fontSize: 11, marginTop: 4 }}>
+          {spec.widgets.length} widget{spec.widgets.length === 1 ? "" : "s"} ·
+          refreshing every {spec.refresh_interval_seconds}s · layout: {spec.layout}
+        </div>
+      </div>
+      <div
+        className="muted"
+        style={{
+          padding: 12,
+          background: "var(--bg-alt)",
+          border: "1px solid var(--border)",
+          borderRadius: 4,
+          marginBottom: 12,
+          fontSize: 12,
+        }}
+      >
+        Widget rendering lands in Phase 1 — for now this is the spec the
+        agent saved. The dashboard JSON below describes what the rendered
+        view will look like.
+      </div>
+      <pre
+        className="mono"
+        style={{
+          margin: 0,
+          padding: 12,
+          background: "var(--bg-alt)",
+          border: "1px solid var(--border)",
+          borderRadius: 4,
+          fontSize: 11,
+          lineHeight: 1.5,
+          overflow: "auto",
+        }}
+      >
+        {JSON.stringify(spec, null, 2)}
+      </pre>
     </div>
   );
 }
@@ -95,7 +407,8 @@ function SourceView({ path, refreshKey }: { path: string; refreshKey: number }) 
     let cancelled = false;
     setLoading(true);
     setError(null);
-    cmd.forgeReadFile(path)
+    cmd
+      .forgeReadFile(path)
       .then((text) => {
         if (!cancelled) {
           setContent(text);
@@ -150,38 +463,19 @@ function SourceView({ path, refreshKey }: { path: string; refreshKey: number }) 
 }
 
 // ── Backtest tab ─────────────────────────────────────────────────
-//
-// Probes Houston's status to decide what to render:
-//
-//   * Houston offline       → "Start the Auracle stack" message
-//   * Houston online        → "Run Backtest" CTA (opens Houston's
-//                              new-backtest form pre-filled with
-//                              this strategy)
-//
-// The earlier iteration tried to iframe Houston's per-strategy
-// recent-run URL inline, but that route doesn't exist yet — Houston
-// served its own 404 page inside the iframe, which my onError
-// handler couldn't detect (a load is a load). Cleaner: a small
-// probe via the connect-src-allowed REST origin, and we route to
-// Houston for actual results until the planned
-// /api/forge/strategies/{rel_path}/runs endpoint lands (then we
-// render results inline). Spec lives in docs/HOUSTON-FORGE-API.md.
 
 function BacktestView({ path }: { path: string }) {
   const [houstonStatus, setHoustonStatus] = useState<
     "checking" | "online" | "offline"
   >("checking");
 
-  // One small healthcheck probe per path change — much cheaper than
-  // iframing a heavyweight page and the failure mode is unambiguous.
-  // /healthz is a Houston route we know exists across all versions.
   useEffect(() => {
     let cancelled = false;
     setHoustonStatus("checking");
     const controller = new AbortController();
     fetch("http://localhost:1969/healthz", {
       signal: controller.signal,
-      mode: "no-cors", // we just need to know it responded, not the body
+      mode: "no-cors",
     })
       .then(() => {
         if (!cancelled) setHoustonStatus("online");

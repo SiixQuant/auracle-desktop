@@ -199,6 +199,19 @@ export const cmd = {
   anthropicKeySet: (value: string) =>
     invoke<void>("anthropic_key_set", { value }),
   anthropicKeyClear: () => invoke<void>("anthropic_key_clear"),
+
+  // ── Dashboards (CVForge-class persistent visual analytics) ────
+  forgeDashboardsDir: () => invoke<string>("forge_dashboards_dir"),
+  forgeListDashboards: () =>
+    invoke<DashboardSummary[]>("forge_list_dashboards"),
+  forgeReadDashboard: (slug: string) =>
+    invoke<Dashboard>("forge_read_dashboard", { slug }),
+  forgeSaveDashboard: (dashboard: Dashboard) =>
+    invoke<DashboardSummary>("forge_save_dashboard", { dashboard }),
+  forgeDeleteDashboard: (slug: string) =>
+    invoke<void>("forge_delete_dashboard", { slug }),
+  forgeOpenDashboard: (slug: string) =>
+    invoke<void>("forge_open_dashboard", { slug }),
 };
 
 // ── Forge types ─────────────────────────────────────────────────
@@ -297,6 +310,62 @@ export interface StrategyTemplate {
 }
 
 export type ForgeLayoutMode = "agent" | "code";
+
+// ── Dashboards ──────────────────────────────────────────────────
+//
+// On-disk shape mirrors `commands/dashboards.rs::Dashboard`. The
+// widget-type-specific fields are loose (per-widget config goes
+// alongside the wrapper fields) — the WidgetRenderer in
+// components/forge/dashboard/ validates per-renderer at runtime.
+
+export interface DashboardWidget {
+  /** Unique within the dashboard. Used as the React key + the
+   *  refresh-loop subscription target. */
+  id: string;
+  /** Selects the renderer — see WidgetRenderer for the type table. */
+  type:
+    | "kpi_grid"
+    | "data_table"
+    | "line_chart"
+    | "bar_chart"
+    | "candlestick_chart"
+    | "option_chain_table"
+    | "iv_surface_3d"
+    | "payoff_diagram"
+    | "scanner_table"
+    | "notes_md";
+  title?: string;
+  /** Where the data comes from. `tool` is the name of an agent
+   *  broker/data tool; `args` are passed through to it on each
+   *  refresh. Special-case: tool === "inline" + args.data is a
+   *  literal payload for static widgets (e.g. notes). */
+  data_source: { tool: string; args: Record<string, unknown> };
+  /** Grid placement for layout === "grid". Optional otherwise. */
+  grid?: { x: number; y: number; w: number; h: number };
+  /** Catch-all for type-specific config (columns / fields / etc.). */
+  [key: string]: unknown;
+}
+
+export interface Dashboard {
+  slug: string;
+  title: string;
+  /** ISO-8601 UTC. */
+  created_at: string;
+  /** ISO-8601 UTC. */
+  updated_at: string;
+  /** 5..3600 seconds. */
+  refresh_interval_seconds: number;
+  layout: "grid" | "rows" | "tabs";
+  widgets: DashboardWidget[];
+}
+
+export interface DashboardSummary {
+  slug: string;
+  title: string;
+  updated_at: string;
+  widget_count: number;
+  refresh_interval_seconds: number;
+}
 
 // ── Misc helpers ────────────────────────────────────────────────
 
