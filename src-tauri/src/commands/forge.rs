@@ -1472,8 +1472,55 @@ struct ChatToolResultPayload<'a> {
     ok: bool,
 }
 
+/// Helper for the broker/data tools: do a Houston GET, return the
+/// (body, ok) tuple Claude expects. Centralizes the "Houston offline"
+/// fallback message + the http status handling. Houston endpoints
+/// are the customer-already-running stack at localhost:1969; if it's
+/// not up, every broker tool returns a clear instruction for Claude
+/// to relay rather than a network-error stack trace.
+async fn houston_get(path_and_query: &str) -> (String, bool) {
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return (format!("http client setup failed: {e}"), false),
+    };
+    let url = format!("{HOUSTON_BASE_URL}{path_and_query}");
+    match client.get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => match resp.text().await {
+            Ok(body) => (body, true),
+            Err(e) => (format!("read response failed: {e}"), false),
+        },
+        Ok(resp) => (
+            format!(
+                "houston returned HTTP {}. The Auracle stack might be \
+                 running an older version that doesn't expose {path_and_query}. \
+                 Tell the user to update with: cd ~/auracle && git pull && docker compose up -d",
+                resp.status()
+            ),
+            false,
+        ),
+        Err(_) => (
+            "houston is offline. Tell the user to start the Auracle stack with: \
+             cd ~/auracle && docker compose up -d. Without the stack running, \
+             account/position/fill data isn't available."
+                .to_string(),
+            false,
+        ),
+    }
+}
+
 /// Static tool catalog. Serialized into the Anthropic request body
-/// on every agent_loop call.
+/// on every agent_loop call. Tools fall into two families:
+///
+///   * File ops (list_strategies, read_strategy, write_strategy,
+///     list_templates) — local file system, always work.
+///   * Houston-backed (run_backtest, get_account_summary,
+///     get_open_positions, get_recent_fills, list_connected_brokers,
+///     list_universes, get_historical_bars) — need the Auracle stack
+///     up at localhost:1969. Tool returns a clear "stack offline"
+///     message when not, which Claude can relay to the user.
 fn agent_tool_catalog() -> serde_json::Value {
     serde_json::json!([
         {
@@ -1560,6 +1607,100 @@ fn agent_tool_catalog() -> serde_json::Value {
                 "required": ["rel_path"],
                 "additionalProperties": false
             }
+        },
+        {
+            "name": "get_account_summary",
+            "description": "Read the user's connected broker account summary — \
+                            NetLiquidation, BuyingPower, AvailableFunds, MaintenanceMargin, \
+                            currency, etc. Returns JSON from Houston. Use this when the user \
+                            asks about their account, what they can trade, how much capital \
+                            they have, etc.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "get_open_positions",
+            "description": "Read the user's current open positions across their connected \
+                            broker accounts. Returns an array of position rows with symbol, \
+                            quantity, average cost, market value, unrealized P&L, currency. \
+                            Use this to give context-aware suggestions ('you're already long \
+                            SPY — adding QQQ would concentrate beta-1 exposure').",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "get_recent_fills",
+            "description": "Read the user's recent broker fills (executed trades) for the \
+                            given lookback window. Returns symbol, side, quantity, price, \
+                            timestamp, commission per row. Useful for portfolio attribution \
+                            questions ('how did my mean-reversion trades do last week?').",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback window in days. Defaults to 30 if omitted. Max 365.",
+                        "minimum": 1,
+                        "maximum": 365
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "list_connected_brokers",
+            "description": "List which broker integrations the user has connected (IBKR, \
+                            Alpaca, ClearStreet, Hyperliquid, Tradier, Tradovate) and their \
+                            connection state (connected / not_connected / error). Use this \
+                            before assuming the user has a particular broker available.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "list_universes",
+            "description": "List the named symbol universes available in Auracle's master \
+                            (e.g. 'sp500', 'liquid_us_etfs', 'crypto_perps_top25'). Each \
+                            universe is a curated list of symbols you can reference in a \
+                            Strategy's `universe = ...` declaration. Use this to pick a \
+                            domain-appropriate universe instead of hand-listing symbols.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "get_historical_bars",
+            "description": "Fetch daily OHLCV bars for a symbol over a window. Use sparingly \
+                            (each call hits the data warehouse). Returns dates + open / high / \
+                            low / close / volume arrays. Good for quick sanity-checks on a \
+                            strategy idea before writing the full code.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Ticker symbol, e.g. SPY or AAPL."
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "How many trading days back from today. Defaults to 252 (one year). Max 2520.",
+                        "minimum": 5,
+                        "maximum": 2520
+                    }
+                },
+                "required": ["symbol"],
+                "additionalProperties": false
+            }
         }
     ])
 }
@@ -1629,6 +1770,57 @@ async fn execute_agent_tool(
             };
             run_backtest_via_houston(rel_path).await
         }
+        // ── Houston-backed broker / data read tools ────────────────
+        // All thin wrappers over GETs against Houston. The
+        // `houston_get` helper handles offline / wrong-version
+        // failure modes with a relayable error message so the agent
+        // can keep the conversation useful even when the stack is
+        // down. Endpoint paths live in docs/HOUSTON-FORGE-API.md so
+        // the main Auracle repo can implement them in lockstep.
+        "get_account_summary" => houston_get("/api/broker/account-summary").await,
+        "get_open_positions" => houston_get("/api/broker/positions").await,
+        "get_recent_fills" => {
+            // Default 30d lookback; clamp to the schema's 1..=365.
+            let days = input
+                .get("days")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(30)
+                .clamp(1, 365);
+            houston_get(&format!("/api/broker/fills?days={days}")).await
+        }
+        "list_connected_brokers" => houston_get("/api/connections").await,
+        "list_universes" => houston_get("/api/master/universes").await,
+        "get_historical_bars" => {
+            let Some(symbol) = input.get("symbol").and_then(|v| v.as_str()) else {
+                return ("error: symbol required".to_string(), false);
+            };
+            // Reject anything that's not a normal ticker shape so we
+            // can't be tricked into building a path that escapes the
+            // intended endpoint (e.g. "AAPL&admin=1" or "../../etc").
+            // Symbols on the supported venues are ASCII alnum + a
+            // few punctuation chars (., -, /, : for crypto perps).
+            if symbol.is_empty()
+                || symbol.len() > 32
+                || !symbol
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '/' | ':'))
+            {
+                return (
+                    format!("error: symbol {symbol:?} doesn't look like a valid ticker"),
+                    false,
+                );
+            }
+            let days = input
+                .get("days")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(252)
+                .clamp(5, 2520);
+            houston_get(&format!(
+                "/api/data/bars?symbol={}&days={days}",
+                urlencoding::encode(symbol),
+            ))
+            .await
+        }
         _ => (format!("unknown tool: {name}"), false),
     }
 }
@@ -1684,12 +1876,31 @@ async fn run_backtest_via_houston(rel_path: &str) -> (String, bool) {
 /// activity-card title in the UI.
 fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
     match name {
-        "list_strategies" | "list_templates" => String::new(),
+        // No-arg tools — the tool name alone is informative enough.
+        "list_strategies"
+        | "list_templates"
+        | "get_account_summary"
+        | "get_open_positions"
+        | "list_connected_brokers"
+        | "list_universes" => String::new(),
         "read_strategy" | "write_strategy" | "run_backtest" => input
             .get("rel_path")
             .and_then(|v| v.as_str())
             .map(String::from)
             .unwrap_or_else(|| "?".to_string()),
+        "get_recent_fills" => input
+            .get("days")
+            .and_then(|v| v.as_u64())
+            .map(|d| format!("last {d}d"))
+            .unwrap_or_else(|| "last 30d".to_string()),
+        "get_historical_bars" => {
+            let symbol = input
+                .get("symbol")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
+            let days = input.get("days").and_then(|v| v.as_u64()).unwrap_or(252);
+            format!("{symbol} · {days}d")
+        }
         _ => input.to_string(),
     }
 }
