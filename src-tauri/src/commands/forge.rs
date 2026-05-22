@@ -1522,15 +1522,28 @@ async fn houston_get(path_and_query: &str) -> (String, bool) {
 }
 
 /// Static tool catalog. Serialized into the Anthropic request body
-/// on every agent_loop call. Tools fall into two families:
+/// on every agent_loop call.
+///
+/// Currently advertised:
 ///
 ///   * File ops (list_strategies, read_strategy, write_strategy,
 ///     list_templates) — local file system, always work.
-///   * Houston-backed (run_backtest, get_account_summary,
-///     get_open_positions, get_recent_fills, list_connected_brokers,
-///     list_universes, get_historical_bars) — need the Auracle stack
-///     up at localhost:1969. Tool returns a clear "stack offline"
-///     message when not, which Claude can relay to the user.
+///   * run_backtest — Houston-backed, hits an endpoint that exists
+///     in shipping Houston versions.
+///
+/// Intentionally NOT advertised right now (dispatch code retained
+/// below for fast re-enablement):
+///
+///   get_account_summary, get_open_positions, get_recent_fills,
+///   list_connected_brokers, list_universes, get_historical_bars
+///
+/// Why: those endpoints aren't shipped by any current Houston build
+/// (see docs/HOUSTON-FORGE-API.md for the planned spec). Advertising
+/// them was making the agent reach for them on tasks like "write me
+/// a monte-carlo simulator", get a 404, then burn a turn pivoting.
+/// Better to not offer a tool than offer a broken one. When Houston
+/// ships the matching routes in a release, add the catalog blocks
+/// back in lockstep with the launcher release that depends on them.
 fn agent_tool_catalog() -> serde_json::Value {
     serde_json::json!([
         {
@@ -1618,100 +1631,16 @@ fn agent_tool_catalog() -> serde_json::Value {
                 "additionalProperties": false
             }
         },
-        {
-            "name": "get_account_summary",
-            "description": "Read the user's connected broker account summary — \
-                            NetLiquidation, BuyingPower, AvailableFunds, MaintenanceMargin, \
-                            currency, etc. Returns JSON from Houston. Use this when the user \
-                            asks about their account, what they can trade, how much capital \
-                            they have, etc.",
-            "input_schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "get_open_positions",
-            "description": "Read the user's current open positions across their connected \
-                            broker accounts. Returns an array of position rows with symbol, \
-                            quantity, average cost, market value, unrealized P&L, currency. \
-                            Use this to give context-aware suggestions ('you're already long \
-                            SPY — adding QQQ would concentrate beta-1 exposure').",
-            "input_schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "get_recent_fills",
-            "description": "Read the user's recent broker fills (executed trades) for the \
-                            given lookback window. Returns symbol, side, quantity, price, \
-                            timestamp, commission per row. Useful for portfolio attribution \
-                            questions ('how did my mean-reversion trades do last week?').",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "days": {
-                        "type": "integer",
-                        "description": "Lookback window in days. Defaults to 30 if omitted. Max 365.",
-                        "minimum": 1,
-                        "maximum": 365
-                    }
-                },
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "list_connected_brokers",
-            "description": "List which broker integrations the user has connected (IBKR, \
-                            Alpaca, ClearStreet, Hyperliquid, Tradier, Tradovate) and their \
-                            connection state (connected / not_connected / error). Use this \
-                            before assuming the user has a particular broker available.",
-            "input_schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "list_universes",
-            "description": "List the named symbol universes available in Auracle's master \
-                            (e.g. 'sp500', 'liquid_us_etfs', 'crypto_perps_top25'). Each \
-                            universe is a curated list of symbols you can reference in a \
-                            Strategy's `universe = ...` declaration. Use this to pick a \
-                            domain-appropriate universe instead of hand-listing symbols.",
-            "input_schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "get_historical_bars",
-            "description": "Fetch daily OHLCV bars for a symbol over a window. Use sparingly \
-                            (each call hits the data warehouse). Returns dates + open / high / \
-                            low / close / volume arrays. Good for quick sanity-checks on a \
-                            strategy idea before writing the full code.",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Ticker symbol, e.g. SPY or AAPL."
-                    },
-                    "days": {
-                        "type": "integer",
-                        "description": "How many trading days back from today. Defaults to 252 (one year). Max 2520.",
-                        "minimum": 5,
-                        "maximum": 2520
-                    }
-                },
-                "required": ["symbol"],
-                "additionalProperties": false
-            }
-        }
+        // ── Broker / data tools intentionally omitted ──────────────
+        // The dispatch arms below still handle these names if Claude
+        // happens to call them via a stale prompt, but they're not
+        // advertised here so the agent doesn't reach for tools
+        // Houston can't serve. Re-add the catalog entries (the
+        // get_account_summary / get_open_positions / get_recent_fills
+        // / list_connected_brokers / list_universes / get_historical_bars
+        // blocks — see git history for the full text) in the same
+        // release that ships the Houston endpoints. Spec lives in
+        // docs/HOUSTON-FORGE-API.md.
     ])
 }
 
@@ -1915,11 +1844,26 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
     }
 }
 
-/// Short summary of a tool result. Capped at ~120 chars so the
-/// activity-card subline doesn't dominate the chat.
+/// Short summary of a tool result. Two different caps:
+///
+///   * Success results: 120 chars. These are usually informational
+///     (file written, X items returned) and the activity card is
+///     just for "did it work" reassurance — Claude consumes the full
+///     content anyway via the tool_result message.
+///
+///   * Error results: 500 chars. Errors usually contain an
+///     actionable command for the user (e.g. "cd ~/auracle && git
+///     pull && docker compose up -d") — truncating in the middle of
+///     that command leaves the user stuck. The earlier 180-char cap
+///     was clipping a real command at "cd ~" and burying the rest
+///     where only Claude could see it. Bumped so the user gets the
+///     full instruction without having to ask Claude to repeat it.
+///
+/// Claude always receives the full untruncated string regardless —
+/// this only affects what's rendered in the activity card.
 fn summarize_tool_result(result: &str, ok: bool) -> String {
     if !ok {
-        return result.chars().take(180).collect();
+        return result.chars().take(500).collect();
     }
     // Heuristic: if the result is JSON, count items or show field
     // names; otherwise truncate. The agent often returns JSON for
