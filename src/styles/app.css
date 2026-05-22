@@ -724,3 +724,131 @@ pre.logs {
 .forge-tree-row .forge-tree-name {
   margin-right: var(--s-2);
 }
+
+/* ── File-tree actions (+ New + per-row ⋯ menu) ──────────────── */
+
+.forge-tree-new {
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 3px var(--s-2);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.forge-tree-new:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* Row needs position:relative so the menu can anchor right of it. */
+.forge-tree-row {
+  position: relative;
+}
+
+.forge-tree-menu-trigger {
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  margin-left: 4px;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  opacity: 0;
+  transition: opacity 0.12s, background-color 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+/* Show the ⋯ only on hover so the row stays clean by default. */
+.forge-tree-row:hover .forge-tree-menu-trigger,
+.forge-tree-row.active .forge-tree-menu-trigger {
+  opacity: 1;
+}
+.forge-tree-menu-trigger:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.forge-tree-menu {
+  position: absolute;
+  top: 100%;
+  right: var(--s-2);
+  z-index: 50;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+}
+
+.forge-tree-menu button {
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.forge-tree-menu button:hover {
+  background: var(--surface-2);
+}
+.forge-tree-menu button.danger {
+  color: var(--err);
+}
+.forge-tree-menu button.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Inline rename input that replaces the row label. */
+.forge-tree-rename-input {
+  flex: 1;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--r-sm);
+  padding: 2px var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  min-width: 0;
+}
+.forge-tree-rename-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Header layout — left side flexes, right side hugs the + New button. */
+.forge-panel-head {
+  /* override default justify-content:space-between with align-items
+   * for the slightly taller header when the + button is present */
+  align-items: center;
+}
+
+/* Template dropdown in the New Strategy modal */
+.forge-template-select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+.forge-template-select:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}

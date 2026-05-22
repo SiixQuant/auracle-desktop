@@ -11,7 +11,7 @@
 // they just collapse into the nearest top-level group. Real tree
 // UX lands in Phase 2.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   cmd,
@@ -27,6 +27,12 @@ interface FileTreeProps {
   states: Record<string, StrategyState>;
   /** True when states came from Houston (fresh); false on cache fallback. */
   statesAreFresh: boolean;
+  /** Open the "New strategy" modal. */
+  onNewStrategy: () => void;
+  /** Called after a successful rename — parent re-fetches the tree. */
+  onRenamed: (oldPath: string, newPath: string) => void;
+  /** Called after a successful delete — parent re-fetches the tree. */
+  onDeleted: (path: string) => void;
 }
 
 export default function FileTree({
@@ -35,7 +41,16 @@ export default function FileTree({
   refreshKey,
   states,
   statesAreFresh,
+  onNewStrategy,
+  onRenamed,
+  onDeleted,
 }: FileTreeProps) {
+  // Per-row inline rename state: which row is being edited + the
+  // value-in-progress. null = nothing being renamed.
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  // Which row's ⋯ menu is open. Click outside to close.
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
   const [files, setFiles] = useState<StrategyFile[] | null>(null);
   const [dir, setDir] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -97,20 +112,33 @@ export default function FileTree({
   });
 
   return (
-    <div className="forge-panel">
+    <div className="forge-panel" onClick={() => setMenuOpenFor(null)}>
       <div className="forge-panel-head">
-        Strategies
-        <span className="forge-panel-sub" title={dir}>
-          {shortPath(dir)}
-          {!statesAreFresh && files.length > 0 ? (
-            <span
-              title="Showing cached lifecycle states — Houston is offline or hasn't implemented /api/forge/strategies yet."
-              style={{ marginLeft: 6, opacity: 0.6 }}
-            >
-              · cached
-            </span>
-          ) : null}
+        <span>
+          Strategies
+          <span className="forge-panel-sub" title={dir}>
+            {shortPath(dir)}
+            {!statesAreFresh && files.length > 0 ? (
+              <span
+                title="Showing cached lifecycle states — Houston is offline or hasn't implemented /api/forge/strategies yet."
+                style={{ marginLeft: 6, opacity: 0.6 }}
+              >
+                · cached
+              </span>
+            ) : null}
+          </span>
         </span>
+        <button
+          type="button"
+          className="forge-tree-new"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNewStrategy();
+          }}
+          title="New strategy"
+        >
+          + New
+        </button>
       </div>
       <div className="forge-tree">
         {files.length === 0 ? (
@@ -133,30 +161,195 @@ export default function FileTree({
               <div className="forge-tree-group-head">{groupName}</div>
               {groups.get(groupName)!.map((f) => {
                 const state = states[f.rel_path] ?? "draft";
+                const isRenaming = renamingPath === f.rel_path;
+                const isMenuOpen = menuOpenFor === f.rel_path;
                 return (
-                  <button
+                  <TreeRow
                     key={f.rel_path}
-                    type="button"
-                    className={`forge-tree-row ${
-                      activePath === f.rel_path ? "active" : ""
-                    }`}
-                    onClick={() => onOpen(f.rel_path)}
-                    title={`${f.rel_path} · ${state}`}
-                  >
-                    <span className="forge-tree-kind">
-                      {f.kind === "notebook" ? "ⓝ" : "py"}
-                    </span>
-                    <span className="forge-tree-name">
-                      {leafName(f.rel_path)}
-                    </span>
-                    <StatePill state={state} />
-                  </button>
+                    file={f}
+                    state={state}
+                    active={activePath === f.rel_path}
+                    isRenaming={isRenaming}
+                    isMenuOpen={isMenuOpen}
+                    renameValue={renameValue}
+                    setRenameValue={setRenameValue}
+                    onOpen={onOpen}
+                    onMenuToggle={() => {
+                      setMenuOpenFor(isMenuOpen ? null : f.rel_path);
+                    }}
+                    onBeginRename={() => {
+                      setMenuOpenFor(null);
+                      setRenamingPath(f.rel_path);
+                      setRenameValue(leafName(f.rel_path));
+                    }}
+                    onCommitRename={async () => {
+                      const trimmed = renameValue.trim();
+                      if (!trimmed || trimmed === leafName(f.rel_path)) {
+                        setRenamingPath(null);
+                        return;
+                      }
+                      // Preserve the parent directory of the original path.
+                      const slash = f.rel_path.lastIndexOf("/");
+                      const newRel =
+                        slash === -1
+                          ? trimmed
+                          : `${f.rel_path.slice(0, slash + 1)}${trimmed}`;
+                      try {
+                        await cmd.forgeRenameFile(f.rel_path, newRel);
+                        onRenamed(f.rel_path, newRel);
+                      } catch (err) {
+                        alert(`Rename failed: ${err}`);
+                      } finally {
+                        setRenamingPath(null);
+                      }
+                    }}
+                    onCancelRename={() => setRenamingPath(null)}
+                    onDelete={async () => {
+                      setMenuOpenFor(null);
+                      if (
+                        !confirm(
+                          `Move ${f.rel_path} to .archive/?\n\nThe file is archived (not permanently deleted) and recoverable from Finder.`,
+                        )
+                      )
+                        return;
+                      try {
+                        await cmd.forgeDeleteFile(f.rel_path);
+                        onDeleted(f.rel_path);
+                      } catch (err) {
+                        alert(`Delete failed: ${err}`);
+                      }
+                    }}
+                  />
                 );
               })}
             </div>
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+interface TreeRowProps {
+  file: StrategyFile;
+  state: StrategyState;
+  active: boolean;
+  isRenaming: boolean;
+  isMenuOpen: boolean;
+  renameValue: string;
+  setRenameValue: (v: string) => void;
+  onOpen: (path: string) => void;
+  onMenuToggle: () => void;
+  onBeginRename: () => void;
+  onCommitRename: () => void;
+  onCancelRename: () => void;
+  onDelete: () => void;
+}
+
+function TreeRow({
+  file,
+  state,
+  active,
+  isRenaming,
+  isMenuOpen,
+  renameValue,
+  setRenameValue,
+  onOpen,
+  onMenuToggle,
+  onBeginRename,
+  onCommitRename,
+  onCancelRename,
+  onDelete,
+}: TreeRowProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Autofocus + select the stem (no extension) when rename begins
+  // so the user can type a new name without having to delete the
+  // .py suffix every time.
+  useEffect(() => {
+    if (isRenaming && inputRef.current) {
+      const el = inputRef.current;
+      el.focus();
+      const dot = el.value.lastIndexOf(".");
+      el.setSelectionRange(0, dot === -1 ? el.value.length : dot);
+    }
+  }, [isRenaming]);
+
+  if (isRenaming) {
+    return (
+      <div className={`forge-tree-row ${active ? "active" : ""}`}>
+        <span className="forge-tree-kind">
+          {file.kind === "notebook" ? "ⓝ" : "py"}
+        </span>
+        <input
+          ref={inputRef}
+          type="text"
+          className="forge-tree-rename-input"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onCommitRename();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onCancelRename();
+            }
+          }}
+          onBlur={onCommitRename}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`forge-tree-row ${active ? "active" : ""}`}
+      onClick={() => onOpen(file.rel_path)}
+      title={`${file.rel_path} · ${state}`}
+    >
+      <span className="forge-tree-kind">
+        {file.kind === "notebook" ? "ⓝ" : "py"}
+      </span>
+      <span className="forge-tree-name">{leafName(file.rel_path)}</span>
+      <StatePill state={state} />
+      <button
+        type="button"
+        className="forge-tree-menu-trigger"
+        onClick={(e) => {
+          e.stopPropagation();
+          onMenuToggle();
+        }}
+        title="File actions"
+        aria-label="File actions"
+      >
+        ⋯
+      </button>
+      {isMenuOpen && (
+        <div
+          className="forge-tree-menu"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onBeginRename();
+            }}
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => {
+              onDelete();
+            }}
+          >
+            Archive…
+          </button>
+        </div>
+      )}
     </div>
   );
 }

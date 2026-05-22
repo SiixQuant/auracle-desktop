@@ -168,6 +168,16 @@ export const cmd = {
   forgeSetStrategyState: (relPath: string, state: StrategyState) =>
     invoke<void>("forge_set_strategy_state", { relPath, state }),
 
+  // File management
+  forgeNewFile: (relPath: string, template: string) =>
+    invoke<void>("forge_new_file", { relPath, template }),
+  forgeRenameFile: (oldRelPath: string, newRelPath: string) =>
+    invoke<void>("forge_rename_file", { oldRelPath, newRelPath }),
+  forgeDeleteFile: (relPath: string) =>
+    invoke<void>("forge_delete_file", { relPath }),
+  forgeAvailableTemplates: () =>
+    invoke<StrategyTemplate[]>("forge_available_templates"),
+
   // Anthropic API key — separate keychain slot from the license key
   anthropicKeyGet: () => invoke<string | null>("anthropic_key_get"),
   anthropicKeySet: (value: string) =>
@@ -242,6 +252,12 @@ export interface StrategyStates {
   states: Record<string, StrategyState>;
   /** True when freshly fetched from Houston; false on cache fallback. */
   from_houston: boolean;
+}
+
+export interface StrategyTemplate {
+  id: string;
+  name: string;
+  description: string;
 }
 
 // ── Misc helpers ────────────────────────────────────────────────

@@ -20,12 +20,14 @@ import { useCallback, useEffect, useState } from "react";
 import ChatPanel from "@/components/forge/ChatPanel";
 import Editor from "@/components/forge/Editor";
 import FileTree from "@/components/forge/FileTree";
+import NewStrategyModal from "@/components/forge/NewStrategyModal";
 import { cmd, type StrategyState } from "@/lib/tauri";
 
 export default function Forge() {
   const [activePath, setActivePath] = useState<string | null>(null);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
+  const [showNewModal, setShowNewModal] = useState(false);
 
   // Strategy lifecycle state map. Lives at the Forge level so the
   // tree pills + the editor dropdown stay in sync without prop-
@@ -76,6 +78,17 @@ export default function Forge() {
           refreshKey={treeRefreshKey}
           states={states}
           statesAreFresh={fromHouston}
+          onNewStrategy={() => setShowNewModal(true)}
+          onRenamed={(oldPath, newPath) => {
+            // Refresh + reopen the renamed file in the editor if it
+            // was the active one.
+            setTreeRefreshKey((k) => k + 1);
+            if (activePath === oldPath) setActivePath(newPath);
+          }}
+          onDeleted={(deleted) => {
+            setTreeRefreshKey((k) => k + 1);
+            if (activePath === deleted) setActivePath(null);
+          }}
         />
       </div>
       <div className="forge-col forge-col-center">
@@ -105,6 +118,17 @@ export default function Forge() {
           onInsertCode={(code) => setPendingCode(code)}
         />
       </div>
+
+      {showNewModal && (
+        <NewStrategyModal
+          onCreated={(relPath) => {
+            setShowNewModal(false);
+            setTreeRefreshKey((k) => k + 1);
+            setActivePath(relPath);
+          }}
+          onCancel={() => setShowNewModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -338,6 +338,324 @@ pub async fn forge_write_file(
     Ok(())
 }
 
+// ── File management (Phase 4c-1) ────────────────────────────────
+//
+// Three operations: create, rename, delete. Each goes through the
+// same path-safety gate (safe_resolve) so untrusted input — like
+// a user-typed filename or a future drag-and-drop — can't reach
+// outside the strategies root.
+//
+// Delete moves the file to <root>/.archive/<timestamp>-<name>
+// rather than fs::remove_file. The archive is invisible in the
+// tree (walk_into skips dotfiles) but recoverable from Finder
+// in case a customer deletes the wrong file at 2am. Same pattern
+// Houston uses for its own delete_strategy().
+
+#[tauri::command]
+pub async fn forge_new_file(
+    app: tauri::AppHandle,
+    rel_path: String,
+    template: String,
+) -> Result<(), String> {
+    let root = resolve_strategies_dir(&app)?;
+    let abs = safe_resolve(&root, &rel_path)?;
+    if abs.exists() {
+        return Err(format!("file already exists: {rel_path}"));
+    }
+    // Reject if the path resolves to a non-.py / non-.ipynb leaf —
+    // Forge's tree only renders those two types, so creating
+    // anything else produces an invisible file the user can't see.
+    let ext_ok = matches!(
+        abs.extension().and_then(|s| s.to_str()),
+        Some("py") | Some("ipynb")
+    );
+    if !ext_ok {
+        return Err(
+            "new strategy files must end in .py or .ipynb".to_string(),
+        );
+    }
+
+    if let Some(parent) = abs.parent() {
+        fs::create_dir_all(parent).map_err(to_error_string)?;
+    }
+    let contents = template_for(&template, &rel_path);
+    fs::write(&abs, contents).map_err(|e| format!("write failed: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn forge_rename_file(
+    app: tauri::AppHandle,
+    old_rel_path: String,
+    new_rel_path: String,
+) -> Result<(), String> {
+    let root = resolve_strategies_dir(&app)?;
+    let from = safe_resolve(&root, &old_rel_path)?;
+    let to = safe_resolve(&root, &new_rel_path)?;
+    if !from.exists() {
+        return Err(format!("source does not exist: {old_rel_path}"));
+    }
+    if to.exists() {
+        return Err(format!("destination already exists: {new_rel_path}"));
+    }
+    if let Some(parent) = to.parent() {
+        fs::create_dir_all(parent).map_err(to_error_string)?;
+    }
+    fs::rename(&from, &to).map_err(|e| format!("rename failed: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn forge_delete_file(
+    app: tauri::AppHandle,
+    rel_path: String,
+) -> Result<(), String> {
+    let root = resolve_strategies_dir(&app)?;
+    let abs = safe_resolve(&root, &rel_path)?;
+    if !abs.exists() {
+        return Err(format!("file does not exist: {rel_path}"));
+    }
+
+    // Move to <root>/.archive/<ts>-<flattened-name> rather than
+    // delete outright. The archive is invisible in the tree but
+    // recoverable from Finder.
+    let archive_root = root.join(".archive");
+    fs::create_dir_all(&archive_root).map_err(to_error_string)?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let flat = rel_path.replace('/', "__");
+    let archived = archive_root.join(format!("{stamp}-{flat}"));
+    fs::rename(&abs, &archived).map_err(|e| format!("archive failed: {e}"))?;
+    Ok(())
+}
+
+// ── Strategy templates ──────────────────────────────────────────
+//
+// Hardcoded into the binary so a fresh install has working
+// templates without depending on a templates/ directory the user
+// might not have synced. Each template is a complete runnable
+// strategy — the user can hit Run Backtest immediately after
+// creation. New templates added here automatically appear in the
+// NewStrategyModal's dropdown (the frontend fetches the list via
+// forge_available_templates).
+
+#[derive(Serialize)]
+pub struct StrategyTemplate {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+}
+
+#[tauri::command]
+pub async fn forge_available_templates() -> Result<Vec<StrategyTemplate>, String> {
+    Ok(vec![
+        StrategyTemplate {
+            id: "blank".into(),
+            name: "Blank".into(),
+            description: "Empty Strategy subclass with method stubs. Start from scratch.".into(),
+        },
+        StrategyTemplate {
+            id: "ma_crossover".into(),
+            name: "MA Crossover".into(),
+            description: "Classic 50/200 simple-moving-average crossover on SPY. Long when 50 > 200.".into(),
+        },
+        StrategyTemplate {
+            id: "rsi_mean_reversion".into(),
+            name: "RSI Mean-Reversion".into(),
+            description: "Buy when 14-day RSI < 30, sell when RSI > 70. Liquid US ETFs.".into(),
+        },
+        StrategyTemplate {
+            id: "momentum".into(),
+            name: "Cross-Sectional Momentum".into(),
+            description: "Top-N 12-1 momentum on a US equities universe. Equal-weight, monthly rebalance.".into(),
+        },
+    ])
+}
+
+fn template_for(id: &str, rel_path: &str) -> String {
+    // Strip directory + extension to derive a class name. The
+    // user-typed filename becomes the class identifier so it's
+    // immediately discoverable from auracle's scheduler.
+    let stem = std::path::Path::new(rel_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("MyStrategy");
+    let class_name = to_pascal_case(stem);
+
+    match id {
+        "ma_crossover" => format!(
+            r#"""""MA Crossover — 50/200 simple moving average crossover on SPY."""
+
+from __future__ import annotations
+import pandas as pd
+
+from auracle.backtest import Strategy, run_backtest
+from auracle.db import get_engine
+
+
+class {class_name}(Strategy):
+    universe = [("SPY", "ARCA")]
+
+    fast = 50
+    slow = 200
+
+    def prices_to_signals(self, prices: pd.DataFrame) -> pd.DataFrame:
+        close = prices.xs("close", level=1, axis=1)
+        fast = close.rolling(self.fast).mean()
+        slow = close.rolling(self.slow).mean()
+        # 1 when fast crosses above slow, else 0 (flat). One signal
+        # per symbol; long-only.
+        return (fast > slow).astype(int)
+
+
+if __name__ == "__main__":
+    print(run_backtest(get_engine(), {class_name}))
+"#,
+            class_name = class_name
+        ),
+
+        "rsi_mean_reversion" => format!(
+            r#"""""RSI mean-reversion — buy oversold, sell overbought on a liquid ETF basket."""
+
+from __future__ import annotations
+import pandas as pd
+
+from auracle.backtest import Strategy, run_backtest
+from auracle.db import get_engine
+
+
+def _rsi(close: pd.Series, window: int = 14) -> pd.Series:
+    delta = close.diff()
+    gain = delta.clip(lower=0).rolling(window).mean()
+    loss = (-delta.clip(upper=0)).rolling(window).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+
+class {class_name}(Strategy):
+    universe = [
+        ("SPY", "ARCA"), ("QQQ", "NASDAQ"), ("IWM", "ARCA"),
+        ("XLF", "ARCA"), ("XLE", "ARCA"), ("XLK", "ARCA"),
+    ]
+
+    rsi_window = 14
+    buy_below = 30
+    sell_above = 70
+
+    def prices_to_signals(self, prices: pd.DataFrame) -> pd.DataFrame:
+        close = prices.xs("close", level=1, axis=1)
+        rsi = close.apply(_rsi, window=self.rsi_window)
+        # +1 buy, -1 sell, 0 hold. Long-only flavor — clip floor at 0.
+        signal = pd.DataFrame(0, index=close.index, columns=close.columns)
+        signal[rsi < self.buy_below] = 1
+        signal[rsi > self.sell_above] = -1
+        return signal.clip(lower=0)
+
+
+if __name__ == "__main__":
+    print(run_backtest(get_engine(), {class_name}))
+"#,
+            class_name = class_name
+        ),
+
+        "momentum" => format!(
+            r#"""""Cross-sectional momentum — top-N 12-1 momentum on US equities."""
+
+from __future__ import annotations
+import pandas as pd
+
+from auracle.backtest import Strategy, run_backtest
+from auracle.db import get_engine
+
+
+class {class_name}(Strategy):
+    universe = [
+        ("AAPL", "NASDAQ"), ("MSFT", "NASDAQ"), ("NVDA", "NASDAQ"),
+        ("AMZN", "NASDAQ"), ("META", "NASDAQ"), ("GOOGL", "NASDAQ"),
+        ("TSLA", "NASDAQ"), ("BRK.B", "NYSE"), ("JPM", "NYSE"),
+        ("UNH", "NYSE"),
+    ]
+
+    lookback_months = 12
+    skip_months = 1
+    top_n = 3
+
+    def prices_to_signals(self, prices: pd.DataFrame) -> pd.DataFrame:
+        close = prices.xs("close", level=1, axis=1)
+        # 12-1 momentum: trailing 12-month return excluding the
+        # most recent month. ~252 trading days for 12m, ~21 for 1m.
+        mom = close.pct_change(252 - 21) - close.pct_change(21)
+        rank = mom.rank(axis=1, ascending=False)
+        return (rank <= self.top_n).astype(int)
+
+    def signals_to_target_weights(self, signals: pd.DataFrame) -> pd.DataFrame:
+        # Equal-weight across the selected names; refresh once per
+        # month (resample to month-end, then forward-fill).
+        weights = signals.div(signals.sum(axis=1).replace(0, 1), axis=0)
+        return weights.resample("ME").last().reindex(signals.index).ffill().fillna(0)
+
+
+if __name__ == "__main__":
+    print(run_backtest(get_engine(), {class_name}))
+"#,
+            class_name = class_name
+        ),
+
+        // "blank" or unknown -> blank template
+        _ => format!(
+            r#"""""{class_name} — Auracle strategy template.
+
+Fill in `universe` and `prices_to_signals` to get started. The
+default below is empty long/short; running this as-is produces
+zero trades.
+"""
+
+from __future__ import annotations
+import pandas as pd
+
+from auracle.backtest import Strategy, run_backtest
+from auracle.db import get_engine
+
+
+class {class_name}(Strategy):
+    universe = [
+        # ("SPY", "ARCA"),
+    ]
+
+    def prices_to_signals(self, prices: pd.DataFrame) -> pd.DataFrame:
+        close = prices.xs("close", level=1, axis=1)
+        # Replace with your signal logic. Return a DataFrame of the
+        # same shape as `close` with values in [-1, 1] or {{0, 1}}.
+        return pd.DataFrame(0, index=close.index, columns=close.columns)
+
+
+if __name__ == "__main__":
+    print(run_backtest(get_engine(), {class_name}))
+"#,
+            class_name = class_name
+        ),
+    }
+}
+
+fn to_pascal_case(s: &str) -> String {
+    // file_stem -> FileStem. Splits on _ - and whitespace.
+    let mut out = String::new();
+    let mut capitalize_next = true;
+    for ch in s.chars() {
+        if ch == '_' || ch == '-' || ch.is_whitespace() {
+            capitalize_next = true;
+        } else if capitalize_next {
+            out.extend(ch.to_uppercase());
+            capitalize_next = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    if out.is_empty() { "MyStrategy".to_string() } else { out }
+}
+
 // ── Anthropic API key (separate keychain slot from license) ─────
 
 #[tauri::command]
