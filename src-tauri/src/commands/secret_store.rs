@@ -57,7 +57,9 @@
 //!   never need to re-enter their keys. See `migrate_from_keyring`.
 
 use std::path::PathBuf;
+use std::sync::Mutex;
 
+use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
@@ -81,9 +83,35 @@ const CLIENT_BYTES: &[u8] = b"auracle-desktop";
 /// release.
 const VAULT_KEY_DOMAIN: &[u8] = b"auracle-desktop-vault-v1:";
 
+/// Process-wide cache for the open Stronghold instance. Avoids the
+/// 200-500ms reopen cost on every put/get/delete:
+///
+///   * machine_uid::get() shells out to ioreg/registry/file-read
+///   * Stronghold::new() loads + decrypts the snapshot
+///
+/// Both happen ONCE for the process lifetime. Subsequent calls just
+/// lock the mutex (uncontended in our usage) and operate on the
+/// in-memory client. save() is the only thing that touches disk per
+/// write call, and that's necessary by definition.
+///
+/// Thread safety: iota_stronghold uses its own internal locking, so
+/// holding our mutex across the inner ops is correct. Tauri
+/// commands are short-lived so contention is a non-issue.
+static VAULT: Lazy<Mutex<Option<Stronghold>>> = Lazy::new(|| Mutex::new(None));
+
+/// Cache the machine-derived password too — `machine_uid::get()` is
+/// the most expensive call in the whole open path (ioreg subprocess
+/// on macOS). Once per process is enough.
+static CACHED_PASSWORD: Lazy<Mutex<Option<String>>> =
+    Lazy::new(|| Mutex::new(None));
+
 // ── Password derivation ─────────────────────────────────────────
 
 fn derive_password(app: &AppHandle) -> Result<String, String> {
+    let mut guard = CACHED_PASSWORD.lock().unwrap();
+    if let Some(p) = guard.as_ref() {
+        return Ok(p.clone());
+    }
     let machine = machine_uid::get().unwrap_or_else(|_| {
         // machine-uid can fail on stripped-down Linux containers,
         // headless CI, etc. Fall back to a stable placeholder; the
@@ -97,7 +125,9 @@ fn derive_password(app: &AppHandle) -> Result<String, String> {
         "no-machine-id".to_string()
     });
     let install = ensure_install_uuid(app)?;
-    Ok(format!("auracle:{machine}:{install}"))
+    let password = format!("auracle:{machine}:{install}");
+    *guard = Some(password.clone());
+    Ok(password)
 }
 
 fn ensure_install_uuid(app: &AppHandle) -> Result<String, String> {
@@ -124,86 +154,120 @@ fn vault_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join(VAULT_FILE))
 }
 
-/// Open the snapshot. Each call builds a fresh `Stronghold` wrapper
-/// — they're cheap (one disk read of the snapshot if it exists, no
-/// work if it doesn't). The plugin's own Stronghold collection is
-/// for frontend-facing Tauri commands; we use the wrapper type
-/// directly here so we don't have to plumb requests through the
-/// command dispatcher.
-fn open(app: &AppHandle) -> Result<Stronghold, String> {
-    let path = vault_path(app)?;
-    let password = derive_password(app)?;
-    // Hash the machine-derived password into a fixed-size key for
-    // the snapshot. SHA-256 with a versioned domain-separator
-    // prefix so we can rotate via the prefix later.
-    let mut hasher = Sha256::new();
-    hasher.update(VAULT_KEY_DOMAIN);
-    hasher.update(password.as_bytes());
-    let key = hasher.finalize().to_vec();
-    Stronghold::new(path, key).map_err(to_error_string)
+/// Lock the global vault, lazily opening + caching on the first
+/// call. The closure receives the cached Stronghold instance —
+/// subsequent invocations skip the entire open path (machine_uid
+/// lookup, snapshot decryption, KeyProvider construction).
+///
+/// Cost profile:
+///   First call:        ~200-500ms (open + cache)
+///   Subsequent calls:  ~1ms lock + closure body
+fn with_vault<F, R>(app: &AppHandle, f: F) -> Result<R, String>
+where
+    F: FnOnce(&Stronghold) -> Result<R, String>,
+{
+    let mut guard = VAULT.lock().unwrap();
+
+    if guard.is_none() {
+        let path = vault_path(app)?;
+        let password = derive_password(app)?;
+        // SHA-256 with a versioned domain-separator. Bumping the
+        // prefix would re-key the vault — would need a one-shot
+        // re-encrypt migration in that release.
+        let mut hasher = Sha256::new();
+        hasher.update(VAULT_KEY_DOMAIN);
+        hasher.update(password.as_bytes());
+        let key = hasher.finalize().to_vec();
+        let stronghold = Stronghold::new(path, key).map_err(to_error_string)?;
+        *guard = Some(stronghold);
+    }
+
+    // unwrap-safe: we just ensured it's Some above.
+    f(guard.as_ref().unwrap())
+}
+
+/// Variant of `with_vault` that swallows vault-open errors and
+/// returns the supplied default. Used by get() / delete() where
+/// "vault doesn't exist" is a legitimate no-op state.
+fn with_vault_or_default<F, R>(app: &AppHandle, default: R, f: F) -> Result<R, String>
+where
+    F: FnOnce(&Stronghold) -> Result<R, String>,
+{
+    let mut guard = VAULT.lock().unwrap();
+
+    if guard.is_none() {
+        let path = vault_path(app)?;
+        let password = match derive_password(app) {
+            Ok(p) => p,
+            Err(_) => return Ok(default),
+        };
+        let mut hasher = Sha256::new();
+        hasher.update(VAULT_KEY_DOMAIN);
+        hasher.update(password.as_bytes());
+        let key = hasher.finalize().to_vec();
+        match Stronghold::new(path, key) {
+            Ok(s) => *guard = Some(s),
+            Err(_) => return Ok(default),
+        }
+    }
+
+    f(guard.as_ref().unwrap())
 }
 
 // ── Public API ──────────────────────────────────────────────────
 //
-// Each fn opens the vault fresh and looks up the client by name.
-// Cheap — the snapshot file is small and the plugin handles
-// loading/decryption efficiently. We don't extract a `client_for`
-// helper because doing so would require naming
-// `iota_stronghold::Client` in the return type (which isn't a
-// direct dep). Inlining the lookup lets type inference handle it.
+// All three ops go through with_vault so they share the cached
+// Stronghold instance. The client lookup inside each closure is
+// in-memory + cheap (~microseconds).
 
 pub fn put(app: &AppHandle, key: &str, value: &str) -> Result<(), String> {
-    let stronghold = open(app)?;
-    let client = match stronghold.load_client(CLIENT_BYTES) {
-        Ok(c) => c,
-        Err(_) => stronghold
-            .create_client(CLIENT_BYTES)
-            .map_err(to_error_string)?,
-    };
-    let store = client.store();
-    store
-        .insert(key.as_bytes().to_vec(), value.as_bytes().to_vec(), None)
-        .map_err(to_error_string)?;
-    stronghold.save().map_err(to_error_string)?;
-    Ok(())
+    with_vault(app, |stronghold| {
+        let client = match stronghold.load_client(CLIENT_BYTES) {
+            Ok(c) => c,
+            Err(_) => stronghold
+                .create_client(CLIENT_BYTES)
+                .map_err(to_error_string)?,
+        };
+        let store = client.store();
+        store
+            .insert(key.as_bytes().to_vec(), value.as_bytes().to_vec(), None)
+            .map_err(to_error_string)?;
+        // save() encrypts + writes the snapshot. The actual disk
+        // cost — unavoidable for a write op, but our vault is
+        // small (a few keys = few KB) so this is ~10-50ms.
+        stronghold.save().map_err(to_error_string)?;
+        Ok(())
+    })
 }
 
 pub fn get(app: &AppHandle, key: &str) -> Result<Option<String>, String> {
-    let stronghold = match open(app) {
-        Ok(s) => s,
-        // Vault open failure (most often: doesn't exist yet) → no
-        // secrets, return None. Not an error from the caller's
-        // perspective.
-        Err(_) => return Ok(None),
-    };
-    let client = match stronghold.load_client(CLIENT_BYTES) {
-        Ok(c) => c,
-        // Vault exists but no client → no data yet.
-        Err(_) => return Ok(None),
-    };
-    let store = client.store();
-    let bytes = match store.get(key.as_bytes()) {
-        Ok(Some(b)) => b,
-        Ok(None) => return Ok(None),
-        Err(e) => return Err(to_error_string(e)),
-    };
-    let s = String::from_utf8(bytes).map_err(to_error_string)?;
-    Ok(Some(s))
+    with_vault_or_default(app, None, |stronghold| {
+        let client = match stronghold.load_client(CLIENT_BYTES) {
+            Ok(c) => c,
+            Err(_) => return Ok(None),
+        };
+        let store = client.store();
+        let bytes = match store.get(key.as_bytes()) {
+            Ok(Some(b)) => b,
+            Ok(None) => return Ok(None),
+            Err(e) => return Err(to_error_string(e)),
+        };
+        let s = String::from_utf8(bytes).map_err(to_error_string)?;
+        Ok(Some(s))
+    })
 }
 
 pub fn delete(app: &AppHandle, key: &str) -> Result<(), String> {
-    let stronghold = match open(app) {
-        Ok(s) => s,
-        Err(_) => return Ok(()), // vault gone = key gone
-    };
-    let client = match stronghold.load_client(CLIENT_BYTES) {
-        Ok(c) => c,
-        Err(_) => return Ok(()),
-    };
-    let store = client.store();
-    let _ = store.delete(key.as_bytes()).map_err(to_error_string);
-    stronghold.save().map_err(to_error_string)?;
-    Ok(())
+    with_vault_or_default(app, (), |stronghold| {
+        let client = match stronghold.load_client(CLIENT_BYTES) {
+            Ok(c) => c,
+            Err(_) => return Ok(()),
+        };
+        let store = client.store();
+        let _ = store.delete(key.as_bytes()).map_err(to_error_string);
+        stronghold.save().map_err(to_error_string)?;
+        Ok(())
+    })
 }
 
 // ── Migration from the OS keychain ──────────────────────────────
