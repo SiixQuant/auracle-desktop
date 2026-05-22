@@ -53,6 +53,16 @@ const ANTHROPIC_DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
+/// Shared error string when no API key is found in either the
+/// keychain or the ANTHROPIC_API_KEY env var. Single source of
+/// truth so the message stays consistent across forge_chat,
+/// forge_chat_stream, and forge_agent_run.
+const MISSING_KEY_ERROR: &str =
+    "Anthropic API key not found. Either: (1) open Settings → Forge and paste your key \
+     (sk-ant-…), OR (2) set ANTHROPIC_API_KEY in your shell or .env. \
+     If you DID paste it and still see this, your keychain may have a permission issue \
+     — see the Save error for fix instructions.";
+
 /// Model whitelist. Adding a new Anthropic model means appending it
 /// here; the frontend reads via `forge_available_models` so the
 /// dropdown stays in lockstep with the Rust enforcement layer (we
@@ -701,8 +711,24 @@ fn to_pascal_case(s: &str) -> String {
 
 // ── Anthropic API key (separate keychain slot from license) ─────
 
-#[tauri::command]
-pub fn anthropic_key_get() -> Result<Option<String>, String> {
+/// Read the Anthropic API key from either the OS keychain OR the
+/// ANTHROPIC_API_KEY env var. The env var wins if both are set —
+/// it's the dev/CI override path AND the customer's "the keychain
+/// is being weird, let me put it in .env" escape hatch.
+///
+/// This single resolver is the source of truth used by every Forge
+/// command that needs the key. Calling sites use this instead of
+/// reading the Entry directly so the env-var fallback covers all of
+/// them (chat, stream, agent loop, and any future tool).
+fn resolve_anthropic_key() -> Result<Option<String>, String> {
+    // Env-var first.
+    if let Ok(v) = std::env::var("ANTHROPIC_API_KEY") {
+        let trimmed = v.trim().to_string();
+        if !trimmed.is_empty() {
+            return Ok(Some(trimmed));
+        }
+    }
+    // Then keychain.
     let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
         .map_err(to_error_string)?;
     match entry.get_password() {
@@ -710,6 +736,11 @@ pub fn anthropic_key_get() -> Result<Option<String>, String> {
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(e) => Err(to_error_string(e)),
     }
+}
+
+#[tauri::command]
+pub fn anthropic_key_get() -> Result<Option<String>, String> {
+    resolve_anthropic_key()
 }
 
 #[tauri::command]
@@ -730,7 +761,41 @@ pub fn anthropic_key_set(value: String) -> Result<(), String> {
     let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
         .map_err(to_error_string)?;
     entry.set_password(&v).map_err(to_error_string)?;
-    Ok(())
+
+    // Verify-after-save: the macOS keychain occasionally claims a
+    // write succeeded but a subsequent read returns NoEntry (we've
+    // seen this when permission is granted for write only, or when
+    // the keyring crate's caller has a different code signature
+    // than the writer). Catching the mismatch here means the UI
+    // shows an immediate, actionable error instead of a silent
+    // success followed by a confusing "key not set" later.
+    match entry.get_password() {
+        Ok(ref stored) if stored == &v => Ok(()),
+        Ok(_) => Err(
+            "Saved but the keychain returned a different value when re-read — \
+             this usually means another process wrote the same slot. Open \
+             Keychain Access, search for 'com.auracle.desktop / anthropic-api-key', \
+             delete the entry, then save again. \
+             OR set ANTHROPIC_API_KEY in your shell / .env as a workaround."
+                .to_string(),
+        ),
+        Err(keyring::Error::NoEntry) => Err(
+            "Saved but the keychain immediately returned no entry on read. \
+             This is a macOS permission issue — the most common fix: open \
+             Keychain Access, find 'com.auracle.desktop / anthropic-api-key' \
+             under Local Items, right-click → Get Info → Access Control, \
+             and either add Auracle Desktop to 'Always allow access' OR \
+             delete the entry and save again (you'll get a fresh permission \
+             prompt). \
+             Quick unblock: set ANTHROPIC_API_KEY in your shell / .env \
+             — Forge reads the env var first."
+                .to_string(),
+        ),
+        Err(e) => Err(format!(
+            "Saved but verify-read failed: {e}. \
+             Quick unblock: set ANTHROPIC_API_KEY in your shell / .env."
+        )),
+    }
 }
 
 #[tauri::command]
@@ -802,18 +867,8 @@ pub async fn forge_chat(
     app: tauri::AppHandle,
     messages: Vec<ChatMessage>,
 ) -> Result<ChatResponse, String> {
-    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
-        .map_err(to_error_string)?;
-    let api_key = match entry.get_password() {
-        Ok(v) => v,
-        Err(keyring::Error::NoEntry) => {
-            return Err(
-                "Anthropic API key not set — open Settings → Forge and paste your key (sk-ant-…)"
-                    .to_string(),
-            );
-        }
-        Err(e) => return Err(to_error_string(e)),
-    };
+    let api_key = resolve_anthropic_key()?
+        .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     // Validate roles before sending — Anthropic 400s on anything
     // outside {user, assistant} and the error JSON it returns is
@@ -943,18 +998,8 @@ pub async fn forge_chat_stream(
     // with a clear message — by the time the task is spawned the
     // frontend has already committed to the streaming UI path and
     // a delayed error feels jarring.
-    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
-        .map_err(to_error_string)?;
-    let api_key = match entry.get_password() {
-        Ok(v) => v,
-        Err(keyring::Error::NoEntry) => {
-            return Err(
-                "Anthropic API key not set — open Settings → Forge and paste your key (sk-ant-…)"
-                    .to_string(),
-            );
-        }
-        Err(e) => return Err(to_error_string(e)),
-    };
+    let api_key = resolve_anthropic_key()?
+        .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     for m in &messages {
         if m.role != "user" && m.role != "assistant" {
@@ -1677,18 +1722,8 @@ pub async fn forge_agent_run(
     app: AppHandle,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
-    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
-        .map_err(to_error_string)?;
-    let api_key = match entry.get_password() {
-        Ok(v) => v,
-        Err(keyring::Error::NoEntry) => {
-            return Err(
-                "Anthropic API key not set — open Settings → Forge and paste your key (sk-ant-…)"
-                    .to_string(),
-            );
-        }
-        Err(e) => return Err(to_error_string(e)),
-    };
+    let api_key = resolve_anthropic_key()?
+        .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     for m in &messages {
         if m.role != "user" && m.role != "assistant" {
