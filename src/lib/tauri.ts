@@ -133,7 +133,50 @@ export const cmd = {
   // IBKR Client Portal login (embedded webview)
   openIbkrLogin: (url: string) => invoke<void>("open_ibkr_login", { url }),
   closeIbkrLogin: () => invoke<void>("close_ibkr_login"),
+
+  // ── Forge — strategy authoring (Phase 1) ──────────────────────
+  forgeStrategiesDir: () => invoke<string>("forge_strategies_dir"),
+  forgeSetStrategiesDir: (path: string) =>
+    invoke<void>("forge_set_strategies_dir", { path }),
+  forgeListStrategies: () => invoke<StrategyFile[]>("forge_list_strategies"),
+  forgeReadFile: (relPath: string) =>
+    invoke<string>("forge_read_file", { relPath }),
+  forgeWriteFile: (relPath: string, contents: string) =>
+    invoke<void>("forge_write_file", { relPath, contents }),
+  forgeChat: (messages: ChatMessage[]) =>
+    invoke<ChatResponse>("forge_chat", { messages }),
+
+  // Anthropic API key — separate keychain slot from the license key
+  anthropicKeyGet: () => invoke<string | null>("anthropic_key_get"),
+  anthropicKeySet: (value: string) =>
+    invoke<void>("anthropic_key_set", { value }),
+  anthropicKeyClear: () => invoke<void>("anthropic_key_clear"),
 };
+
+// ── Forge types ─────────────────────────────────────────────────
+
+export type StrategyFileKind = "py" | "notebook" | "other";
+
+export interface StrategyFile {
+  rel_path: string;
+  name: string;
+  size_bytes: number;
+  /** Unix epoch seconds. */
+  modified_at: number;
+  kind: StrategyFileKind;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  text: string;
+  model: string;
+  usage_in: number;
+  usage_out: number;
+}
 
 // ── Misc helpers ────────────────────────────────────────────────
 

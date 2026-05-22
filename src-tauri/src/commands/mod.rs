@@ -11,6 +11,7 @@
 //! `log::error!` first.
 
 pub mod docker;
+pub mod forge;
 pub mod healthcheck;
 pub mod ibkr_login;
 pub mod installer;

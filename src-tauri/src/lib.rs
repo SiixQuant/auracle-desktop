@@ -64,10 +64,10 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    docker as docker_cmd, healthcheck as health_cmd, ibkr_login as ibkr_login_cmd,
-    installer as installer_cmd, keychain as keychain_cmd, preflight as preflight_cmd,
-    scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
-    view as view_cmd,
+    docker as docker_cmd, forge as forge_cmd, healthcheck as health_cmd,
+    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
+    preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, tray as tray_cmd,
+    update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -281,6 +281,16 @@ pub fn run() {
             // IBKR Client Portal embedded login window
             ibkr_login_cmd::open_ibkr_login,
             ibkr_login_cmd::close_ibkr_login,
+            // Forge — strategy authoring + AI chat (Phase 1)
+            forge_cmd::forge_strategies_dir,
+            forge_cmd::forge_set_strategies_dir,
+            forge_cmd::forge_list_strategies,
+            forge_cmd::forge_read_file,
+            forge_cmd::forge_write_file,
+            forge_cmd::forge_chat,
+            forge_cmd::anthropic_key_get,
+            forge_cmd::anthropic_key_set,
+            forge_cmd::anthropic_key_clear,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

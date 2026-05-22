@@ -275,3 +275,278 @@ pre.logs {
   word-break: break-word;
   color: var(--fg-dim);
 }
+
+/* ── Forge view ─────────────────────────────────────────────────
+ * Three-column layout that fills the viewport below the top bar.
+ * The Forge view doesn't share the centered max-width column the
+ * other views use — see App.tsx for the conditional render. */
+
+.forge-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr 380px;
+  height: calc(100vh - 56px);  /* 56px = top-bar height */
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.forge-col {
+  border-right: 1px solid var(--line);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.forge-col-right {
+  border-right: none;
+}
+
+.forge-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.forge-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  gap: var(--s-2);
+}
+
+.forge-panel-sub {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-mono);
+  color: var(--fg-muted);
+  font-size: 10px;
+  margin-left: var(--s-2);
+}
+
+.forge-empty {
+  padding: var(--s-4);
+  font-size: var(--t-sm);
+  line-height: 1.55;
+}
+
+.forge-link {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.forge-link:hover { color: var(--fg); }
+
+/* ── File tree ───────────────────────────────────────────────── */
+
+.forge-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-2) 0;
+}
+
+.forge-tree-group {
+  margin-bottom: var(--s-3);
+}
+
+.forge-tree-group-head {
+  padding: var(--s-1) var(--s-4);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.forge-tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: 4px var(--s-4);
+  background: transparent;
+  border: none;
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.1s, color 0.1s;
+}
+.forge-tree-row:hover { color: var(--fg); background: var(--surface); }
+.forge-tree-row.active {
+  color: var(--fg);
+  background: var(--accent-soft);
+  border-left: 2px solid var(--accent);
+  padding-left: calc(var(--s-4) - 2px);
+}
+
+.forge-tree-kind {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-muted);
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.forge-tree-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Editor ─────────────────────────────────────────────────── */
+
+.forge-editor {
+  flex: 1;
+  min-height: 0;
+  background: #1e1e1e;  /* matches vscode-dark theme bg */
+}
+
+/* CodeMirror's root needs a fixed height to scroll properly */
+.forge-editor .cm-editor {
+  height: 100%;
+}
+
+.forge-dirty {
+  color: var(--warn);
+  font-weight: 400;
+  font-size: 10px;
+  margin-left: var(--s-2);
+}
+
+.forge-error {
+  color: var(--err);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Chat panel ─────────────────────────────────────────────── */
+
+.forge-chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.forge-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.forge-msg-role {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.forge-msg.user .forge-msg-role { color: var(--accent); }
+
+.forge-msg-content {
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  color: var(--fg-dim);
+}
+
+.forge-msg.user .forge-msg-content {
+  background: var(--surface-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  color: var(--fg);
+}
+
+.forge-msg-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.forge-msg-code {
+  margin: var(--s-2) 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.forge-msg-code pre {
+  margin: 0;
+  padding: var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  line-height: 1.55;
+  color: var(--fg);
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.forge-msg-code-actions {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.forge-msg-meta {
+  font-size: 10px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+
+.forge-chat-error {
+  padding: var(--s-2) var(--s-3);
+  background: rgba(239, 68, 68, 0.08);
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--err);
+  font-size: var(--t-xs);
+  word-break: break-word;
+}
+
+.forge-chat-input {
+  padding: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+
+.forge-chat-input textarea {
+  width: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 200px;
+}
+.forge-chat-input textarea:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}

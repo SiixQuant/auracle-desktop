@@ -16,10 +16,11 @@ import { useEffect, useState } from "react";
 
 import { cmd, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
+import Forge from "@/views/Forge";
 import Onboarding from "@/views/Onboarding";
 import Settings from "@/views/Settings";
 
-type View = "dashboard" | "settings" | "onboarding";
+type View = "dashboard" | "forge" | "settings" | "onboarding";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -112,6 +113,13 @@ export default function App() {
             </button>
             <button
               type="button"
+              className={`tab ${view === "forge" ? "active" : ""}`}
+              onClick={() => setView("forge")}
+            >
+              Forge
+            </button>
+            <button
+              type="button"
               className={`tab ${view === "settings" ? "active" : ""}`}
               onClick={() => setView("settings")}
             >
@@ -121,18 +129,25 @@ export default function App() {
         )}
       </header>
 
-      <main>
-        {view === "onboarding" && (
-          <Onboarding
-            onDone={() => {
-              setNeedsOnboarding(false);
-              setView("dashboard");
-            }}
-          />
-        )}
-        {view === "dashboard" && <Dashboard />}
-        {view === "settings" && <Settings />}
-      </main>
+      {/* Forge uses a different layout — it fills the viewport
+          rather than the centered max-width column. Render it
+          outside <main> so it can claim full width. */}
+      {view === "forge" ? (
+        <Forge />
+      ) : (
+        <main>
+          {view === "onboarding" && (
+            <Onboarding
+              onDone={() => {
+                setNeedsOnboarding(false);
+                setView("dashboard");
+              }}
+            />
+          )}
+          {view === "dashboard" && <Dashboard />}
+          {view === "settings" && <Settings />}
+        </main>
+      )}
     </>
   );
 }
