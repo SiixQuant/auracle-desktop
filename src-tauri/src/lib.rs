@@ -204,6 +204,25 @@ pub fn run() {
         if let Some(p) = try_plugin("updater", || tauri_plugin_updater::Builder::new().build()) {
             builder = builder.plugin(p);
         }
+        // Stronghold — encrypted secret store. The hash function
+        // turns whatever password we hand the plugin at vault-open
+        // time into a 32-byte ChaCha20 key. We use SHA-256 with a
+        // versioned constant prefix so we can rotate the derivation
+        // later by bumping the prefix (with a one-shot re-encrypt
+        // migration). The actual password is machine-derived in
+        // commands/secret_store.rs::derive_password().
+        if let Some(p) = try_plugin("stronghold", || {
+            use sha2::{Digest, Sha256};
+            tauri_plugin_stronghold::Builder::new(|password| {
+                let mut hasher = Sha256::new();
+                hasher.update(b"auracle-desktop-vault-v1:");
+                hasher.update(password);
+                hasher.finalize().to_vec()
+            })
+            .build()
+        }) {
+            builder = builder.plugin(p);
+        }
     }
 
     let builder = builder

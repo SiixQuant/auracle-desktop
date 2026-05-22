@@ -21,13 +21,13 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
-use keyring::Entry;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Notify;
 
+use super::secret_store;
 use super::to_error_string;
 
 // ── Strategies directory resolution ─────────────────────────────
@@ -46,8 +46,16 @@ const KEY_LAYOUT_MODE: &str = "layout_mode";
 ///     with this.
 const LAYOUT_MODES: &[&str] = &["agent", "code"];
 
+// Legacy OS-keychain slot (pre-Stronghold migration). The
+// secret_store::get_with_migration helper reads from this on the
+// first lookup, copies into Stronghold, then deletes. Constants
+// stay so the migration knows where to look — they're unused once
+// every existing customer has upgraded once.
 const ANTHROPIC_KEY_SERVICE: &str = "com.auracle.desktop";
 const ANTHROPIC_KEY_ACCOUNT: &str = "anthropic-api-key";
+
+/// Key under which the Anthropic key lives in the Stronghold vault.
+const VAULT_KEY_ANTHROPIC: &str = "anthropic_api_key";
 
 const ANTHROPIC_DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
@@ -711,40 +719,40 @@ fn to_pascal_case(s: &str) -> String {
 
 // ── Anthropic API key (separate keychain slot from license) ─────
 
-/// Read the Anthropic API key from either the OS keychain OR the
-/// ANTHROPIC_API_KEY env var. The env var wins if both are set —
-/// it's the dev/CI override path AND the customer's "the keychain
-/// is being weird, let me put it in .env" escape hatch.
+/// Read the Anthropic API key. Resolution order:
+///
+///   1. `ANTHROPIC_API_KEY` env var — dev/CI override + customer
+///      escape hatch. Always wins when set.
+///   2. Stronghold-encrypted vault at app_data/vault.snap.
+///   3. Legacy OS-keychain entry (transparently migrated to
+///      Stronghold on first read, then deleted from keychain).
 ///
 /// This single resolver is the source of truth used by every Forge
-/// command that needs the key. Calling sites use this instead of
-/// reading the Entry directly so the env-var fallback covers all of
-/// them (chat, stream, agent loop, and any future tool).
-fn resolve_anthropic_key() -> Result<Option<String>, String> {
-    // Env-var first.
+/// command that needs the key. Calling sites go through this, not
+/// the secret_store directly, so the env-var fallback + migration
+/// stay consistent across chat / stream / agent.
+fn resolve_anthropic_key(app: &AppHandle) -> Result<Option<String>, String> {
     if let Ok(v) = std::env::var("ANTHROPIC_API_KEY") {
         let trimmed = v.trim().to_string();
         if !trimmed.is_empty() {
             return Ok(Some(trimmed));
         }
     }
-    // Then keychain.
-    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
-        .map_err(to_error_string)?;
-    match entry.get_password() {
-        Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(to_error_string(e)),
-    }
+    secret_store::get_with_migration(
+        app,
+        VAULT_KEY_ANTHROPIC,
+        ANTHROPIC_KEY_SERVICE,
+        ANTHROPIC_KEY_ACCOUNT,
+    )
 }
 
 #[tauri::command]
-pub fn anthropic_key_get() -> Result<Option<String>, String> {
-    resolve_anthropic_key()
+pub fn anthropic_key_get(app: AppHandle) -> Result<Option<String>, String> {
+    resolve_anthropic_key(&app)
 }
 
 #[tauri::command]
-pub fn anthropic_key_set(value: String) -> Result<(), String> {
+pub fn anthropic_key_set(app: AppHandle, value: String) -> Result<(), String> {
     let v = value.trim().to_string();
     if v.is_empty() {
         return Err("paste a key first".to_string());
@@ -758,55 +766,44 @@ pub fn anthropic_key_set(value: String) -> Result<(), String> {
                 .to_string(),
         );
     }
-    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
-        .map_err(to_error_string)?;
-    entry.set_password(&v).map_err(to_error_string)?;
 
-    // Verify-after-save: the macOS keychain occasionally claims a
-    // write succeeded but a subsequent read returns NoEntry (we've
-    // seen this when permission is granted for write only, or when
-    // the keyring crate's caller has a different code signature
-    // than the writer). Catching the mismatch here means the UI
-    // shows an immediate, actionable error instead of a silent
-    // success followed by a confusing "key not set" later.
-    match entry.get_password() {
-        Ok(ref stored) if stored == &v => Ok(()),
+    secret_store::put(&app, VAULT_KEY_ANTHROPIC, &v)?;
+
+    // Verify-after-save: the encrypted vault is much more reliable
+    // than the OS keychain (the whole reason we migrated), but the
+    // check is cheap and catches disk-full / permission-denied
+    // failure modes that would otherwise produce silent set-OK +
+    // read-empty bugs.
+    match secret_store::get(&app, VAULT_KEY_ANTHROPIC) {
+        Ok(Some(ref stored)) if stored == &v => Ok(()),
         Ok(_) => Err(
-            "Saved but the keychain returned a different value when re-read — \
-             this usually means another process wrote the same slot. Open \
-             Keychain Access, search for 'com.auracle.desktop / anthropic-api-key', \
-             delete the entry, then save again. \
-             OR set ANTHROPIC_API_KEY in your shell / .env as a workaround."
-                .to_string(),
-        ),
-        Err(keyring::Error::NoEntry) => Err(
-            "Saved but the keychain immediately returned no entry on read. \
-             This is a macOS permission issue — the most common fix: open \
-             Keychain Access, find 'com.auracle.desktop / anthropic-api-key' \
-             under Local Items, right-click → Get Info → Access Control, \
-             and either add Auracle Desktop to 'Always allow access' OR \
-             delete the entry and save again (you'll get a fresh permission \
-             prompt). \
-             Quick unblock: set ANTHROPIC_API_KEY in your shell / .env \
-             — Forge reads the env var first."
+            "Saved but the vault returned a different value when re-read. \
+             This is a filesystem permission or disk-full issue. \
+             Workaround: set ANTHROPIC_API_KEY in your shell / .env — \
+             Forge reads the env var first."
                 .to_string(),
         ),
         Err(e) => Err(format!(
-            "Saved but verify-read failed: {e}. \
-             Quick unblock: set ANTHROPIC_API_KEY in your shell / .env."
+            "Saved but vault verify-read failed: {e}. \
+             Workaround: set ANTHROPIC_API_KEY in your shell / .env."
         )),
     }
 }
 
 #[tauri::command]
-pub fn anthropic_key_clear() -> Result<(), String> {
-    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
-        .map_err(to_error_string)?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(to_error_string(e)),
+pub fn anthropic_key_clear(app: AppHandle) -> Result<(), String> {
+    // Clear both stores so a customer who hits Clear actually has
+    // no stored key anywhere. The legacy keychain delete is best-
+    // effort — if it fails (entry doesn't exist after migration,
+    // or permission denied) the customer-visible state is correct
+    // because the vault wins on read regardless.
+    secret_store::delete(&app, VAULT_KEY_ANTHROPIC)?;
+    if let Ok(entry) =
+        keyring::Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
+    {
+        let _ = entry.delete_credential();
     }
+    Ok(())
 }
 
 // ── Chat (single-shot, non-streaming MVP) ──────────────────────
@@ -867,7 +864,7 @@ pub async fn forge_chat(
     app: tauri::AppHandle,
     messages: Vec<ChatMessage>,
 ) -> Result<ChatResponse, String> {
-    let api_key = resolve_anthropic_key()?
+    let api_key = resolve_anthropic_key(&app)?
         .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     // Validate roles before sending — Anthropic 400s on anything
@@ -998,7 +995,7 @@ pub async fn forge_chat_stream(
     // with a clear message — by the time the task is spawned the
     // frontend has already committed to the streaming UI path and
     // a delayed error feels jarring.
-    let api_key = resolve_anthropic_key()?
+    let api_key = resolve_anthropic_key(&app)?
         .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     for m in &messages {
@@ -1722,7 +1719,7 @@ pub async fn forge_agent_run(
     app: AppHandle,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
-    let api_key = resolve_anthropic_key()?
+    let api_key = resolve_anthropic_key(&app)?
         .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     for m in &messages {

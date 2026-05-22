@@ -1,40 +1,51 @@
-//! Secure license-key storage in the OS keychain.
+//! License-key storage.
 //!
-//! - macOS:   Keychain Services (Keychain.app)
-//! - Windows: Credential Manager
-//! - Linux:   Secret Service (libsecret) — works under GNOME, KDE,
-//!   and headless via `secret-tool` if available
+//! Backed by the Stronghold-encrypted vault in
+//! commands/secret_store.rs (and not, despite the legacy name of
+//! this file, the OS keychain). Switched away from the OS
+//! keychain in the 0.3.0 release after seeing silent
+//! set-then-NoEntry-on-read bugs on macOS in the field — see
+//! secret_store.rs's module docstring for the full rationale.
 //!
-//! The license key is the only secret the launcher itself manages —
-//! everything else (Stripe MCP token, broker credentials, SMTP
-//! password) is owned by the auracle stack and lives in
-//! ~/auracle/.env. The launcher writes the license key to BOTH:
+//! The license key lives in TWO places:
 //!
-//!   1. The OS keychain (canonical)
-//!   2. ~/auracle/.env as AURACLE_LICENSE_KEY (because the running
-//!      Houston container reads .env, not the host keychain)
+//!   1. Stronghold vault (canonical) — this module owns the
+//!      read/write path.
+//!   2. ~/auracle/.env as AURACLE_LICENSE_KEY — the running
+//!      Houston container reads .env, not the desktop vault.
+//!      The installer command handles writing step 2.
 //!
-//! Step 2 happens in the install flow; this module owns step 1.
+//! On first run of 0.3.0+ for a customer with an existing OS-
+//! keychain entry, secret_store::get_with_migration transparently
+//! pulls the old entry over to Stronghold and deletes the
+//! keychain slot. Migration runs lazily, on the first license_get
+//! call. No customer action needed.
 
-use keyring::Entry;
+use tauri::AppHandle;
 
-use super::to_error_string;
+use super::secret_store;
 
-const SERVICE: &str = "com.auracle.desktop";
-const ACCOUNT: &str = "license-key";
+/// Legacy OS-keychain slot. Stays in code so the migration knows
+/// where to look; can be removed in a future release once all
+/// customers have upgraded past 0.3.0.
+const LEGACY_KEYCHAIN_SERVICE: &str = "com.auracle.desktop";
+const LEGACY_KEYCHAIN_ACCOUNT: &str = "license-key";
+
+/// Stronghold vault key.
+const VAULT_KEY_LICENSE: &str = "license_key";
 
 #[tauri::command]
-pub fn license_get() -> Result<Option<String>, String> {
-    let entry = Entry::new(SERVICE, ACCOUNT).map_err(to_error_string)?;
-    match entry.get_password() {
-        Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(to_error_string(e)),
-    }
+pub fn license_get(app: AppHandle) -> Result<Option<String>, String> {
+    secret_store::get_with_migration(
+        &app,
+        VAULT_KEY_LICENSE,
+        LEGACY_KEYCHAIN_SERVICE,
+        LEGACY_KEYCHAIN_ACCOUNT,
+    )
 }
 
 #[tauri::command]
-pub fn license_set(value: String) -> Result<(), String> {
+pub fn license_set(app: AppHandle, value: String) -> Result<(), String> {
     let value = value.trim().to_string();
     // Reject empty and obvious non-key shapes (whitespace, < 16 chars)
     // but accept any of the three formats Auracle understands — the
@@ -53,25 +64,28 @@ pub fn license_set(value: String) -> Result<(), String> {
     // store the string, not gate it.
     if value.len() < 16 {
         return Err(
-            "license key looks too short — paste the full key from your purchase email".to_string(),
+            "license key looks too short — paste the full key from your purchase email"
+                .to_string(),
         );
     }
-    let entry = Entry::new(SERVICE, ACCOUNT).map_err(to_error_string)?;
-    entry.set_password(&value).map_err(to_error_string)?;
+
+    secret_store::put(&app, VAULT_KEY_LICENSE, &value)?;
+
     let prefix = &value[..value.len().min(8)];
     log::info!(
-        "license_set: stored license starting with '{}…' in OS keychain",
+        "license_set: stored license starting with '{}…' in Stronghold vault",
         prefix
     );
     Ok(())
 }
 
 #[tauri::command]
-pub fn license_clear() -> Result<(), String> {
-    let entry = Entry::new(SERVICE, ACCOUNT).map_err(to_error_string)?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(to_error_string(e)),
+pub fn license_clear(app: AppHandle) -> Result<(), String> {
+    // Vault first; then best-effort scrub of the legacy keychain
+    // entry so a clear leaves no copies behind.
+    secret_store::delete(&app, VAULT_KEY_LICENSE)?;
+    if let Ok(entry) = keyring::Entry::new(LEGACY_KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_ACCOUNT) {
+        let _ = entry.delete_credential();
     }
+    Ok(())
 }

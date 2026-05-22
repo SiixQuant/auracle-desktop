@@ -155,11 +155,11 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
         }
     }
 
-    // 2. Pull license key from keychain, set in env so installer
-    //    script's prompt-for-key step skips. Operator who wants to
-    //    install without a key (Community tier) can clear the key
-    //    in Settings before running install.
-    let license = keychain::license_get().ok().flatten().unwrap_or_default();
+    // 2. Pull license key from the secret store, set in env so the
+    //    installer script's prompt-for-key step skips. Operator who
+    //    wants to install without a key (Community tier) can clear
+    //    the key in Settings before running install.
+    let license = keychain::license_get(app.clone()).ok().flatten().unwrap_or_default();
 
     emit_progress(
         &app,

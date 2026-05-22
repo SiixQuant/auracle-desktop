@@ -19,6 +19,7 @@ pub mod keychain;
 pub mod mcp_sidecar;
 pub mod preflight;
 pub mod scheduled_update;
+pub mod secret_store;
 pub mod tray;
 pub mod update;
 pub mod view;

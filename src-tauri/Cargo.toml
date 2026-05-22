@@ -33,6 +33,13 @@ tauri-plugin-notification = "2" # native OS notifications
 tauri-plugin-updater = "2"      # signed auto-updater
 tauri-plugin-opener = "2"       # open URLs in default browser
 tauri-plugin-store = "2"        # persistent settings (auto-start, telemetry opt-in)
+# Stronghold — IOTA Foundation's libsodium-backed encrypted store.
+# Used by secret_store.rs as a more robust alternative to the OS
+# keychain for storing API keys + license tokens. Single snapshot
+# file in the app data dir, ChaCha20-Poly1305 encryption, machine-
+# derived password. See secret_store.rs for the threat model + why
+# we picked this over keyring crate.
+tauri-plugin-stronghold = "2"
 
 # Async runtime. Tauri 2 ships its own tokio integration but we keep
 # tokio explicit for the long-running healthcheck poll.
@@ -87,6 +94,15 @@ once_cell = "1.20"
 # other URL-significant characters. Tiny dependency (~5 KB), no
 # transitive bloat.
 urlencoding = "2"
+
+# secret_store.rs deps. SHA-256 hashes the Stronghold password into
+# a fixed-size key; machine-uid pulls a stable per-machine
+# identifier (used as entropy for the password derivation);
+# uuid generates the per-install random suffix that's mixed into
+# the password so reinstalls produce a fresh vault.
+sha2 = "0.10"
+machine-uid = "0.5"
+uuid = { version = "1.10", features = ["v4"] }
 
 [features]
 # Default features omit the built-in dev-tools surface. Enable in
