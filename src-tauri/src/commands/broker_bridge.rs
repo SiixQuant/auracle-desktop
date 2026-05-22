@@ -339,6 +339,177 @@ pub async fn get_quote(symbol: &str) -> Result<Value, BrokerError> {
     }))
 }
 
+/// GET /iserver/secdef/strikes?conid=X&sectype=OPT&month=YYYYMM
+/// → `{call: [strikes...], put: [strikes...]}`. We pick the nearest
+/// expiry in the same month if `expiry` is omitted.
+async fn ibkr_option_strikes(
+    client: &reqwest::Client,
+    underlying_conid: i64,
+    month: &str,
+) -> Result<Vec<f64>, BrokerError> {
+    let url = format!(
+        "{IBKR_GATEWAY_BASE}/iserver/secdef/strikes?conid={underlying_conid}&sectype=OPT&month={month}"
+    );
+    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    if !resp.status().is_success() {
+        return Err(BrokerError::BadStatus {
+            source: "IBKR gateway",
+            status: resp.status().as_u16(),
+            body: resp.text().await.unwrap_or_default(),
+        });
+    }
+    let v: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("strikes JSON: {e}")))?;
+    // Combine call + put strikes into one sorted unique list.
+    let mut strikes: Vec<f64> = Vec::new();
+    for key in &["call", "put"] {
+        if let Some(arr) = v.get(*key).and_then(|x| x.as_array()) {
+            for s in arr {
+                if let Some(n) = s.as_f64() {
+                    strikes.push(n);
+                }
+            }
+        }
+    }
+    strikes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    strikes.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    Ok(strikes)
+}
+
+/// Fetch an option chain snapshot for a symbol. Returns calls + puts
+/// across the nearest available strikes for the requested expiry
+/// month. Shape designed for the option_chain_table widget AND for
+/// downstream IV-surface aggregation.
+///
+/// Args:
+///   - symbol: underlying ticker (e.g. "SPY")
+///   - month:  YYYYMM (e.g. "202606"). Required — IBKR doesn't
+///             accept a default. Caller can compute "next monthly
+///             expiry" client-side or in the agent prompt.
+///   - max_strikes: hard cap on returned strikes (default 30). Each
+///                  strike requires its own conid lookup + snapshot
+///                  roundtrip, so this is the right knob to keep
+///                  latency bounded.
+pub async fn get_options_chain(
+    symbol: &str,
+    month: &str,
+    max_strikes: usize,
+) -> Result<Value, BrokerError> {
+    if !is_yyyymm(month) {
+        return Err(BrokerError::BadResponse(format!(
+            "expiry month {month:?} doesn't look like YYYYMM"
+        )));
+    }
+    let client = ibkr_client()?;
+    ibkr_check_auth(&client).await?;
+    let underlying_conid = ibkr_resolve_conid(&client, symbol).await?;
+    let strikes = ibkr_option_strikes(&client, underlying_conid, month).await?;
+    if strikes.is_empty() {
+        return Err(BrokerError::UnknownSymbol(format!(
+            "{symbol} {month}: no option strikes found"
+        )));
+    }
+
+    // Pick the center N strikes (closest to the underlying's current
+    // price) so we don't waste roundtrips on deep OTM tails. Quote
+    // the underlying first to get spot.
+    let spot_quote = get_quote(symbol).await?;
+    let spot = spot_quote.get("last").and_then(|v| v.as_f64()).unwrap_or_else(|| {
+        // Fall back to median strike if no quote (after-hours edge
+        // case). Better than refusing to render.
+        strikes[strikes.len() / 2]
+    });
+
+    let mut strikes_with_dist: Vec<(f64, f64)> = strikes
+        .iter()
+        .map(|&k| (k, (k - spot).abs()))
+        .collect();
+    strikes_with_dist.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    let mut picked: Vec<f64> = strikes_with_dist
+        .iter()
+        .take(max_strikes)
+        .map(|(k, _)| *k)
+        .collect();
+    picked.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Resolve each (strike, right) into a conid via secdef/info. This
+    // is the heaviest part of the chain fetch — N strikes × 2 rights
+    // × 1 roundtrip each. We could parallelize but IBKR rate-limits
+    // and a synchronous loop with a small N (default 30) finishes in
+    // a few seconds on a warm gateway.
+    let mut rows: Vec<Value> = Vec::with_capacity(picked.len());
+    for strike in &picked {
+        let mut row = serde_json::Map::new();
+        row.insert("strike".to_string(), Value::from(*strike));
+        for right in &["C", "P"] {
+            let info_url = format!(
+                "{IBKR_GATEWAY_BASE}/iserver/secdef/info?conid={underlying_conid}&sectype=OPT&month={month}&strike={strike}&right={right}"
+            );
+            let info_resp = match client.get(&info_url).send().await {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+            if !info_resp.status().is_success() {
+                continue;
+            }
+            let info: Value = match info_resp.json().await {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let opt_conid = info
+                .as_array()
+                .and_then(|a| a.first())
+                .and_then(|r| r.get("conid"))
+                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())));
+            let Some(opt_conid) = opt_conid else { continue };
+            // Snapshot fields: 31=last, 84=bid, 86=ask, 7295=volume,
+            // 7280=imp vol, 7283=delta, 7308=gamma, 7311=theta, 7310=vega.
+            let snap_url = format!(
+                "{IBKR_GATEWAY_BASE}/iserver/marketdata/snapshot?conids={opt_conid}&fields=31,84,86,7295,7280,7283,7308,7311,7310"
+            );
+            let snap_resp = match client.get(&snap_url).send().await {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+            let snap: Value = match snap_resp.json().await {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let snap_row = snap.as_array().and_then(|a| a.first()).cloned().unwrap_or_default();
+            let pull = |k: &str| -> Option<f64> {
+                snap_row.get(k).and_then(|v| match v {
+                    Value::Number(n) => n.as_f64(),
+                    Value::String(s) => s.parse().ok(),
+                    _ => None,
+                })
+            };
+            let prefix = if *right == "C" { "call" } else { "put" };
+            row.insert(format!("{prefix}_conid"), Value::from(opt_conid));
+            row.insert(format!("{prefix}_last"), pull("31").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_bid"), pull("84").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_ask"), pull("86").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_volume"), pull("7295").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_iv"), pull("7280").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_delta"), pull("7283").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_gamma"), pull("7308").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_theta"), pull("7311").map(Value::from).unwrap_or(Value::Null));
+            row.insert(format!("{prefix}_vega"), pull("7310").map(Value::from).unwrap_or(Value::Null));
+        }
+        rows.push(Value::Object(row));
+    }
+
+    Ok(serde_json::json!({
+        "symbol": symbol,
+        "month": month,
+        "spot": spot,
+        "underlying_conid": underlying_conid,
+        "rows": rows,
+    }))
+}
+
+fn is_yyyymm(s: &str) -> bool {
+    s.len() == 6 && s.chars().all(|c| c.is_ascii_digit())
+}
+
 // ── Yahoo Finance (free, no auth) ────────────────────────────────
 
 /// GET /v8/finance/chart/{symbol}?range={range}&interval=1d

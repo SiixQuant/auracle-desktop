@@ -896,6 +896,9 @@ const SYSTEM_PROMPT: &str = concat!(
                        {open: 'open', high: 'high', low: 'low', close: 'close'}. \
                        Feed from get_historical_bars.\n",
     "  bar_chart      — Vertical bars (e.g. volume by day, P&L by symbol). x_field, y_field, color.\n",
+    "  option_chain_table — Calls/puts grid centered on ATM. Optional fields list \
+                       (default ['bid','ask','iv','delta','volume']; supported: bid, ask, last, \
+                       iv, delta, gamma, theta, vega, volume). Feed from get_options_chain.\n",
     "  notes_md       — Markdown annotation panel. data_source: {tool: 'inline', args: {}}. \
                        Set top-level `body`: 'markdown text...'. Use for methodology/rationale \
                        alongside data widgets.\n\n",
@@ -904,6 +907,8 @@ const SYSTEM_PROMPT: &str = concat!(
     "  {tool: 'get_open_positions', args: {}}            — IBKR portfolio rows\n",
     "  {tool: 'get_quote', args: {symbol: 'SPY'}}        — IBKR live quote\n",
     "  {tool: 'get_historical_bars', args: {symbol: 'SPY', days: 90}} — Yahoo daily bars\n",
+    "  {tool: 'get_options_chain', args: {symbol: 'SPY', month: '202607', max_strikes: 20}} \
+       — IBKR option chain (calls + puts + Greeks)\n",
     "  {tool: 'inline', args: {data: <literal>}}         — for notes / demo dashboards\n\n",
     "Grid layout — each widget can take a {grid: {x, y, w, h}} with a 12-column grid; omit for \
      auto-flow. Typical kpi_grid: w=12, h=2. Typical data_table or chart: w=6-12, h=4-6.\n\n",
@@ -1740,6 +1745,38 @@ fn agent_tool_catalog() -> serde_json::Value {
             }
         },
         {
+            "name": "get_options_chain",
+            "description": "Fetch an option chain snapshot for an underlying — calls + puts \
+                            across the strikes nearest spot for one expiry month. Returns \
+                            {symbol, month, spot, rows: [{strike, call_bid, call_ask, call_iv, \
+                            call_delta, call_gamma, call_theta, call_vega, call_volume, \
+                            put_bid, put_ask, put_iv, put_delta, ...}, ...]}. Drops straight \
+                            into an option_chain_table widget. Use after get_quote to pick a \
+                            sensible expiry month (typically the third Friday of next month). \
+                            Requires IBKR Gateway logged in.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Underlying ticker, e.g. 'SPY' or 'AAPL'."
+                    },
+                    "month": {
+                        "type": "string",
+                        "description": "Expiry month in YYYYMM format, e.g. '202606' for June 2026."
+                    },
+                    "max_strikes": {
+                        "type": "integer",
+                        "description": "Cap on strikes returned (centered on spot). Default 20, max 80.",
+                        "minimum": 5,
+                        "maximum": 80
+                    }
+                },
+                "required": ["symbol", "month"],
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "get_historical_bars",
             "description": "Daily OHLCV bars for a symbol over a window. Returns \
                             {symbol, currency, rows: [{date (YYYY-MM-DD), timestamp (unix s), \
@@ -1923,6 +1960,7 @@ pub async fn forge_invoke_tool(
         "get_account_summary",
         "get_open_positions",
         "get_quote",
+        "get_options_chain",
         "get_recent_fills",
         "list_connected_brokers",
         "list_universes",
@@ -2033,6 +2071,29 @@ async fn execute_agent_tool(
                 );
             }
             match super::broker_bridge::get_quote(symbol).await {
+                Ok(v) => (v.to_string(), true),
+                Err(e) => (format!("error: {}", e.to_user_string()), false),
+            }
+        }
+        "get_options_chain" => {
+            let Some(symbol) = input.get("symbol").and_then(|v| v.as_str()) else {
+                return ("error: symbol required".to_string(), false);
+            };
+            let Some(month) = input.get("month").and_then(|v| v.as_str()) else {
+                return ("error: month required (YYYYMM, e.g. '202606')".to_string(), false);
+            };
+            if !is_valid_ticker(symbol) {
+                return (
+                    format!("error: symbol {symbol:?} doesn't look like a valid ticker"),
+                    false,
+                );
+            }
+            let max_strikes = input
+                .get("max_strikes")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(20)
+                .clamp(5, 80) as usize;
+            match super::broker_bridge::get_options_chain(symbol, month, max_strikes).await {
                 Ok(v) => (v.to_string(), true),
                 Err(e) => (format!("error: {}", e.to_user_string()), false),
             }
@@ -2243,6 +2304,11 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
             .and_then(|v| v.as_str())
             .map(String::from)
             .unwrap_or_else(|| "?".to_string()),
+        "get_options_chain" => {
+            let symbol = input.get("symbol").and_then(|v| v.as_str()).unwrap_or("?");
+            let month = input.get("month").and_then(|v| v.as_str()).unwrap_or("?");
+            format!("{symbol} · {month}")
+        }
         "get_historical_bars" => {
             let symbol = input
                 .get("symbol")

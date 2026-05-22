@@ -551,6 +551,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_account_summary: "Account summary",
   get_open_positions: "Open positions",
   get_quote: "Quote",
+  get_options_chain: "Options chain",
   get_historical_bars: "Historical bars",
 };
 

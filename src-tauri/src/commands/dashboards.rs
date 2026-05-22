@@ -168,8 +168,121 @@ pub async fn forge_dashboards_dir(app: AppHandle) -> Result<String, String> {
     Ok(dir.to_string_lossy().to_string())
 }
 
+/// Seed the welcome dashboard on first launch IF the dashboards
+/// directory is empty. Idempotent — once any dashboard exists (saved
+/// by the user, by the agent, or by a previous seed call), this is
+/// a no-op. Failure to seed is logged + swallowed; an empty
+/// dashboards view is recoverable, a failed seed shouldn't break
+/// the rest of the launcher.
+fn maybe_seed_welcome(app: &AppHandle) {
+    let dir = match resolve_dashboards_dir(app) {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+    // Cheap directory-empty check — early-exit before we parse
+    // any JSON.
+    let has_any = std::fs::read_dir(&dir)
+        .map(|entries| {
+            entries.flatten().any(|e| {
+                e.path()
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    == Some("json")
+            })
+        })
+        .unwrap_or(true); // if read_dir fails, assume populated; safer
+    if has_any {
+        return;
+    }
+    let spec = welcome_dashboard_spec();
+    let path = dir.join("welcome-tour.json");
+    let json = match serde_json::to_string_pretty(&spec) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("dashboards: welcome seed serialize failed: {e}");
+            return;
+        }
+    };
+    if let Err(e) = std::fs::write(&path, json) {
+        log::warn!("dashboards: welcome seed write failed: {e}");
+    }
+}
+
+/// The out-of-box welcome dashboard. Pure data widgets that work
+/// without an IBKR connection — the SPY line chart uses Yahoo
+/// Finance via get_historical_bars; the markdown panel explains
+/// what Forge can do next.
+fn welcome_dashboard_spec() -> Dashboard {
+    let now = now_iso8601();
+    Dashboard {
+        slug: "welcome-tour".to_string(),
+        title: "Welcome to Auracle Forge".to_string(),
+        created_at: now.clone(),
+        updated_at: now,
+        refresh_interval_seconds: 60,
+        layout: "rows".to_string(),
+        widgets: vec![
+            // 1. Markdown intro panel
+            serde_json::json!({
+                "id": "intro-notes",
+                "type": "notes_md",
+                "title": "What Forge can do",
+                "data_source": { "tool": "inline", "args": {} },
+                "body": "# Welcome — this is what Forge can build for you\n\n\
+                        Forge is the agent-powered authoring surface inside Auracle. Ask in plain \
+                        English for a strategy, a dashboard, a chart, an account view — Forge \
+                        builds it inline and persists it.\n\n\
+                        **Try one of these as your first prompt:**\n\n\
+                        - *Build me a dashboard with my IBKR account summary and a 90-day chart of SPY*\n\
+                        - *Show me a candlestick chart of QQQ over the last 6 months with volume*\n\
+                        - *Write an RSI mean-reversion strategy on liquid US ETFs*\n\
+                        - *Rank my open positions by unrealized P&L*\n\n\
+                        **To pull live broker data**: open Settings → Broker Connections and \
+                        connect IBKR. The market-data widgets work without a broker (via \
+                        Yahoo Finance) — but account, position, and quote widgets need IBKR \
+                        logged in.\n\n\
+                        Every dashboard you build is saved as JSON under \
+                        `~/auracle/forge/dashboards/` — version-control them, share them \
+                        between machines, copy them as templates."
+            }),
+            // 2. SPY 90-day line chart — uses Yahoo Finance so it
+            // works on a fresh install with no broker setup.
+            serde_json::json!({
+                "id": "spy-90d",
+                "type": "line_chart",
+                "title": "SPY · last 90 trading days (Yahoo Finance)",
+                "data_source": {
+                    "tool": "get_historical_bars",
+                    "args": { "symbol": "SPY", "days": 90 }
+                },
+                "x_field": "date",
+                "series": [
+                    { "key": "close", "label": "Close", "color": "#60a5fa" }
+                ]
+            }),
+            // 3. SPY OHLC candles — same data, different shape.
+            serde_json::json!({
+                "id": "spy-candles",
+                "type": "candlestick_chart",
+                "title": "SPY · OHLC + volume",
+                "data_source": {
+                    "tool": "get_historical_bars",
+                    "args": { "symbol": "SPY", "days": 90 }
+                },
+                "x_field": "date",
+                "volume_field": "volume"
+            }),
+        ],
+    }
+}
+
 #[tauri::command]
 pub async fn forge_list_dashboards(app: AppHandle) -> Result<Vec<DashboardSummary>, String> {
+    // Seed the welcome dashboard on first call after install. Safe
+    // to do here rather than at app startup: list_dashboards is the
+    // first thing the preview pane calls, so seeding here means
+    // it's present by the time the user looks at the panel.
+    maybe_seed_welcome(&app);
     let dir = resolve_dashboards_dir(&app)?;
     let mut out = Vec::new();
     let entries = match std::fs::read_dir(&dir) {

@@ -25,6 +25,7 @@ import DataTable from "./DataTable";
 import KpiGrid from "./KpiGrid";
 import LineChart from "./LineChart";
 import NotesMd from "./NotesMd";
+import OptionChainTable from "./OptionChainTable";
 import type { WidgetRenderState } from "./types";
 
 interface WidgetRendererProps {
@@ -179,6 +180,8 @@ function WidgetBody({ state }: { state: WidgetRenderState }): ReactElement {
       return <CandlestickChart state={state} />;
     case "bar_chart":
       return <BarChart state={state} />;
+    case "option_chain_table":
+      return <OptionChainTable state={state} />;
     case "notes_md":
       return <NotesMd state={state} />;
     default:
