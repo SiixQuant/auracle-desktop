@@ -22,19 +22,30 @@ import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
 
 import DiffModal from "@/components/forge/DiffModal";
-import { cmd, openInBrowser } from "@/lib/tauri";
+import {
+  cmd,
+  openInBrowser,
+  STRATEGY_STATES,
+  type StrategyState,
+} from "@/lib/tauri";
 
 interface EditorProps {
   /** Path relative to the strategies dir; null when no file is open. */
   activePath: string | null;
   /** Set by the parent so the chat panel can inject AI-generated code. */
   externalContent: string | null;
+  /** Lifecycle state of the currently-open file. */
+  currentState: StrategyState;
+  /** Fires when the operator changes the state via the toolbar dropdown. */
+  onChangeState: (next: StrategyState) => void;
   onSaved: () => void;
 }
 
 export default function Editor({
   activePath,
   externalContent,
+  currentState,
+  onChangeState,
   onSaved,
 }: EditorProps) {
   const [content, setContent] = useState<string>("");
@@ -192,8 +203,22 @@ export default function Editor({
           {activePath}
           {dirty ? <span className="forge-dirty"> · unsaved</span> : null}
         </span>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {error && <span className="muted mono forge-error">{error}</span>}
+          <select
+            value={currentState}
+            onChange={(e) =>
+              onChangeState(e.target.value as StrategyState)
+            }
+            className={`forge-state-select state-${currentState}`}
+            title="Strategy lifecycle state — synced to Houston when the stack is running."
+          >
+            {STRATEGY_STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             className="ghost"

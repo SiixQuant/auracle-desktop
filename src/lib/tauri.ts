@@ -163,6 +163,11 @@ export const cmd = {
   forgeSetModel: (model: string) =>
     invoke<void>("forge_set_model", { model }),
 
+  // Strategy lifecycle
+  forgeStrategyStates: () => invoke<StrategyStates>("forge_strategy_states"),
+  forgeSetStrategyState: (relPath: string, state: StrategyState) =>
+    invoke<void>("forge_set_strategy_state", { relPath, state }),
+
   // Anthropic API key — separate keychain slot from the license key
   anthropicKeyGet: () => invoke<string | null>("anthropic_key_get"),
   anthropicKeySet: (value: string) =>
@@ -213,6 +218,30 @@ export interface ChatDonePayload {
 
 export interface ChatErrorPayload {
   message: string;
+}
+
+// ── Strategy lifecycle ──────────────────────────────────────────
+
+export type StrategyState =
+  | "draft"
+  | "backtested"
+  | "paper"
+  | "live"
+  | "archived";
+
+export const STRATEGY_STATES: StrategyState[] = [
+  "draft",
+  "backtested",
+  "paper",
+  "live",
+  "archived",
+];
+
+export interface StrategyStates {
+  /** rel_path → state. Missing entries default to "draft" client-side. */
+  states: Record<string, StrategyState>;
+  /** True when freshly fetched from Houston; false on cache fallback. */
+  from_houston: boolean;
 }
 
 // ── Misc helpers ────────────────────────────────────────────────

@@ -665,3 +665,62 @@ pre.logs {
   word-break: break-word;
   white-space: pre-wrap;
 }
+
+/* ── Strategy lifecycle pills + selects ─────────────────────── */
+
+/* Pill in the file tree row. Compact, color-coded by state. */
+.forge-state-pill {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Dropdown in the editor toolbar. Color-codes the trigger so the
+ * current state is visible without opening the menu. */
+.forge-state-select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.forge-state-select:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Shared color palette. Same hex values for both pill + select so
+ * the visual mapping stays consistent across the two surfaces. */
+.state-draft       { background: rgba(255, 255, 255, 0.06); color: var(--fg-dim); }
+.state-backtested  { background: rgba(79, 141, 247, 0.15);  color: #7ba8f8; }
+.state-paper       { background: rgba(245, 158, 11, 0.15);  color: var(--warn); }
+.state-live        { background: rgba(16, 185, 129, 0.15);  color: var(--ok); }
+.state-archived    { background: rgba(255, 255, 255, 0.04); color: var(--fg-muted); }
+
+/* When applied to the select element, only the border + text color
+ * carry the state — background stays dark so the trigger doesn't
+ * fight the toolbar visually. */
+.forge-state-select.state-draft       { border-color: var(--line); }
+.forge-state-select.state-backtested  { border-color: rgba(79, 141, 247, 0.4); color: #7ba8f8; }
+.forge-state-select.state-paper       { border-color: rgba(245, 158, 11, 0.4);  color: var(--warn); }
+.forge-state-select.state-live        { border-color: var(--accent-dim);        color: var(--ok); }
+.forge-state-select.state-archived    { border-color: var(--line);              color: var(--fg-muted); }
+
+/* Tree row needs a small adjustment so the pill sits flush right
+ * without pushing the name into a clip. Override the flex children. */
+.forge-tree-row .forge-tree-name {
+  margin-right: var(--s-2);
+}

@@ -15,16 +15,57 @@
 // clicks "Insert into editor." Editor consumes the slot once + we
 // reset it to null so subsequent unrelated edits don't get clobbered.
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import ChatPanel from "@/components/forge/ChatPanel";
 import Editor from "@/components/forge/Editor";
 import FileTree from "@/components/forge/FileTree";
+import { cmd, type StrategyState } from "@/lib/tauri";
 
 export default function Forge() {
   const [activePath, setActivePath] = useState<string | null>(null);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
+
+  // Strategy lifecycle state map. Lives at the Forge level so the
+  // tree pills + the editor dropdown stay in sync without prop-
+  // drilling through ChatPanel. Refreshed when the tree refreshes
+  // (which covers: app open, file create, file save) and after any
+  // explicit state change from the editor dropdown.
+  const [states, setStates] = useState<Record<string, StrategyState>>({});
+  const [fromHouston, setFromHouston] = useState<boolean>(false);
+
+  const refreshStates = useCallback(async () => {
+    try {
+      const resp = await cmd.forgeStrategyStates();
+      setStates(resp.states);
+      setFromHouston(resp.from_houston);
+    } catch {
+      // Houston offline + cache empty — leave the map untouched
+      // so we keep showing whatever we had. Worst case the tree
+      // renders no pills, which is the right neutral state.
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshStates();
+  }, [refreshStates, treeRefreshKey]);
+
+  const onChangeState = useCallback(
+    async (relPath: string, next: StrategyState) => {
+      // Optimistic local update first so the UI feels instant; the
+      // Rust command writes the cache + pushes to Houston.
+      setStates((prev) => ({ ...prev, [relPath]: next }));
+      try {
+        await cmd.forgeSetStrategyState(relPath, next);
+      } catch (err) {
+        console.warn("set strategy state failed:", err);
+        // Roll back the optimistic write.
+        refreshStates();
+      }
+    },
+    [refreshStates],
+  );
 
   return (
     <div className="forge-shell">
@@ -33,12 +74,18 @@ export default function Forge() {
           activePath={activePath}
           onOpen={(p) => setActivePath(p)}
           refreshKey={treeRefreshKey}
+          states={states}
+          statesAreFresh={fromHouston}
         />
       </div>
       <div className="forge-col forge-col-center">
         <Editor
           activePath={activePath}
           externalContent={pendingCode}
+          currentState={activePath ? states[activePath] ?? "draft" : "draft"}
+          onChangeState={(next) => {
+            if (activePath) onChangeState(activePath, next);
+          }}
           onSaved={() => {
             // Bump the tree so a freshly-created file (or a renamed
             // one) appears immediately + any "modified" sort would

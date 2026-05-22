@@ -13,18 +13,28 @@
 
 import { useEffect, useState } from "react";
 
-import { cmd, type StrategyFile } from "@/lib/tauri";
+import {
+  cmd,
+  type StrategyFile,
+  type StrategyState,
+} from "@/lib/tauri";
 
 interface FileTreeProps {
   activePath: string | null;
   onOpen: (path: string) => void;
   refreshKey: number;
+  /** rel_path -> state. Missing entries render as "draft". */
+  states: Record<string, StrategyState>;
+  /** True when states came from Houston (fresh); false on cache fallback. */
+  statesAreFresh: boolean;
 }
 
 export default function FileTree({
   activePath,
   onOpen,
   refreshKey,
+  states,
+  statesAreFresh,
 }: FileTreeProps) {
   const [files, setFiles] = useState<StrategyFile[] | null>(null);
   const [dir, setDir] = useState<string>("");
@@ -92,6 +102,14 @@ export default function FileTree({
         Strategies
         <span className="forge-panel-sub" title={dir}>
           {shortPath(dir)}
+          {!statesAreFresh && files.length > 0 ? (
+            <span
+              title="Showing cached lifecycle states — Houston is offline or hasn't implemented /api/forge/strategies yet."
+              style={{ marginLeft: 6, opacity: 0.6 }}
+            >
+              · cached
+            </span>
+          ) : null}
         </span>
       </div>
       <div className="forge-tree">
@@ -113,27 +131,46 @@ export default function FileTree({
           sortedGroupNames.map((groupName) => (
             <div key={groupName} className="forge-tree-group">
               <div className="forge-tree-group-head">{groupName}</div>
-              {groups.get(groupName)!.map((f) => (
-                <button
-                  key={f.rel_path}
-                  type="button"
-                  className={`forge-tree-row ${
-                    activePath === f.rel_path ? "active" : ""
-                  }`}
-                  onClick={() => onOpen(f.rel_path)}
-                  title={f.rel_path}
-                >
-                  <span className="forge-tree-kind">
-                    {f.kind === "notebook" ? "ⓝ" : "py"}
-                  </span>
-                  <span className="forge-tree-name">{leafName(f.rel_path)}</span>
-                </button>
-              ))}
+              {groups.get(groupName)!.map((f) => {
+                const state = states[f.rel_path] ?? "draft";
+                return (
+                  <button
+                    key={f.rel_path}
+                    type="button"
+                    className={`forge-tree-row ${
+                      activePath === f.rel_path ? "active" : ""
+                    }`}
+                    onClick={() => onOpen(f.rel_path)}
+                    title={`${f.rel_path} · ${state}`}
+                  >
+                    <span className="forge-tree-kind">
+                      {f.kind === "notebook" ? "ⓝ" : "py"}
+                    </span>
+                    <span className="forge-tree-name">
+                      {leafName(f.rel_path)}
+                    </span>
+                    <StatePill state={state} />
+                  </button>
+                );
+              })}
             </div>
           ))
         )}
       </div>
     </div>
+  );
+}
+
+// Tiny state pill rendered at the end of each file row. The
+// Editor toolbar's dropdown is the place to CHANGE state; this is
+// just visual at-a-glance. Color mapping mirrors the Editor
+// dropdown so the same state always looks the same.
+function StatePill({ state }: { state: StrategyState }) {
+  if (state === "draft") return null; // draft is the default — no pill, less visual noise
+  return (
+    <span className={`forge-state-pill state-${state}`} title={`State: ${state}`}>
+      {state.slice(0, 4)}
+    </span>
   );
 }
 

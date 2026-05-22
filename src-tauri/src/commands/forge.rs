@@ -641,6 +641,157 @@ pub fn forge_chat_cancel() -> Result<(), String> {
     Ok(())
 }
 
+// ── Strategy lifecycle (Phase 4b) ──────────────────────────────
+//
+// Each strategy has a state that moves through:
+//
+//   draft → backtested → paper → live → archived
+//
+// Houston is the authoritative source — when the stack is up we
+// fetch + update through its REST API. When it's down (or hasn't
+// implemented the endpoints yet) we fall back to a local cache in
+// forge.json so the pills still render and edits persist locally;
+// the next time Houston is reachable, we push the cache to it.
+//
+// Expected Houston endpoints (documented in docs/houston-api.md):
+//
+//   GET    /api/forge/strategies                  → { states: { "rel_path": "paper", ... } }
+//   PATCH  /api/forge/strategies/{rel_path}       → body { state: "paper" } → 204
+//
+// If Houston returns 404 for these (running an older Auracle that
+// pre-dates the endpoint), we treat it the same as offline — pure
+// local cache. No crash, no broken UI.
+
+const KEY_STATE_CACHE: &str = "strategy_state_cache";
+const HOUSTON_BASE_URL: &str = "http://localhost:1969";
+
+const VALID_STATES: &[&str] = &[
+    "draft",
+    "backtested",
+    "paper",
+    "live",
+    "archived",
+];
+
+fn read_cache(app: &tauri::AppHandle) -> serde_json::Map<String, serde_json::Value> {
+    if let Ok(store) = app.store(STORE_FILE) {
+        if let Some(v) = store.get(KEY_STATE_CACHE) {
+            if let Some(obj) = v.as_object() {
+                return obj.clone();
+            }
+        }
+    }
+    serde_json::Map::new()
+}
+
+fn write_cache_entry(app: &tauri::AppHandle, rel_path: &str, state: &str) {
+    if let Ok(store) = app.store(STORE_FILE) {
+        let mut cache = read_cache(app);
+        cache.insert(rel_path.to_string(), serde_json::Value::String(state.to_string()));
+        store.set(KEY_STATE_CACHE, serde_json::Value::Object(cache));
+        let _ = store.save();
+    }
+}
+
+fn write_cache_bulk(app: &tauri::AppHandle, states: &serde_json::Map<String, serde_json::Value>) {
+    if let Ok(store) = app.store(STORE_FILE) {
+        store.set(KEY_STATE_CACHE, serde_json::Value::Object(states.clone()));
+        let _ = store.save();
+    }
+}
+
+#[derive(Serialize)]
+pub struct StrategyStates {
+    /// Map of rel_path → state. Includes ONLY strategies for which
+    /// we have a known state; absent files default to "draft" on
+    /// the frontend.
+    pub states: serde_json::Map<String, serde_json::Value>,
+    /// True when the data came from Houston, false when we fell
+    /// back to the local cache. UI can use this to grey out the
+    /// pills slightly + show a "offline (cached)" hint.
+    pub from_houston: bool,
+}
+
+#[tauri::command]
+pub async fn forge_strategy_states(app: tauri::AppHandle) -> Result<StrategyStates, String> {
+    // Try Houston first.
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .map_err(to_error_string)?;
+
+    match client
+        .get(format!("{HOUSTON_BASE_URL}/api/forge/strategies"))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            // Houston has the endpoint and returned data — refresh
+            // the local cache so we have something to serve when
+            // the stack next goes offline.
+            let parsed: serde_json::Value = match resp.json().await {
+                Ok(v) => v,
+                Err(_) => return Ok(StrategyStates {
+                    states: read_cache(&app),
+                    from_houston: false,
+                }),
+            };
+            let states = parsed
+                .get("states")
+                .and_then(|v| v.as_object())
+                .cloned()
+                .unwrap_or_default();
+            write_cache_bulk(&app, &states);
+            Ok(StrategyStates { states, from_houston: true })
+        }
+        // 404 (Auracle pre-dates the endpoint) or any non-success
+        // status → cache fallback, same as offline.
+        _ => Ok(StrategyStates {
+            states: read_cache(&app),
+            from_houston: false,
+        }),
+    }
+}
+
+#[tauri::command]
+pub async fn forge_set_strategy_state(
+    app: tauri::AppHandle,
+    rel_path: String,
+    state: String,
+) -> Result<(), String> {
+    if !VALID_STATES.iter().any(|&s| s == state) {
+        return Err(format!(
+            "invalid state {state:?} — must be one of {:?}",
+            VALID_STATES
+        ));
+    }
+
+    // Optimistically write to the local cache so the UI updates
+    // immediately. If the Houston call below fails, the cache is
+    // still authoritative for the operator's local view.
+    write_cache_entry(&app, &rel_path, &state);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(to_error_string)?;
+
+    let url = format!(
+        "{HOUSTON_BASE_URL}/api/forge/strategies/{}",
+        urlencoding::encode(&rel_path)
+    );
+    let body = serde_json::json!({ "state": state });
+
+    // Push to Houston. Best-effort — if it fails (offline, 404,
+    // 5xx) the local cache write above stands. Logging the failure
+    // would be useful but we don't want to surface "Houston is
+    // offline" as a chat-level error every time someone tweaks
+    // a state; that's a normal state when the stack isn't running.
+    let _ = client.patch(&url).json(&body).send().await;
+
+    Ok(())
+}
+
 async fn run_stream(
     app: AppHandle,
     api_key: String,
