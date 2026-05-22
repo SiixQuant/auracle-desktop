@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 
+import BrokerConnectionsCard from "@/views/BrokerConnections";
 import {
   cmd,
   openInBrowser,
@@ -21,6 +22,7 @@ export default function Settings() {
       <h1>Settings</h1>
       <ViewModeCard />
       <ForgeCard />
+      <BrokerConnectionsCard />
       <InstallCard />
       <UpdatesCard />
     </>

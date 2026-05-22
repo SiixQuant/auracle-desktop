@@ -217,6 +217,11 @@ export const cmd = {
    *  agent would see as tool_result content. */
   forgeInvokeTool: (name: string, args: Record<string, unknown>) =>
     invoke<ToolInvocationResult>("forge_invoke_tool", { name, args }),
+
+  // ── Broker connections ───────────────────────────────────────
+  forgeBrokerStatus: () => invoke<BrokerStatus[]>("forge_broker_status"),
+  forgeBrokerTest: (brokerId: string) =>
+    invoke<string>("forge_broker_test", { brokerId }),
 };
 
 export interface ToolInvocationResult {
@@ -375,6 +380,31 @@ export interface DashboardSummary {
   updated_at: string;
   widget_count: number;
   refresh_interval_seconds: number;
+}
+
+// ── Broker connections ──────────────────────────────────────────
+//
+// Tagged union mirrors `commands/broker_connections.rs::BrokerState`.
+// The frontend renders different controls per variant so the type
+// describes UX intent, not just network status.
+
+export type BrokerState =
+  | { state: "offline"; hint: string }
+  | { state: "unauthenticated"; login_url: string }
+  | {
+      state: "connected";
+      account_id: string;
+      account_label: string | null;
+    }
+  | { state: "error"; detail: string }
+  | { state: "not_implemented" };
+
+export interface BrokerStatus {
+  id: string;
+  label: string;
+  description: string;
+  capabilities: string[];
+  state: BrokerState;
 }
 
 // ── Misc helpers ────────────────────────────────────────────────

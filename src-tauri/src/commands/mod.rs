@@ -11,6 +11,7 @@
 //! `log::error!` first.
 
 pub mod broker_bridge;
+pub mod broker_connections;
 pub mod dashboards;
 pub mod docker;
 pub mod forge;

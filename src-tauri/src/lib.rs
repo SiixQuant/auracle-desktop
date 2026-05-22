@@ -64,9 +64,9 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    dashboards as dash_cmd, docker as docker_cmd, forge as forge_cmd,
-    healthcheck as health_cmd, ibkr_login as ibkr_login_cmd,
-    installer as installer_cmd, keychain as keychain_cmd,
+    broker_connections as broker_conn_cmd, dashboards as dash_cmd,
+    docker as docker_cmd, forge as forge_cmd, healthcheck as health_cmd,
+    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
     mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
     scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
     view as view_cmd,
@@ -343,6 +343,10 @@ pub fn run() {
             // path. Allow-listed in the command itself; safe for
             // read-only tools only.
             forge_cmd::forge_invoke_tool,
+            // Broker connection status + test surface. Powers the
+            // Settings Broker Connections card.
+            broker_conn_cmd::forge_broker_status,
+            broker_conn_cmd::forge_broker_test,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook
