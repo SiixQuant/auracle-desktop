@@ -17,6 +17,7 @@ pub mod dashboards;
 pub mod docker;
 pub mod forge;
 pub mod healthcheck;
+pub mod ibeam;
 pub mod ibkr_login;
 pub mod installer;
 pub mod keychain;

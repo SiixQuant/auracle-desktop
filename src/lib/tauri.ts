@@ -264,7 +264,44 @@ export const cmd = {
     invoke<void>("broker_stream_unsubscribe", { symbol }),
   brokerStreamStatus: () =>
     invoke<BrokerStreamStatus[]>("broker_stream_status"),
+
+  // ── ibeam supervisor (auto-managed IBKR gateway) ─────────────
+  //
+  // Wraps the voyz/ibeam Docker container that keeps the IBKR
+  // Client Portal Gateway session alive indefinitely (auto re-login
+  // on the daily IBKR session reset). See commands/ibeam.rs for
+  // the full background.
+  ibeamStatus: () => invoke<IbeamStatus>("ibeam_status"),
+  ibeamInstall: (creds: IbeamCredentials) =>
+    invoke<void>("ibeam_install", { creds }),
+  ibeamStart: () => invoke<void>("ibeam_start"),
+  ibeamStop: () => invoke<void>("ibeam_stop"),
+  ibeamRestart: () => invoke<void>("ibeam_restart"),
+  ibeamLogs: (lines?: number) =>
+    invoke<string>("ibeam_logs", { lines }),
+  ibeamUninstall: () => invoke<void>("ibeam_uninstall"),
 };
+
+export type IbeamState =
+  | { state: "not_installed" }
+  | { state: "stopped"; reason: string }
+  | { state: "running"; auth_ok: boolean }
+  | { state: "docker_unavailable"; detail: string }
+  | { state: "other"; detail: string };
+
+export interface IbeamStatus {
+  state: IbeamState;
+  compose_dir: string;
+  has_credentials: boolean;
+}
+
+export interface IbeamCredentials {
+  username: string;
+  password: string;
+  account_id: string;
+  /** "paper" | "live" */
+  mode: string;
+}
 
 export interface ToolInvocationResult {
   result: string;

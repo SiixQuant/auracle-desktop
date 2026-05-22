@@ -67,8 +67,8 @@ use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
     broker_stream as broker_stream_cmd, dashboards as dash_cmd,
     docker as docker_cmd, forge as forge_cmd, healthcheck as health_cmd,
-    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
-    mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
+    ibeam as ibeam_cmd, ibkr_login as ibkr_login_cmd, installer as installer_cmd,
+    keychain as keychain_cmd, mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
     scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
     view as view_cmd,
 };
@@ -366,6 +366,16 @@ pub fn run() {
             broker_stream_cmd::broker_stream_subscribe,
             broker_stream_cmd::broker_stream_unsubscribe,
             broker_stream_cmd::broker_stream_status,
+            // ibeam supervisor — auto-managed IBKR gateway via
+            // a Docker container that handles daily reauth on
+            // its own. See commands/ibeam.rs.
+            ibeam_cmd::ibeam_status,
+            ibeam_cmd::ibeam_install,
+            ibeam_cmd::ibeam_start,
+            ibeam_cmd::ibeam_stop,
+            ibeam_cmd::ibeam_restart,
+            ibeam_cmd::ibeam_logs,
+            ibeam_cmd::ibeam_uninstall,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

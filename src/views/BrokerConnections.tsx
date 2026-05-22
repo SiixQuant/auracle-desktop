@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import IbeamSetup from "@/views/IbeamSetup";
 import {
   cmd,
   openInBrowser,
@@ -101,24 +102,31 @@ function BrokerRow({
 }) {
   return (
     <div
-      className="row"
       style={{
-        alignItems: "flex-start",
         padding: "10px 0",
         borderBottom: "1px solid var(--border)",
       }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <strong>{broker.label}</strong>
-          <StatePill state={broker.state} />
+      <div className="row" style={{ alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <strong>{broker.label}</strong>
+            <StatePill state={broker.state} />
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+            {broker.description}
+          </div>
+          <BrokerDetail broker={broker} />
         </div>
-        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-          {broker.description}
-        </div>
-        <BrokerDetail broker={broker} />
+        <BrokerActions broker={broker} onRefresh={onRefresh} />
       </div>
-      <BrokerActions broker={broker} onRefresh={onRefresh} />
+      {/* The ibeam supervisor sub-card only renders under IBKR. It
+       *  handles the persistent-session story: install + manage the
+       *  voyz/ibeam Docker container that auto-reauths the gateway
+       *  whenever IBKR's daily session timeout fires. */}
+      {broker.id === "ibkr" && (
+        <IbeamSetup onStateChange={onRefresh} />
+      )}
     </div>
   );
 }
