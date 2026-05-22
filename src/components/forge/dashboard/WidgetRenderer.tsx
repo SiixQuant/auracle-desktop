@@ -26,6 +26,7 @@ import KpiGrid from "./KpiGrid";
 import LineChart from "./LineChart";
 import NotesMd from "./NotesMd";
 import OptionChainTable from "./OptionChainTable";
+import PayoffDiagram from "./PayoffDiagram";
 import type { WidgetRenderState } from "./types";
 
 interface WidgetRendererProps {
@@ -182,6 +183,8 @@ function WidgetBody({ state }: { state: WidgetRenderState }): ReactElement {
       return <BarChart state={state} />;
     case "option_chain_table":
       return <OptionChainTable state={state} />;
+    case "payoff_diagram":
+      return <PayoffDiagram state={state} />;
     case "notes_md":
       return <NotesMd state={state} />;
     default:

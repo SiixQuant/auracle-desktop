@@ -899,6 +899,11 @@ const SYSTEM_PROMPT: &str = concat!(
     "  option_chain_table — Calls/puts grid centered on ATM. Optional fields list \
                        (default ['bid','ask','iv','delta','volume']; supported: bid, ask, last, \
                        iv, delta, gamma, theta, vega, volume). Feed from get_options_chain.\n",
+    "  payoff_diagram — Multi-leg option P&L at expiry. Set top-level `spot`, `legs`: \
+                       [{type:'call'|'put', strike, premium, qty, action:'buy'|'sell'}, ...]. \
+                       Optional `price_range`: {min, max, steps}. Static (data_source = inline). \
+                       Use after get_options_chain when the user wants to evaluate a structure \
+                       (strangle, condor, calendar, etc.) before placing it.\n",
     "  notes_md       — Markdown annotation panel. data_source: {tool: 'inline', args: {}}. \
                        Set top-level `body`: 'markdown text...'. Use for methodology/rationale \
                        alongside data widgets.\n\n",
