@@ -366,6 +366,12 @@ pub fn run() {
             broker_stream_cmd::broker_stream_subscribe,
             broker_stream_cmd::broker_stream_unsubscribe,
             broker_stream_cmd::broker_stream_status,
+            // Conflict detection + remediation between the launcher-
+            // managed ibeam container and Houston's bundled IBKR
+            // gateway service. Both want port 5000 — one of them
+            // has to yield.
+            docker_cmd::stack_stop_service,
+            docker_cmd::docker_container_running,
             // ibeam supervisor — auto-managed IBKR gateway via
             // a Docker container that handles daily reauth on
             // its own. See commands/ibeam.rs.

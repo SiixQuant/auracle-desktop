@@ -106,6 +106,16 @@ export const cmd = {
   stackPullUpdate: () => invoke<void>("stack_pull_update"),
   stackRestartContainer: (name: string) =>
     invoke<void>("stack_restart_container", { name }),
+  /** Stop one whitelisted service in the Auracle compose stack
+   *  (currently only the ibgateway/cpgateway IBKR services so the
+   *  launcher's ibeam container can take over port 5000). */
+  stackStopService: (name: string) =>
+    invoke<void>("stack_stop_service", { name }),
+  /** First name from `names` that's currently a running Docker
+   *  container, or null. Used by Broker Connections to detect when
+   *  Houston's bundled gateway would conflict with ibeam. */
+  dockerContainerRunning: (names: string[]) =>
+    invoke<string | null>("docker_container_running", { names }),
   containerLogs: (name: string, lines = 200) =>
     invoke<string>("container_logs", { name, lines }),
 

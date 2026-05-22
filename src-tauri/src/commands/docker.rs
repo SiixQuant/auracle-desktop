@@ -350,6 +350,75 @@ pub async fn stack_restart_container(name: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Stop a single compose service in the Auracle stack. Currently used
+/// by the Broker Connections card to take over IBKR session management
+/// from Houston: the stack ships an `ibgateway` / `cpgateway` service
+/// that runs the IBKR Client Portal Gateway with no auto-reauth, and
+/// that conflicts on port 5000 with the launcher-managed ibeam
+/// container. Stopping the Houston-side service lets ibeam own the
+/// session.
+///
+/// Same trust model as stack_restart_container: short whitelist, no
+/// arbitrary service names from the frontend.
+#[tauri::command]
+pub async fn stack_stop_service(name: String) -> Result<(), String> {
+    let dir = installer::resolve_install_path().map_err(to_error_string)?;
+    const ALLOWED: &[&str] = &["ibgateway", "cpgateway"];
+    if !ALLOWED.contains(&name.as_str()) {
+        return Err(format!("service not in stop-allow-list: {name}"));
+    }
+    run_in("docker", &["compose", "stop", &name], &dir)
+        .await
+        .map_err(to_error_string)?;
+    Ok(())
+}
+
+/// Lightweight "is this container running" probe. Doesn't go through
+/// compose — uses `docker ps --filter` so it works regardless of which
+/// compose project owns the container (handles both `auracle-cpgateway`
+/// and `ibgateway` naming conventions across stack versions).
+///
+/// Returns the running container's name when found, or None.
+#[tauri::command]
+pub async fn docker_container_running(
+    names: Vec<String>,
+) -> Result<Option<String>, String> {
+    // Refuse empty / huge inputs — defense in depth.
+    if names.is_empty() || names.len() > 32 {
+        return Err("provide 1-32 container names to check".to_string());
+    }
+    for n in &names {
+        // Validate each name: docker container names are
+        // [a-zA-Z0-9][a-zA-Z0-9_.-]*. Reject anything else so the
+        // arg can't be tricked into a shell-injection vector even
+        // though Command::arg already quotes properly.
+        if n.is_empty()
+            || n.len() > 64
+            || !n.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(format!("invalid container name: {n:?}"));
+        }
+    }
+    let out = match Command::new("docker")
+        .args(["ps", "--format", "{{.Names}}"])
+        .output()
+        .await
+    {
+        Ok(o) => o,
+        Err(_) => return Ok(None), // docker not on PATH = "nothing running"
+    };
+    if !out.status.success() {
+        return Ok(None);
+    }
+    let running: std::collections::HashSet<&str> = std::str::from_utf8(&out.stdout)
+        .unwrap_or("")
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    Ok(names.into_iter().find(|n| running.contains(n.as_str())))
+}
+
 #[tauri::command]
 pub async fn container_logs(name: String, tail: u32) -> Result<Vec<String>, String> {
     let dir = installer::resolve_install_path().map_err(to_error_string)?;

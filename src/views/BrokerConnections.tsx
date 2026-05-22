@@ -24,6 +24,7 @@ export default function BrokerConnectionsCard() {
   const [statuses, setStatuses] = useState<BrokerStatus[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [houstonConflict, setHoustonConflict] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -35,6 +36,22 @@ export default function BrokerConnectionsCard() {
       setError(String(err));
     } finally {
       setRefreshing(false);
+    }
+    // Probe for the Houston-managed IBKR gateway container — it's
+    // the predecessor of the launcher's ibeam path and the two
+    // can't coexist (both bind port 5000). Surface a clear
+    // conflict notice if it's running so the user knows to take
+    // one path or the other.
+    try {
+      const found = await cmd.dockerContainerRunning([
+        "auracle-cpgateway",
+        "auracle-ibgateway",
+        "ibgateway",
+        "cpgateway",
+      ]);
+      setHoustonConflict(found);
+    } catch {
+      setHoustonConflict(null);
     }
   }, []);
 
@@ -77,6 +94,13 @@ export default function BrokerConnectionsCard() {
         </button>
       </h2>
       <div className="card">
+        <CanonicalSourceBanner />
+        {houstonConflict && (
+          <HoustonConflictBanner
+            containerName={houstonConflict}
+            onResolved={refresh}
+          />
+        )}
         {error && (
           <div className="muted mono" style={{ color: "var(--err)", marginBottom: 12 }}>
             {error}
@@ -90,6 +114,115 @@ export default function BrokerConnectionsCard() {
         {statuses?.map((b) => <BrokerRow key={b.id} broker={b} onRefresh={refresh} />)}
       </div>
     </>
+  );
+}
+
+/** Permanent header explaining that this card is the canonical
+ *  global broker config — supersedes the broker tab that used to
+ *  live inside Houston's web UI. Keeps users from configuring the
+ *  same broker twice in two different places. */
+function CanonicalSourceBanner() {
+  return (
+    <div
+      style={{
+        padding: 10,
+        marginBottom: 12,
+        background: "rgba(96,165,250,0.08)",
+        border: "1px solid rgba(96,165,250,0.25)",
+        borderRadius: 4,
+        fontSize: 12,
+        lineHeight: 1.6,
+        color: "var(--fg-dim)",
+      }}
+    >
+      <strong style={{ color: "var(--fg)" }}>This is the global broker config</strong>
+      {" — "}
+      both the Forge agent and the Auracle web dashboard (Houston) read from the
+      session this card maintains. If you used to manage your broker connection
+      from Houston&apos;s broker tab, switch to this card; the Houston-side tab
+      is deprecated and any credentials entered there are unused.
+    </div>
+  );
+}
+
+/** Conflict banner — shown when Houston's bundled IBKR gateway
+ *  container is currently running. It and the launcher-managed
+ *  ibeam container both bind localhost:5000, so one of them has to
+ *  yield. Default recommendation is to let the launcher take over
+ *  (auto-reauth is the whole point) but provide both paths. */
+function HoustonConflictBanner({
+  containerName,
+  onResolved,
+}: {
+  containerName: string;
+  onResolved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const takeOver = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      // The compose service name is usually the bare suffix
+      // (ibgateway / cpgateway); strip the project prefix
+      // ("auracle-") to translate the container name into a
+      // valid compose service identifier.
+      const service = containerName.replace(/^auracle-/, "");
+      await cmd.stackStopService(service);
+      onResolved();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: 10,
+        marginBottom: 12,
+        background: "rgba(251,191,36,0.08)",
+        border: "1px solid rgba(251,191,36,0.35)",
+        borderRadius: 4,
+        fontSize: 12,
+        lineHeight: 1.6,
+      }}
+    >
+      <div style={{ color: "var(--fg)", marginBottom: 6 }}>
+        <strong>Conflict detected</strong> — the Auracle stack is currently
+        running its bundled IBKR gateway (<code>{containerName}</code>) on
+        the same port the launcher&apos;s auto-managed connection wants.
+      </div>
+      <div style={{ color: "var(--fg-dim)", marginBottom: 8 }}>
+        Recommended: let the launcher take over. The auto-managed connection
+        re-authenticates itself when IBKR&apos;s daily session timeout
+        fires, so you stop having to log in every 24 hours.
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="primary"
+          onClick={takeOver}
+          disabled={busy}
+          style={{ fontSize: 12 }}
+        >
+          {busy ? "Stopping…" : "Stop Houston's gateway"}
+        </button>
+        <span className="muted mono" style={{ fontSize: 10 }}>
+          then install the launcher-managed connection below
+        </span>
+      </div>
+      {error && (
+        <div
+          className="muted mono"
+          style={{ color: "var(--err)", fontSize: 11, marginTop: 6 }}
+        >
+          {error}
+        </div>
+      )}
+    </div>
   );
 }
 
