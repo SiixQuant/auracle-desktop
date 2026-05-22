@@ -553,6 +553,8 @@ const TOOL_LABELS: Record<string, string> = {
   get_quote: "Quote",
   get_options_chain: "Options chain",
   get_historical_bars: "Historical bars",
+  list_deployments: "List deployments",
+  deploy_strategy: "Deploy",
 };
 
 /**

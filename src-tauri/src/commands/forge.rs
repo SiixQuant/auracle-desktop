@@ -1903,6 +1903,53 @@ fn agent_tool_catalog() -> serde_json::Value {
                 "required": ["slug"],
                 "additionalProperties": false
             }
+        },
+        // ── Strategy deployment tools ──────────────────────────────
+        // Wraps Houston's (planned) deployment endpoints. Today
+        // these return a clear "endpoint not shipped, here's how to
+        // do it manually" message instead of erroring opaquely.
+        {
+            "name": "list_deployments",
+            "description": "List the user's currently-scheduled strategy deployments. Each \
+                            entry has rel_path, schedule, mode (paper|live), status \
+                            (running|paused|errored), last_fired_at, next_fire_at. Use this \
+                            before deploy_strategy to avoid creating duplicates.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "deploy_strategy",
+            "description": "Schedule a strategy file for automated execution. Args: rel_path \
+                            (the strategy file you wrote via write_strategy), schedule \
+                            ('on_close' for end-of-day, 'on_open' for market open, \
+                            'every_5min' for intraday, or a cron expression like '0 9 * * 1-5'), \
+                            mode ('paper' or 'live' — DEFAULT 'paper' unless the user explicitly \
+                            requested live). Backend isn't shipped in every Houston version yet; \
+                            when not, the tool returns a clear instruction for the user to \
+                            schedule manually via Houston's UI.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "rel_path": {
+                        "type": "string",
+                        "description": "Strategy file, same format as write_strategy."
+                    },
+                    "schedule": {
+                        "type": "string",
+                        "description": "'on_close' | 'on_open' | 'every_5min' | a cron expression"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["paper", "live"],
+                        "description": "Default 'paper'. Only use 'live' when explicitly requested."
+                    }
+                },
+                "required": ["rel_path"],
+                "additionalProperties": false
+            }
         }
     ])
 }
@@ -2220,7 +2267,78 @@ async fn execute_agent_tool(
                 Err(e) => (format!("error: {e}"), false),
             }
         }
+        // ── Strategy deployment scaffold ───────────────────────────
+        // Houston endpoints aren't shipped yet; these wrap the
+        // matching POST/GET and return a clean "not available, here's
+        // the manual workaround" error string when the backend 404s.
+        // Same policy as 235336b: tools advertised here ARE always
+        // safe to call, even when their backend isn't ready.
+        "list_deployments" => houston_get("/api/forge/deployments").await,
+        "deploy_strategy" => {
+            let Some(rel_path) = input.get("rel_path").and_then(|v| v.as_str()) else {
+                return ("error: rel_path required".to_string(), false);
+            };
+            let schedule = input
+                .get("schedule")
+                .and_then(|v| v.as_str())
+                .unwrap_or("on_close");
+            let mode = input
+                .get("mode")
+                .and_then(|v| v.as_str())
+                .unwrap_or("paper");
+            if !matches!(mode, "paper" | "live") {
+                return (
+                    format!("error: mode {mode:?} must be 'paper' or 'live'"),
+                    false,
+                );
+            }
+            deploy_via_houston(rel_path, schedule, mode).await
+        }
         _ => (format!("unknown tool: {name}"), false),
+    }
+}
+
+/// POST /api/forge/deployments. Same fail-graceful pattern as
+/// run_backtest_via_houston — when the endpoint isn't shipped (the
+/// common case today), return a clear instruction the agent can
+/// relay to the user without making them dig through docs.
+async fn deploy_via_houston(rel_path: &str, schedule: &str, mode: &str) -> (String, bool) {
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return (format!("http client setup failed: {e}"), false),
+    };
+    let url = format!("{HOUSTON_BASE_URL}/api/forge/deployments");
+    let body = serde_json::json!({
+        "rel_path": rel_path,
+        "schedule": schedule,
+        "mode": mode,
+    });
+    match client.post(&url).json(&body).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let text = resp.text().await.unwrap_or_default();
+            (format!("deployment created: {text}"), true)
+        }
+        Ok(resp) => (
+            format!(
+                "houston doesn't expose the deployments endpoint yet (HTTP {}). \
+                 Until it does, run the strategy on a schedule manually from \
+                 Houston's UI at http://localhost:1969/ui/deployments/new — \
+                 the strategy file ({rel_path}) is saved and ready to schedule.",
+                resp.status()
+            ),
+            false,
+        ),
+        Err(_) => (
+            format!(
+                "houston is offline. To deploy {rel_path} on the {schedule} schedule in \
+                 {mode} mode, start the Auracle stack (cd ~/auracle && docker compose up -d) \
+                 and try again — or visit http://localhost:1969/ui/deployments/new once it's up."
+            ),
+            false,
+        ),
     }
 }
 
@@ -2279,11 +2397,12 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
         "list_strategies"
         | "list_templates"
         | "list_dashboards"
+        | "list_deployments"
         | "get_account_summary"
         | "get_open_positions"
         | "list_connected_brokers"
         | "list_universes" => String::new(),
-        "read_strategy" | "write_strategy" | "run_backtest" => input
+        "read_strategy" | "write_strategy" | "run_backtest" | "deploy_strategy" => input
             .get("rel_path")
             .and_then(|v| v.as_str())
             .map(String::from)
