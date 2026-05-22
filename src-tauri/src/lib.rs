@@ -66,8 +66,9 @@ use tauri::Builder;
 use commands::{
     docker as docker_cmd, forge as forge_cmd, healthcheck as health_cmd,
     ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
-    preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, tray as tray_cmd,
-    update as update_cmd, view as view_cmd,
+    mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
+    scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
+    view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -302,6 +303,11 @@ pub fn run() {
             forge_cmd::anthropic_key_get,
             forge_cmd::anthropic_key_set,
             forge_cmd::anthropic_key_clear,
+            // MCP sidecar supervisor (Phase 4c foundation; the
+            // actual chat tool-use loop lands in Phase 4d)
+            mcp_cmd::mcp_sidecar_status,
+            mcp_cmd::mcp_sidecar_start,
+            mcp_cmd::mcp_sidecar_stop,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

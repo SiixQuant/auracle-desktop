@@ -16,6 +16,7 @@ pub mod healthcheck;
 pub mod ibkr_login;
 pub mod installer;
 pub mod keychain;
+pub mod mcp_sidecar;
 pub mod preflight;
 pub mod scheduled_update;
 pub mod tray;
