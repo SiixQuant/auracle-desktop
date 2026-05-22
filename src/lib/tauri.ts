@@ -222,6 +222,31 @@ export const cmd = {
   forgeBrokerStatus: () => invoke<BrokerStatus[]>("forge_broker_status"),
   forgeBrokerTest: (brokerId: string) =>
     invoke<string>("forge_broker_test", { brokerId }),
+
+  // ── Broker data (launcher-global, callable from any view) ────
+  //
+  // Same code paths the Forge agent uses, exposed as first-class
+  // IPC commands so the main Dashboard, the Forge widget refresh
+  // loop, the tray menu, and anything else we build next can pull
+  // broker data without going through the agent's tool surface.
+  brokerAccountSummary: () =>
+    invoke<BrokerAccountSummary>("broker_account_summary"),
+  brokerOpenPositions: () =>
+    invoke<BrokerPositionsPayload>("broker_open_positions"),
+  brokerQuote: (symbol: string) =>
+    invoke<BrokerQuote>("broker_quote", { symbol }),
+  brokerHistoricalBars: (symbol: string, days?: number) =>
+    invoke<BrokerHistoricalBars>("broker_historical_bars", { symbol, days }),
+  brokerOptionsChain: (
+    symbol: string,
+    month: string,
+    maxStrikes?: number,
+  ) =>
+    invoke<BrokerOptionsChain>("broker_options_chain", {
+      symbol,
+      month,
+      maxStrikes,
+    }),
 };
 
 export interface ToolInvocationResult {
@@ -405,6 +430,89 @@ export interface BrokerStatus {
   description: string;
   capabilities: string[];
   state: BrokerState;
+}
+
+// ── Broker data payloads ────────────────────────────────────────
+//
+// Match what `commands/broker_bridge.rs` returns — numbers can be
+// null on after-hours / illiquid instruments, so each one is
+// optional. Keeping the typing loose-but-named is the right
+// tradeoff for cross-broker data where Alpaca / Tradier / Hyper
+// will eventually fill the same shapes from different upstreams.
+
+export interface BrokerAccountSummary {
+  account_id: string;
+  currency: string;
+  net_liquidation: number | null;
+  buying_power: number | null;
+  available_funds: number | null;
+  excess_liquidity: number | null;
+  total_cash: number | null;
+  gross_position_value: number | null;
+  maintenance_margin: number | null;
+  initial_margin: number | null;
+  unrealized_pnl: number | null;
+  realized_pnl: number | null;
+}
+
+export interface BrokerPosition {
+  symbol: string;
+  asset_class: string;
+  quantity: number | null;
+  avg_cost: number | null;
+  market_price: number | null;
+  market_value: number | null;
+  unrealized_pnl: number | null;
+  realized_pnl: number | null;
+  currency: string;
+  conid: number | null;
+}
+
+export interface BrokerPositionsPayload {
+  account_id: string;
+  rows: BrokerPosition[];
+}
+
+export interface BrokerQuote {
+  symbol: string;
+  conid: number;
+  last: number | null;
+  bid: number | null;
+  ask: number | null;
+  volume: number | null;
+  high: number | null;
+  low: number | null;
+  open: number | null;
+  ts: number;
+}
+
+export interface BrokerBar {
+  date: string;
+  timestamp: number;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number;
+  volume: number | null;
+}
+
+export interface BrokerHistoricalBars {
+  symbol: string;
+  currency: string;
+  rows: BrokerBar[];
+}
+
+export interface BrokerOptionChainRow {
+  strike: number;
+  [k: string]: number | null;
+}
+
+export interface BrokerOptionsChain {
+  symbol: string;
+  month: string;
+  spot: number;
+  underlying_conid: number;
+  rows: BrokerOptionChainRow[];
 }
 
 // ── Misc helpers ────────────────────────────────────────────────

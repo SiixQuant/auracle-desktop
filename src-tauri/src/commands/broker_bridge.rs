@@ -609,6 +609,75 @@ fn days_to_yahoo_range(days: u32) -> &'static str {
     }
 }
 
+// ── Direct Tauri commands ────────────────────────────────────────
+//
+// Broker data is a launcher-global resource: it shouldn't be tunneled
+// through Forge's agent-tool surface to reach a frontend view that
+// just wants a number. These thin wrappers expose the same module
+// functions above as first-class Tauri commands so any view in the
+// app — the main launcher Dashboard, a future tray menu, a settings
+// readout — can pull broker data directly via `cmd.brokerXxx()`.
+//
+// The agent's dispatcher in commands/forge.rs ALSO calls into the
+// same module functions, so there's exactly one source of truth for
+// each read.
+
+#[tauri::command]
+pub async fn broker_account_summary() -> Result<serde_json::Value, String> {
+    get_account_summary().await.map_err(|e| e.to_user_string())
+}
+
+#[tauri::command]
+pub async fn broker_open_positions() -> Result<serde_json::Value, String> {
+    get_open_positions().await.map_err(|e| e.to_user_string())
+}
+
+#[tauri::command]
+pub async fn broker_quote(symbol: String) -> Result<serde_json::Value, String> {
+    if !is_valid_symbol_for_command(&symbol) {
+        return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
+    }
+    get_quote(&symbol).await.map_err(|e| e.to_user_string())
+}
+
+#[tauri::command]
+pub async fn broker_historical_bars(
+    symbol: String,
+    days: Option<u32>,
+) -> Result<serde_json::Value, String> {
+    if !is_valid_symbol_for_command(&symbol) {
+        return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
+    }
+    let days = days.unwrap_or(252).clamp(5, 2520);
+    get_historical_bars(&symbol, days)
+        .await
+        .map_err(|e| e.to_user_string())
+}
+
+#[tauri::command]
+pub async fn broker_options_chain(
+    symbol: String,
+    month: String,
+    max_strikes: Option<usize>,
+) -> Result<serde_json::Value, String> {
+    if !is_valid_symbol_for_command(&symbol) {
+        return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
+    }
+    let max_strikes = max_strikes.unwrap_or(20).clamp(5, 80);
+    get_options_chain(&symbol, &month, max_strikes)
+        .await
+        .map_err(|e| e.to_user_string())
+}
+
+/// Mirror of forge::is_valid_ticker — duplicated locally so this
+/// module doesn't reach back into a sibling for input validation.
+fn is_valid_symbol_for_command(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 32
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '/' | ':'))
+}
+
 // ── Module-internal types ────────────────────────────────────────
 //
 // (Reserved for shape constants the frontend can introspect if we

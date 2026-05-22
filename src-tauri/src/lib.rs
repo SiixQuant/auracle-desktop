@@ -64,9 +64,10 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    broker_connections as broker_conn_cmd, dashboards as dash_cmd,
-    docker as docker_cmd, forge as forge_cmd, healthcheck as health_cmd,
-    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
+    broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
+    dashboards as dash_cmd, docker as docker_cmd, forge as forge_cmd,
+    healthcheck as health_cmd, ibkr_login as ibkr_login_cmd,
+    installer as installer_cmd, keychain as keychain_cmd,
     mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
     scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
     view as view_cmd,
@@ -347,6 +348,15 @@ pub fn run() {
             // Settings Broker Connections card.
             broker_conn_cmd::forge_broker_status,
             broker_conn_cmd::forge_broker_test,
+            // Broker data — first-class Tauri commands so any view
+            // in the app (launcher Dashboard, Forge widgets, tray
+            // menu, anything we build next) can pull live broker
+            // data without going through the agent surface.
+            broker_cmd::broker_account_summary,
+            broker_cmd::broker_open_positions,
+            broker_cmd::broker_quote,
+            broker_cmd::broker_historical_bars,
+            broker_cmd::broker_options_chain,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook
