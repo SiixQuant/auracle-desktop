@@ -10,6 +10,7 @@
 //! aren't UI-safe go to the log file via `log::warn!` /
 //! `log::error!` first.
 
+pub mod broker_bridge;
 pub mod dashboards;
 pub mod docker;
 pub mod forge;

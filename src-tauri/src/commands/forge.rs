@@ -1640,16 +1640,88 @@ fn agent_tool_catalog() -> serde_json::Value {
                 "additionalProperties": false
             }
         },
-        // ── Broker / data tools intentionally omitted ──────────────
-        // The dispatch arms below still handle these names if Claude
-        // happens to call them via a stale prompt, but they're not
-        // advertised here so the agent doesn't reach for tools
-        // Houston can't serve. Re-add the catalog entries (the
-        // get_account_summary / get_open_positions / get_recent_fills
-        // / list_connected_brokers / list_universes / get_historical_bars
-        // blocks — see git history for the full text) in the same
-        // release that ships the Houston endpoints. Spec lives in
-        // docs/HOUSTON-FORGE-API.md.
+        // ── Broker / market-data tools (launcher-local bridge) ─────
+        // These now route through commands/broker_bridge.rs against
+        // IBKR's Client Portal Gateway (account + positions + quote)
+        // and Yahoo Finance (historical bars). All return JSON
+        // shaped to feed the dashboard widget renderers directly —
+        // an `account_summary` result drops straight into a kpi_grid,
+        // `open_positions` into a data_table, `historical_bars` into
+        // a line_chart, etc.
+        //
+        // The other broker tools (get_recent_fills, list_connected_brokers,
+        // list_universes) still depend on Houston endpoints that aren't
+        // shipped yet — kept off the catalog until they are.
+        {
+            "name": "get_account_summary",
+            "description": "Read the user's IBKR account summary — NetLiquidation, BuyingPower, \
+                            AvailableFunds, ExcessLiquidity, TotalCash, MaintenanceMargin, \
+                            UnrealizedPnL, RealizedPnL, currency. Returns a flat JSON object \
+                            ready to drop into a kpi_grid widget. Requires the IBKR Client Portal \
+                            Gateway to be running and logged in; returns a clear instruction if not.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "get_open_positions",
+            "description": "Read the user's current open IBKR positions. Returns \
+                            {account_id, rows: [{symbol, asset_class, quantity, avg_cost, \
+                            market_price, market_value, unrealized_pnl, realized_pnl, currency, \
+                            conid}, ...]} — ready to drop into a data_table widget. Requires the \
+                            IBKR Client Portal Gateway to be running and logged in.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "get_quote",
+            "description": "Fetch a current quote for a single symbol via IBKR — \
+                            {symbol, last, bid, ask, volume, high, low, open, ts}. Use this when \
+                            the user asks for a current price or you need spot for a calc \
+                            (e.g. payoff diagram, IV percentile). Requires IBKR Gateway logged in.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Ticker, e.g. 'SPY' or 'AAPL'. Stocks only in Phase 2."
+                    }
+                },
+                "required": ["symbol"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "get_historical_bars",
+            "description": "Daily OHLCV bars for a symbol over a window. Returns \
+                            {symbol, currency, rows: [{date (YYYY-MM-DD), timestamp (unix s), \
+                            open, high, low, close, volume}, ...]} — drops straight into a \
+                            line_chart (x_field='date', series=[{key:'close'}]) or \
+                            candlestick_chart widget. Backed by Yahoo Finance's free chart \
+                            endpoint, so this works even when the IBKR gateway is offline.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Ticker, e.g. 'SPY' or 'AAPL'."
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback window in days. Defaults to 252 (one year). Max 2520.",
+                        "minimum": 5,
+                        "maximum": 2520
+                    }
+                },
+                "required": ["symbol"],
+                "additionalProperties": false
+            }
+        },
 
         // ── Dashboard tools (CVForge-class visual analytics) ───────
         // These manage persistent JSON dashboard specs that the
@@ -1750,6 +1822,19 @@ fn agent_tool_catalog() -> serde_json::Value {
     ])
 }
 
+/// Validate a ticker symbol — used by every broker tool that takes
+/// a symbol arg. Reject anything that's not ASCII alnum + `.-/:`
+/// (the punctuation set supported by the venues we cover) so we
+/// can't be tricked into building a URL that escapes the intended
+/// endpoint. The downstream HTTP clients also URL-encode, but
+/// defense-in-depth.
+fn is_valid_ticker(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 32
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '/' | ':'))
+}
+
 /// One-shot tool invocation surface for the frontend.
 ///
 /// Dashboards need to fetch their data on their own refresh schedule
@@ -1790,10 +1875,11 @@ pub async fn forge_invoke_tool(
         "list_templates",
         "list_dashboards",
         "read_dashboard",
-        // Broker / data read tools (dispatch arms exist; safe even
-        // when not advertised because they only ever GET).
+        // Broker / data read tools — all read-only, safe to invoke
+        // from the dashboard refresh loop.
         "get_account_summary",
         "get_open_positions",
+        "get_quote",
         "get_recent_fills",
         "list_connected_brokers",
         "list_universes",
@@ -1873,17 +1959,47 @@ async fn execute_agent_tool(
             };
             run_backtest_via_houston(rel_path).await
         }
-        // ── Houston-backed broker / data read tools ────────────────
-        // All thin wrappers over GETs against Houston. The
-        // `houston_get` helper handles offline / wrong-version
-        // failure modes with a relayable error message so the agent
-        // can keep the conversation useful even when the stack is
-        // down. Endpoint paths live in docs/HOUSTON-FORGE-API.md so
-        // the main Auracle repo can implement them in lockstep.
-        "get_account_summary" => houston_get("/api/broker/account-summary").await,
-        "get_open_positions" => houston_get("/api/broker/positions").await,
+        // ── Broker / market-data tools ─────────────────────────────
+        // Now bridged through commands/broker_bridge.rs instead of
+        // routing through Houston (which doesn't expose these yet).
+        //
+        //   * get_account_summary / get_open_positions / get_quote →
+        //     IBKR Client Portal Gateway (self-signed cert, runs at
+        //     https://localhost:5000, requires user to be logged in)
+        //   * get_historical_bars → Yahoo Finance public chart
+        //     endpoint (free, no auth, works without IBKR)
+        //
+        // Both paths fail gracefully with a clear "what to do next"
+        // string when offline / unauthenticated / unknown-symbol.
+        "get_account_summary" => match super::broker_bridge::get_account_summary().await {
+            Ok(v) => (v.to_string(), true),
+            Err(e) => (format!("error: {}", e.to_user_string()), false),
+        },
+        "get_open_positions" => match super::broker_bridge::get_open_positions().await {
+            Ok(v) => (v.to_string(), true),
+            Err(e) => (format!("error: {}", e.to_user_string()), false),
+        },
+        "get_quote" => {
+            let Some(symbol) = input.get("symbol").and_then(|v| v.as_str()) else {
+                return ("error: symbol required".to_string(), false);
+            };
+            if !is_valid_ticker(symbol) {
+                return (
+                    format!("error: symbol {symbol:?} doesn't look like a valid ticker"),
+                    false,
+                );
+            }
+            match super::broker_bridge::get_quote(symbol).await {
+                Ok(v) => (v.to_string(), true),
+                Err(e) => (format!("error: {}", e.to_user_string()), false),
+            }
+        }
         "get_recent_fills" => {
-            // Default 30d lookback; clamp to the schema's 1..=365.
+            // Still Houston-bound — IBKR's recent-fills endpoint
+            // needs more wiring (per-account flex queries) than
+            // Phase 2 covers. Returns the standard "endpoint not
+            // shipped yet" message until Houston catches up OR
+            // we add an IBKR Trades endpoint in a later phase.
             let days = input
                 .get("days")
                 .and_then(|v| v.as_u64())
@@ -1897,17 +2013,7 @@ async fn execute_agent_tool(
             let Some(symbol) = input.get("symbol").and_then(|v| v.as_str()) else {
                 return ("error: symbol required".to_string(), false);
             };
-            // Reject anything that's not a normal ticker shape so we
-            // can't be tricked into building a path that escapes the
-            // intended endpoint (e.g. "AAPL&admin=1" or "../../etc").
-            // Symbols on the supported venues are ASCII alnum + a
-            // few punctuation chars (., -, /, : for crypto perps).
-            if symbol.is_empty()
-                || symbol.len() > 32
-                || !symbol
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '/' | ':'))
-            {
+            if !is_valid_ticker(symbol) {
                 return (
                     format!("error: symbol {symbol:?} doesn't look like a valid ticker"),
                     false,
@@ -1917,12 +2023,11 @@ async fn execute_agent_tool(
                 .get("days")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(252)
-                .clamp(5, 2520);
-            houston_get(&format!(
-                "/api/data/bars?symbol={}&days={days}",
-                urlencoding::encode(symbol),
-            ))
-            .await
+                .clamp(5, 2520) as u32;
+            match super::broker_bridge::get_historical_bars(symbol, days).await {
+                Ok(v) => (v.to_string(), true),
+                Err(e) => (format!("error: {}", e.to_user_string()), false),
+            }
         }
         // ── Dashboard tools ────────────────────────────────────────
         // Thin wrappers over the dashboards module's Tauri commands.
@@ -2090,6 +2195,11 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
             .and_then(|v| v.as_u64())
             .map(|d| format!("last {d}d"))
             .unwrap_or_else(|| "last 30d".to_string()),
+        "get_quote" => input
+            .get("symbol")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| "?".to_string()),
         "get_historical_bars" => {
             let symbol = input
                 .get("symbol")

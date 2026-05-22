@@ -548,6 +548,10 @@ const TOOL_LABELS: Record<string, string> = {
   save_dashboard: "Save dashboard",
   delete_dashboard: "Delete dashboard",
   open_dashboard: "Open dashboard",
+  get_account_summary: "Account summary",
+  get_open_positions: "Open positions",
+  get_quote: "Quote",
+  get_historical_bars: "Historical bars",
 };
 
 /**
