@@ -904,6 +904,15 @@ const SYSTEM_PROMPT: &str = concat!(
                        Optional `price_range`: {min, max, steps}. Static (data_source = inline). \
                        Use after get_options_chain when the user wants to evaluate a structure \
                        (strangle, condor, calendar, etc.) before placing it.\n",
+    "  tickers_grid   — Live multi-symbol ticker tape. Set top-level `symbols`: ['SPY', \
+                       'QQQ', 'AAPL', ...] (typically 3-12 symbols), optional `interval_ms` \
+                       (default 2000, clamped 500-60000), optional `show_spread` (default true), \
+                       optional `columns` (layout density). Subscribes each symbol to the \
+                       launcher's tick stream — cards flash green/red on each price update and \
+                       show the data_quality tier per symbol so the user can see whether their \
+                       broker subscription gives them real-time or delayed. data_source must be \
+                       'inline' (this widget does its own streaming via the broker_stream surface). \
+                       Use this when the user asks for a watchlist or 'show me X, Y, Z live'.\n",
     "  notes_md       — Markdown annotation panel. data_source: {tool: 'inline', args: {}}. \
                        Set top-level `body`: 'markdown text...'. Use for methodology/rationale \
                        alongside data widgets.\n\n",

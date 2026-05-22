@@ -437,6 +437,7 @@ export interface DashboardWidget {
     | "iv_surface_3d"
     | "payoff_diagram"
     | "scanner_table"
+    | "tickers_grid"
     | "notes_md";
   title?: string;
   /** Where the data comes from. `tool` is the name of an agent

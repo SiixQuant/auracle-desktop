@@ -117,10 +117,10 @@ export default function BrokerConnectionsCard() {
   );
 }
 
-/** Permanent header explaining that this card is the canonical
- *  global broker config — supersedes the broker tab that used to
- *  live inside Houston's web UI. Keeps users from configuring the
- *  same broker twice in two different places. */
+/** Header explaining the role of this card: one broker session,
+ *  consumed by every surface (Forge agent, launcher Dashboard,
+ *  Houston web UI). The card owns connection + auth state; the
+ *  other surfaces read from it. */
 function CanonicalSourceBanner() {
   return (
     <div
@@ -135,12 +135,12 @@ function CanonicalSourceBanner() {
         color: "var(--fg-dim)",
       }}
     >
-      <strong style={{ color: "var(--fg)" }}>This is the global broker config</strong>
-      {" — "}
-      both the Forge agent and the Auracle web dashboard (Houston) read from the
-      session this card maintains. If you used to manage your broker connection
-      from Houston&apos;s broker tab, switch to this card; the Houston-side tab
-      is deprecated and any credentials entered there are unused.
+      <strong style={{ color: "var(--fg)" }}>One connection, every surface.</strong>
+      {" "}
+      The launcher manages your broker session here; the Forge agent, the
+      launcher&apos;s Dashboard view, and the Auracle web UI all read from it.
+      Configure once in this card and the same connection is available
+      everywhere.
     </div>
   );
 }
@@ -191,14 +191,17 @@ function HoustonConflictBanner({
       }}
     >
       <div style={{ color: "var(--fg)", marginBottom: 6 }}>
-        <strong>Conflict detected</strong> — the Auracle stack is currently
-        running its bundled IBKR gateway (<code>{containerName}</code>) on
-        the same port the launcher&apos;s auto-managed connection wants.
+        <strong>Port already in use</strong> — the Auracle stack is currently
+        running its own IBKR gateway container (<code>{containerName}</code>)
+        on the port the launcher&apos;s auto-managed connection wants
+        (<code>localhost:5000</code>).
       </div>
       <div style={{ color: "var(--fg-dim)", marginBottom: 8 }}>
-        Recommended: let the launcher take over. The auto-managed connection
-        re-authenticates itself when IBKR&apos;s daily session timeout
-        fires, so you stop having to log in every 24 hours.
+        Free the port and the launcher-managed connection can host the
+        session for every surface — including the Auracle web UI, which
+        will read from the same gateway transparently. The launcher-managed
+        variant adds automatic re-authentication on the daily IBKR session
+        reset so you don&apos;t have to log in every 24 hours.
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button
@@ -208,10 +211,10 @@ function HoustonConflictBanner({
           disabled={busy}
           style={{ fontSize: 12 }}
         >
-          {busy ? "Stopping…" : "Stop Houston's gateway"}
+          {busy ? "Stopping…" : "Free the port"}
         </button>
         <span className="muted mono" style={{ fontSize: 10 }}>
-          then install the launcher-managed connection below
+          stops <code>{containerName}</code> so the launcher can bring its own up
         </span>
       </div>
       {error && (

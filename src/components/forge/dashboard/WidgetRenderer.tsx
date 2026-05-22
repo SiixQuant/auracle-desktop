@@ -27,6 +27,7 @@ import LineChart from "./LineChart";
 import NotesMd from "./NotesMd";
 import OptionChainTable from "./OptionChainTable";
 import PayoffDiagram from "./PayoffDiagram";
+import TickersGrid from "./TickersGrid";
 import type { WidgetRenderState } from "./types";
 
 interface WidgetRendererProps {
@@ -185,6 +186,8 @@ function WidgetBody({ state }: { state: WidgetRenderState }): ReactElement {
       return <OptionChainTable state={state} />;
     case "payoff_diagram":
       return <PayoffDiagram state={state} />;
+    case "tickers_grid":
+      return <TickersGrid state={state} />;
     case "notes_md":
       return <NotesMd state={state} />;
     default:
