@@ -22,6 +22,7 @@ use std::time::UNIX_EPOCH;
 
 use keyring::Entry;
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_store::StoreExt;
 
 use super::to_error_string;
@@ -462,4 +463,279 @@ pub async fn forge_chat(messages: Vec<ChatMessage>) -> Result<ChatResponse, Stri
         usage_in: parsed.usage.input_tokens,
         usage_out: parsed.usage.output_tokens,
     })
+}
+
+// ── Streaming chat ──────────────────────────────────────────────
+//
+// Same Anthropic Messages API, but with `stream: true` so we can
+// paint tokens into the chat panel as they arrive. The Rust task
+// stays alive for the duration of the HTTP response; we emit three
+// Tauri event types the frontend subscribes to:
+//
+//   * `forge-chat-chunk`  — { text: "..." }     one or more per delta
+//   * `forge-chat-done`   — { model, usage_in, usage_out, full_text }
+//   * `forge-chat-error`  — { message: "..." }  network / API / decode
+//
+// SSE parsing: Anthropic emits text/event-stream with lines like
+//   event: content_block_delta
+//   data:  {"type":"content_block_delta","index":0,
+//            "delta":{"type":"text_delta","text":"Hello"}}
+//   (blank line terminator)
+// We only care about `data:` lines whose JSON has a `delta.text` —
+// everything else (event headers, message_start, message_stop,
+// pings) is structural and the frontend doesn't need it.
+
+#[derive(Serialize)]
+struct AnthropicStreamRequest<'a> {
+    model: &'a str,
+    max_tokens: u32,
+    system: &'a str,
+    messages: Vec<AnthropicMessage<'a>>,
+    stream: bool,
+}
+
+#[derive(Serialize, Clone)]
+struct ChatChunkPayload<'a> {
+    text: &'a str,
+}
+
+#[derive(Serialize, Clone)]
+struct ChatDonePayload<'a> {
+    model: &'a str,
+    full_text: &'a str,
+    usage_in: u32,
+    usage_out: u32,
+}
+
+#[derive(Serialize, Clone)]
+struct ChatErrorPayload<'a> {
+    message: &'a str,
+}
+
+#[tauri::command]
+pub async fn forge_chat_stream(
+    app: AppHandle,
+    messages: Vec<ChatMessage>,
+) -> Result<(), String> {
+    // Resolve the API key up-front so we can fail synchronously
+    // with a clear message — by the time the task is spawned the
+    // frontend has already committed to the streaming UI path and
+    // a delayed error feels jarring.
+    let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
+        .map_err(to_error_string)?;
+    let api_key = match entry.get_password() {
+        Ok(v) => v,
+        Err(keyring::Error::NoEntry) => {
+            return Err(
+                "Anthropic API key not set — open Settings → Forge and paste your key (sk-ant-…)"
+                    .to_string(),
+            );
+        }
+        Err(e) => return Err(to_error_string(e)),
+    };
+
+    for m in &messages {
+        if m.role != "user" && m.role != "assistant" {
+            return Err(format!(
+                "invalid chat role {:?} — must be 'user' or 'assistant'",
+                m.role
+            ));
+        }
+    }
+    if messages.is_empty() {
+        return Err("empty chat — provide at least one user message".to_string());
+    }
+
+    // Spawn the HTTP + SSE-parse task. The command itself returns
+    // immediately; progress goes through Tauri events.
+    let app2 = app.clone();
+    tokio::spawn(async move {
+        if let Err(e) = run_stream(app2.clone(), api_key, messages).await {
+            let _ = app2.emit(
+                "forge-chat-error",
+                ChatErrorPayload { message: &e },
+            );
+        }
+    });
+    Ok(())
+}
+
+async fn run_stream(
+    app: AppHandle,
+    api_key: String,
+    messages: Vec<ChatMessage>,
+) -> Result<(), String> {
+    let body = AnthropicStreamRequest {
+        model: ANTHROPIC_DEFAULT_MODEL,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: messages
+            .iter()
+            .map(|m| AnthropicMessage {
+                role: m.role.as_str(),
+                content: m.content.as_str(),
+            })
+            .collect(),
+        stream: true,
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(to_error_string)?;
+
+    let mut resp = client
+        .post(ANTHROPIC_API_URL)
+        .header("x-api-key", &api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .header("content-type", "application/json")
+        .header("accept", "text/event-stream")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("network error: {e}"))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| String::from("(no body)"));
+        return Err(format!("Anthropic API {status}: {text}"));
+    }
+
+    // Buffered SSE parser. Anthropic doesn't guarantee one event
+    // per chunk — a single TCP read can contain partial events or
+    // multiple events, so we accumulate into a line buffer and
+    // dispatch on each \n\n boundary.
+    let mut buf = String::new();
+    let mut full_text = String::new();
+    let mut model = String::from(ANTHROPIC_DEFAULT_MODEL);
+    let mut usage_in: u32 = 0;
+    let mut usage_out: u32 = 0;
+
+    while let Some(chunk) = resp.chunk().await.map_err(|e| format!("stream read: {e}"))? {
+        let s = match std::str::from_utf8(&chunk) {
+            Ok(s) => s,
+            // Anthropic claims UTF-8 throughout; non-UTF8 means we
+            // either lost framing or hit a network garbage path —
+            // skip the chunk rather than crashing the stream.
+            Err(_) => continue,
+        };
+        buf.push_str(s);
+
+        // Pull out complete events (terminated by blank line, i.e. \n\n).
+        while let Some(end) = buf.find("\n\n") {
+            let event_block = buf[..end].to_string();
+            buf.drain(..end + 2);
+
+            // An event block can have multiple `data:` lines per
+            // the SSE spec — concatenate them. Anthropic only ever
+            // sends one in practice but the parser stays correct.
+            let mut data_payload = String::new();
+            for line in event_block.lines() {
+                if let Some(rest) = line.strip_prefix("data:") {
+                    let trimmed = rest.trim_start();
+                    if !data_payload.is_empty() {
+                        data_payload.push('\n');
+                    }
+                    data_payload.push_str(trimmed);
+                }
+            }
+            if data_payload.is_empty() {
+                continue;
+            }
+            // Anthropic uses a final `data: [DONE]`-style sentinel
+            // on some endpoints, but Messages streaming uses the
+            // `message_stop` event instead. Either way, ignore.
+            if data_payload == "[DONE]" {
+                continue;
+            }
+
+            let parsed: serde_json::Value = match serde_json::from_str(&data_payload) {
+                Ok(v) => v,
+                Err(_) => continue, // malformed event — skip
+            };
+            let event_type = parsed.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+            match event_type {
+                "message_start" => {
+                    if let Some(m) = parsed
+                        .get("message")
+                        .and_then(|m| m.get("model"))
+                        .and_then(|m| m.as_str())
+                    {
+                        model = m.to_string();
+                    }
+                    if let Some(u) = parsed
+                        .get("message")
+                        .and_then(|m| m.get("usage"))
+                    {
+                        if let Some(n) = u.get("input_tokens").and_then(|v| v.as_u64()) {
+                            usage_in = n as u32;
+                        }
+                        if let Some(n) = u.get("output_tokens").and_then(|v| v.as_u64()) {
+                            usage_out = n as u32;
+                        }
+                    }
+                }
+                "content_block_delta" => {
+                    if let Some(text) = parsed
+                        .get("delta")
+                        .and_then(|d| d.get("text"))
+                        .and_then(|t| t.as_str())
+                    {
+                        full_text.push_str(text);
+                        let _ = app.emit(
+                            "forge-chat-chunk",
+                            ChatChunkPayload { text },
+                        );
+                    }
+                }
+                "message_delta" => {
+                    // The final usage update lands here — Anthropic
+                    // updates output_tokens to the actual final count.
+                    if let Some(u) = parsed.get("usage") {
+                        if let Some(n) = u.get("output_tokens").and_then(|v| v.as_u64()) {
+                            usage_out = n as u32;
+                        }
+                    }
+                }
+                "message_stop" => {
+                    // End of stream — emit the consolidated done
+                    // event so the frontend can swap from streaming
+                    // to settled state.
+                    let _ = app.emit(
+                        "forge-chat-done",
+                        ChatDonePayload {
+                            model: &model,
+                            full_text: &full_text,
+                            usage_in,
+                            usage_out,
+                        },
+                    );
+                    return Ok(());
+                }
+                _ => {
+                    // content_block_start, content_block_stop, ping,
+                    // and any future event types — structural only,
+                    // the frontend doesn't need them.
+                }
+            }
+        }
+    }
+
+    // Stream ended without an explicit message_stop (network blip
+    // mid-response). Still emit done so the UI isn't stuck on the
+    // streaming spinner; full_text holds whatever we got.
+    let _ = app.emit(
+        "forge-chat-done",
+        ChatDonePayload {
+            model: &model,
+            full_text: &full_text,
+            usage_in,
+            usage_out,
+        },
+    );
+    Ok(())
 }

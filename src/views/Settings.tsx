@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import {
   cmd,
   openInBrowser,
+  pickDirectory,
   type DockerStatus,
   type UpdateInfo,
   type ViewMode,
@@ -19,9 +20,236 @@ export default function Settings() {
     <>
       <h1>Settings</h1>
       <ViewModeCard />
+      <ForgeCard />
       <InstallCard />
       <UpdatesCard />
     </>
+  );
+}
+
+// ── Forge ───────────────────────────────────────────────────────
+
+function ForgeCard() {
+  const [keyState, setKeyState] = useState<"loading" | "set" | "unset">(
+    "loading",
+  );
+  const [keyHint, setKeyHint] = useState<string>("");
+  const [editingKey, setEditingKey] = useState(false);
+  const [stratDir, setStratDir] = useState<string>("loading…");
+  const [savingDir, setSavingDir] = useState(false);
+  const [dirError, setDirError] = useState<string | null>(null);
+
+  const refreshKey = async () => {
+    try {
+      const v = await cmd.anthropicKeyGet();
+      if (v) {
+        setKeyState("set");
+        // Show a short prefix so the operator can confirm WHICH key
+        // is stored (multiple Anthropic workspace keys is common) —
+        // but never expose enough to reconstruct.
+        setKeyHint(v.slice(0, 12) + "…");
+      } else {
+        setKeyState("unset");
+        setKeyHint("");
+      }
+    } catch (err) {
+      setKeyState("unset");
+      setKeyHint(String(err));
+    }
+  };
+
+  const refreshDir = async () => {
+    try {
+      const p = await cmd.forgeStrategiesDir();
+      setStratDir(p);
+    } catch (err) {
+      setStratDir("unavailable: " + String(err));
+    }
+  };
+
+  useEffect(() => {
+    refreshKey();
+    refreshDir();
+  }, []);
+
+  const browseDir = async () => {
+    setDirError(null);
+    try {
+      const picked = await pickDirectory({
+        title: "Pick the strategies directory",
+        defaultPath: stratDir.startsWith("/") ? stratDir : undefined,
+      });
+      if (!picked) return; // user cancelled
+      setSavingDir(true);
+      await cmd.forgeSetStrategiesDir(picked);
+      setStratDir(picked);
+    } catch (err) {
+      setDirError(String(err));
+    } finally {
+      setSavingDir(false);
+    }
+  };
+
+  return (
+    <>
+      <h2>Forge</h2>
+      <div className="card">
+        <div className="row">
+          <div>
+            <div>Anthropic API key</div>
+            <div className="muted mono">
+              {keyState === "loading"
+                ? "checking…"
+                : keyState === "set"
+                  ? keyHint
+                  : "not set"}
+            </div>
+          </div>
+          {keyState === "set" && !editingKey && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setEditingKey(true)}
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                className="ghost danger"
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      "Remove the stored Anthropic key? Chat in Forge will stop working until you set it again.",
+                    )
+                  )
+                    return;
+                  try {
+                    await cmd.anthropicKeyClear();
+                    refreshKey();
+                  } catch (err) {
+                    alert("Could not clear: " + String(err));
+                  }
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+          {(keyState === "unset" || editingKey) && (
+            <ApiKeyInline
+              onCancel={() => setEditingKey(false)}
+              onSaved={() => {
+                setEditingKey(false);
+                refreshKey();
+              }}
+            />
+          )}
+        </div>
+        <div className="row">
+          <div>
+            <div>Strategies directory</div>
+            <div className="muted mono" title={stratDir}>
+              {stratDir}
+            </div>
+            {dirError && (
+              <div
+                className="muted mono"
+                style={{ color: "var(--err)", marginTop: 4 }}
+              >
+                {dirError}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="ghost"
+            disabled={savingDir}
+            onClick={browseDir}
+          >
+            {savingDir ? "Saving…" : "Browse"}
+          </button>
+        </div>
+        <div className="row">
+          <div>
+            <div>Default model</div>
+            <div className="muted mono">claude-sonnet-4-20250514</div>
+          </div>
+          <span className="muted mono" style={{ fontSize: 11 }}>
+            model picker — coming in Phase 2
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ApiKeyInline({
+  onSaved,
+  onCancel,
+}: {
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    const v = value.trim();
+    if (!v) {
+      setErr("Paste a key first.");
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    try {
+      await cmd.anthropicKeySet(v);
+      onSaved();
+    } catch (e) {
+      setErr(String(e));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        alignItems: "flex-end",
+        flex: 1,
+        maxWidth: 380,
+      }}
+    >
+      <input
+        type="password"
+        placeholder="sk-ant-…"
+        autoComplete="off"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        style={{ width: "100%" }}
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" className="ghost" onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="primary"
+          disabled={saving}
+          onClick={save}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+      {err && (
+        <div className="muted mono" style={{ color: "var(--err)" }}>
+          {err}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -145,6 +145,15 @@ export const cmd = {
     invoke<void>("forge_write_file", { relPath, contents }),
   forgeChat: (messages: ChatMessage[]) =>
     invoke<ChatResponse>("forge_chat", { messages }),
+  /**
+   * Kick off a streaming chat. Returns immediately; progress
+   * arrives via the `forge-chat-chunk` / `forge-chat-done` /
+   * `forge-chat-error` events. Subscribe via `onEvent` before
+   * calling this — events fired before listeners attach are
+   * silently dropped.
+   */
+  forgeChatStream: (messages: ChatMessage[]) =>
+    invoke<void>("forge_chat_stream", { messages }),
 
   // Anthropic API key — separate keychain slot from the license key
   anthropicKeyGet: () => invoke<string | null>("anthropic_key_get"),
@@ -178,6 +187,26 @@ export interface ChatResponse {
   usage_out: number;
 }
 
+// ── Streaming event payloads ────────────────────────────────────
+//
+// These mirror what `forge_chat_stream` emits via Tauri events.
+// Listen with onEvent<ChatChunkPayload>('forge-chat-chunk', ...).
+
+export interface ChatChunkPayload {
+  text: string;
+}
+
+export interface ChatDonePayload {
+  model: string;
+  full_text: string;
+  usage_in: number;
+  usage_out: number;
+}
+
+export interface ChatErrorPayload {
+  message: string;
+}
+
 // ── Misc helpers ────────────────────────────────────────────────
 
 /**
@@ -206,4 +235,27 @@ export async function onEvent<P = unknown>(
   const { listen } = await import("@tauri-apps/api/event");
   const unlisten = await listen<P>(event, (e) => handler(e.payload));
   return unlisten;
+}
+
+/**
+ * Open a native directory picker. Returns the absolute path the
+ * user selected, or null if they cancelled. No-op stub when
+ * running outside Tauri (returns null).
+ */
+export async function pickDirectory(
+  options: { defaultPath?: string; title?: string } = {},
+): Promise<string | null> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
+    return null;
+  }
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    title: options.title,
+    defaultPath: options.defaultPath,
+  });
+  // open() returns string for single dir, string[] for multi, null on cancel.
+  if (typeof selected === "string") return selected;
+  return null;
 }

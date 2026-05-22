@@ -71,16 +71,45 @@ export default function Editor({
     };
   }, [activePath]);
 
-  // AI-suggested content from the chat panel. The parent passes it
-  // in via `externalContent`; we drop it straight into the editor
-  // and mark the buffer dirty. The parent is responsible for resetting
-  // `externalContent` to null after we consume it (otherwise repeated
-  // Insert clicks won't re-trigger this effect).
+  // AI-suggested content from the chat panel.
+  //
+  // Two safety rules:
+  //
+  //   1. If the buffer is dirty (unsaved changes), confirm before
+  //      replacing — protects against the AI clobbering work
+  //      someone is in the middle of writing.
+  //
+  //   2. If no file is open, the editor isn't mounted (we render
+  //      the empty state instead). The parent ALSO checks this and
+  //      gates the Insert button, but if a stale call slips through
+  //      we silently no-op rather than mutating state for an
+  //      invisible editor.
+  //
+  // Parent is responsible for resetting `externalContent` to null
+  // after we consume it (so repeated Insert clicks re-trigger the
+  // effect even when the same code text comes through twice).
   useEffect(() => {
-    if (externalContent != null) {
-      setContent(externalContent);
-      setDirty(true);
+    if (externalContent == null) return;
+    if (!activePath) return;
+
+    if (dirty && content.trim().length > 0) {
+      const ok = confirm(
+        "Replace the editor contents with the AI-generated code?\n\nYou have unsaved changes that will be lost.",
+      );
+      if (!ok) {
+        // Bail without clobbering. The parent's reset-to-null still
+        // fires from the onSaved/onApplied path; we trigger it here
+        // by calling onSaved so the slot clears even on cancel.
+        // (onSaved without an actual save is fine — it just bumps
+        // the tree refresh key.)
+        onSaved();
+        return;
+      }
     }
+
+    setContent(externalContent);
+    setDirty(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalContent]);
 
   // Cmd+S / Ctrl+S to save.

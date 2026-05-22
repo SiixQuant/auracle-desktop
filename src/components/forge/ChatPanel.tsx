@@ -15,9 +15,12 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   cmd,
+  onEvent,
   openInBrowser,
+  type ChatChunkPayload,
+  type ChatDonePayload,
+  type ChatErrorPayload,
   type ChatMessage,
-  type ChatResponse,
 } from "@/lib/tauri";
 
 interface ChatPanelProps {
@@ -83,26 +86,104 @@ export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) 
       return { role: m.role, content: m.content };
     });
 
-    try {
-      const resp: ChatResponse = await cmd.forgeChat(apiMessages);
-      const codeBlocks = extractCodeBlocks(resp.text);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: resp.text,
-          codeBlocks,
-          usage: { in: resp.usage_in, out: resp.usage_out },
-        },
-      ]);
-    } catch (err) {
-      setError(String(err));
-      // Roll the user's message off the buffer so they can retry —
-      // an error shouldn't burn an unsent turn on them.
-      setMessages((prev) => prev.slice(0, -1));
-      setDraft(trimmed);
-    } finally {
+    // Streaming send: subscribe to the three Tauri event types BEFORE
+    // invoking, then invoke. The Rust side spawns a tokio task and
+    // emits chunks as they arrive. We accumulate into a placeholder
+    // assistant message and finalize on `done`.
+    //
+    // Listener teardown happens in `finalize()` — both the done +
+    // error paths call it, so we don't leak Tauri listeners across
+    // turns.
+
+    // Append a placeholder assistant message we'll mutate in-place
+    // as chunks arrive. The empty string renders as nothing until
+    // the first chunk lands.
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: "" },
+    ]);
+
+    let unlistenChunk: (() => void) | null = null;
+    let unlistenDone: (() => void) | null = null;
+    let unlistenError: (() => void) | null = null;
+
+    const teardown = () => {
+      try { unlistenChunk?.(); } catch {}
+      try { unlistenDone?.(); } catch {}
+      try { unlistenError?.(); } catch {}
+      unlistenChunk = unlistenDone = unlistenError = null;
+    };
+
+    const onChunk = (payload: ChatChunkPayload) => {
+      // Append to the last assistant message in the buffer.
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (last.role !== "assistant") return prev;
+        next[next.length - 1] = {
+          ...last,
+          content: last.content + payload.text,
+        };
+        return next;
+      });
+    };
+
+    const onDone = (payload: ChatDonePayload) => {
+      // Final settle: replace the streamed text with the
+      // authoritative full_text (handles the edge case where a
+      // chunk dropped), pull out code blocks for the Insert cards,
+      // attach usage.
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (last.role !== "assistant") return prev;
+        next[next.length - 1] = {
+          ...last,
+          content: payload.full_text,
+          codeBlocks: extractCodeBlocks(payload.full_text),
+          usage: { in: payload.usage_in, out: payload.usage_out },
+        };
+        return next;
+      });
       setSending(false);
+      teardown();
+    };
+
+    const onError = (payload: ChatErrorPayload) => {
+      setError(payload.message);
+      // Roll back the user turn + the placeholder assistant turn
+      // so retry doesn't burn the message and the transcript stays
+      // clean.
+      setMessages((prev) => prev.slice(0, -2));
+      setDraft(trimmed);
+      setSending(false);
+      teardown();
+    };
+
+    try {
+      unlistenChunk = await onEvent<ChatChunkPayload>(
+        "forge-chat-chunk",
+        onChunk,
+      );
+      unlistenDone = await onEvent<ChatDonePayload>(
+        "forge-chat-done",
+        onDone,
+      );
+      unlistenError = await onEvent<ChatErrorPayload>(
+        "forge-chat-error",
+        onError,
+      );
+      await cmd.forgeChatStream(apiMessages);
+    } catch (err) {
+      // Synchronous failure from the invoke (e.g. no API key set
+      // raises a typed Err on the Rust side before any events fire).
+      setError(String(err));
+      setMessages((prev) => prev.slice(0, -2));
+      setDraft(trimmed);
+      setSending(false);
+      teardown();
     }
   };
 
@@ -169,20 +250,19 @@ export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) 
           </div>
         )}
 
-        {messages.map((m, i) => (
-          <MessageBubble
-            key={i}
-            message={m}
-            onInsertCode={onInsertCode}
-          />
-        ))}
-
-        {sending && (
-          <div className="forge-msg assistant">
-            <div className="forge-msg-role">claude</div>
-            <div className="forge-msg-content muted">thinking…</div>
-          </div>
-        )}
+        {messages.map((m, i) => {
+          const isLast = i === messages.length - 1;
+          const isStreamingPlaceholder =
+            isLast && sending && m.role === "assistant" && m.content === "";
+          return (
+            <MessageBubble
+              key={i}
+              message={m}
+              onInsertCode={onInsertCode}
+              streaming={isStreamingPlaceholder}
+            />
+          );
+        })}
       </div>
 
       {error && (
@@ -238,9 +318,11 @@ export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) 
 function MessageBubble({
   message,
   onInsertCode,
+  streaming,
 }: {
   message: UiMessage;
   onInsertCode: (code: string) => void;
+  streaming?: boolean;
 }) {
   const isUser = message.role === "user";
   const blocks = message.codeBlocks ?? [];
@@ -249,7 +331,11 @@ function MessageBubble({
     <div className={`forge-msg ${isUser ? "user" : "assistant"}`}>
       <div className="forge-msg-role">{isUser ? "you" : "claude"}</div>
       <div className="forge-msg-content">
-        {renderContent(message.content, blocks, onInsertCode)}
+        {streaming ? (
+          <div className="muted">thinking…</div>
+        ) : (
+          renderContent(message.content, blocks, onInsertCode)
+        )}
       </div>
       {message.usage && (
         <div className="forge-msg-meta mono">

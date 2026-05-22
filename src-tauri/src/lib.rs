@@ -281,13 +281,14 @@ pub fn run() {
             // IBKR Client Portal embedded login window
             ibkr_login_cmd::open_ibkr_login,
             ibkr_login_cmd::close_ibkr_login,
-            // Forge — strategy authoring + AI chat (Phase 1)
+            // Forge — strategy authoring + AI chat (Phase 1 + 2)
             forge_cmd::forge_strategies_dir,
             forge_cmd::forge_set_strategies_dir,
             forge_cmd::forge_list_strategies,
             forge_cmd::forge_read_file,
             forge_cmd::forge_write_file,
             forge_cmd::forge_chat,
+            forge_cmd::forge_chat_stream,
             forge_cmd::anthropic_key_get,
             forge_cmd::anthropic_key_set,
             forge_cmd::anthropic_key_clear,
