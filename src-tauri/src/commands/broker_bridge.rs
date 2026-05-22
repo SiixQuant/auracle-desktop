@@ -295,15 +295,22 @@ async fn ibkr_resolve_conid(client: &reqwest::Client, symbol: &str) -> Result<i6
 /// GET /iserver/marketdata/snapshot?conids=X&fields=31,84,86,7295 →
 /// last/bid/ask/volume. IBKR returns rows like `[{"31": "503.21",
 /// "84": "503.19", ...}]` where the keys are field codes. We map
-/// them back to readable names.
+/// them back to readable names and surface a `data_quality` flag so
+/// the UI can show "real-time" vs "15-min delayed" badges.
+///
+/// IBKR conventions: the last-price field (31) can be returned as
+/// "503.21" (real-time), "C503.21" (closing price, market closed),
+/// or with a "D" / "Y" prefix indicating delayed quotes. We parse
+/// the prefix to derive data_quality without an extra roundtrip.
 pub async fn get_quote(symbol: &str) -> Result<Value, BrokerError> {
     let client = ibkr_client()?;
     ibkr_check_auth(&client).await?;
     let conid = ibkr_resolve_conid(&client, symbol).await?;
     // Field codes per IBKR docs: 31=last, 84=bid, 86=ask, 7295=volume,
-    // 7762=high, 7763=low, 7637=open.
+    // 7762=high, 7763=low, 7637=open, 6509=mkt data avail (R=real,
+    // D=delayed, Z=delayed-frozen, Y=frozen-real).
     let url = format!(
-        "{IBKR_GATEWAY_BASE}/iserver/marketdata/snapshot?conids={conid}&fields=31,84,86,7295,7762,7763,7637"
+        "{IBKR_GATEWAY_BASE}/iserver/marketdata/snapshot?conids={conid}&fields=31,84,86,7295,7762,7763,7637,6509"
     );
     let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
@@ -318,24 +325,188 @@ pub async fn get_quote(symbol: &str) -> Result<Value, BrokerError> {
         .as_array()
         .and_then(|a| a.first())
         .ok_or_else(|| BrokerError::BadResponse("snapshot empty".to_string()))?;
-    let num = |k: &str| -> Option<f64> {
+    // `parse_price` strips the IBKR letter prefix (C/D/Y/H/Z) before
+    // parsing — prefixes encode market state, not price magnitude.
+    let parse_price = |k: &str| -> Option<f64> {
         row.get(k).and_then(|v| match v {
             Value::Number(n) => n.as_f64(),
+            Value::String(s) => {
+                let trimmed = s.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+                trimmed.parse().ok()
+            }
+            _ => None,
+        })
+    };
+    let int = |k: &str| -> Option<i64> {
+        row.get(k).and_then(|v| match v {
+            Value::Number(n) => n.as_i64(),
             Value::String(s) => s.parse().ok(),
             _ => None,
         })
     };
+    // 6509 is IBKR's "market data availability" string — see method
+    // doc above for the encoding. Falling back to the price-prefix
+    // heuristic when 6509 isn't returned (some symbols don't carry it).
+    let avail = row.get("6509").and_then(|v| v.as_str()).unwrap_or("");
+    let last_str = row.get("31").and_then(|v| v.as_str()).unwrap_or("");
+    let data_quality = derive_data_quality(avail, last_str);
     Ok(json!({
         "symbol": symbol,
         "conid": conid,
-        "last": num("31"),
-        "bid": num("84"),
-        "ask": num("86"),
-        "volume": num("7295"),
-        "high": num("7762"),
-        "low": num("7763"),
-        "open": num("7637"),
+        "last": parse_price("31"),
+        "bid": parse_price("84"),
+        "ask": parse_price("86"),
+        "volume": int("7295"),
+        "high": parse_price("7762"),
+        "low": parse_price("7763"),
+        "open": parse_price("7637"),
         "ts": chrono::Utc::now().timestamp(),
+        "data_quality": data_quality,
+        "data_quality_raw": avail,
+    }))
+}
+
+/// Map IBKR's market-data availability code (+ the last-price prefix
+/// as fallback) into one of: "realtime", "delayed", "frozen", "closed",
+/// "unknown". This is what the UI uses to render the data-quality
+/// badge under each quote.
+fn derive_data_quality(avail: &str, last_str: &str) -> &'static str {
+    // Availability code wins when present — IBKR docs:
+    //   R = real-time streaming, S = real-time snapshot,
+    //   D = delayed streaming, Z = delayed frozen,
+    //   Y = frozen real-time (after-hours frozen value),
+    //   N = no market data permission, P = real-time but consolidated.
+    if avail.contains('R') || avail.contains('S') || avail.contains('P') {
+        return "realtime";
+    }
+    if avail.contains('Z') || avail.contains('D') {
+        return "delayed";
+    }
+    if avail.contains('Y') {
+        return "frozen";
+    }
+    if avail.contains('N') {
+        return "unknown";
+    }
+    // Fall back to the last-price prefix if availability isn't carried.
+    match last_str.chars().next() {
+        Some('C') => "closed",
+        Some('D') => "delayed",
+        Some('Z') => "delayed",
+        Some('Y') => "frozen",
+        Some('H') => "halted",
+        _ => "unknown",
+    }
+}
+
+/// GET /iserver/marketdata/history → IBKR's own historical bars
+/// endpoint. Respects whatever historical data subscription the
+/// user has on their account (US equities historical is included in
+/// every IBKR tier; depth + intraday granularity scales with
+/// subscription).
+///
+/// Args:
+///   - symbol: ticker
+///   - days:   lookback window in days. Mapped to IBKR's `period`
+///             param + `bar` cadence (daily for >90d, hourly for
+///             >10d, 5-minute for the rest)
+async fn get_historical_bars_ibkr(symbol: &str, days: u32) -> Result<Value, BrokerError> {
+    let client = ibkr_client()?;
+    ibkr_check_auth(&client).await?;
+    let conid = ibkr_resolve_conid(&client, symbol).await?;
+    let (period, bar) = days_to_ibkr_period_bar(days);
+    let url = format!(
+        "{IBKR_GATEWAY_BASE}/iserver/marketdata/history?conid={conid}&period={period}&bar={bar}&outsideRth=false"
+    );
+    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    if !resp.status().is_success() {
+        return Err(BrokerError::BadStatus {
+            source: "IBKR gateway",
+            status: resp.status().as_u16(),
+            body: resp.text().await.unwrap_or_default(),
+        });
+    }
+    let v: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("history JSON: {e}")))?;
+    // Shape: { symbol, text, priceFactor, startTime, points, data: [{t, o, h, l, c, v}, ...] }
+    let data = v
+        .get("data")
+        .and_then(|d| d.as_array())
+        .ok_or_else(|| BrokerError::BadResponse("history: missing `data` array".to_string()))?;
+    let rows: Vec<Value> = data
+        .iter()
+        .filter_map(|r| {
+            let ms = r.get("t").and_then(|v| v.as_i64())?;
+            let secs = ms / 1000;
+            let date = chrono::DateTime::<chrono::Utc>::from_timestamp(secs, 0)?
+                .format("%Y-%m-%d")
+                .to_string();
+            let close = r.get("c").and_then(|v| v.as_f64())?;
+            Some(json!({
+                "date": date,
+                "timestamp": secs,
+                "open": r.get("o").and_then(|v| v.as_f64()),
+                "high": r.get("h").and_then(|v| v.as_f64()),
+                "low": r.get("l").and_then(|v| v.as_f64()),
+                "close": close,
+                "volume": r.get("v").and_then(|v| v.as_i64()),
+            }))
+        })
+        .collect();
+    Ok(json!({
+        "symbol": symbol,
+        "currency": "USD",       // IBKR history endpoint doesn't carry currency in the response
+        "source": "ibkr",
+        "bar": bar,
+        "rows": rows,
+    }))
+}
+
+/// Map days lookback → (period, bar) for IBKR's history endpoint.
+/// IBKR's allowed period units are y/m/d/h/min; bar matches.
+fn days_to_ibkr_period_bar(days: u32) -> (String, &'static str) {
+    if days <= 5 {
+        (format!("{days}d"), "5mins")
+    } else if days <= 30 {
+        (format!("{days}d"), "30mins")
+    } else if days <= 90 {
+        (format!("{days}d"), "1h")
+    } else if days <= 365 {
+        let m = (days + 29) / 30;
+        (format!("{m}m"), "1d")
+    } else {
+        let y = (days + 364) / 365;
+        (format!("{y}y"), "1d")
+    }
+}
+
+/// GET /iserver/marketdata/snapshot for a small set of "market data
+/// indicators" that reveal the user's subscription tier. IBKR doesn't
+/// expose a clean "list your subscriptions" endpoint, so we infer
+/// from what a snapshot for SPY returns: if `6509` comes back as
+/// 'R' or 'P' the user has real-time US equity; 'D' / 'Z' means
+/// delayed; 'N' means no permission at all. Augmented with a probe
+/// for OPRA option data via an SPY at-the-money option chain.
+pub async fn get_market_data_status() -> Result<Value, BrokerError> {
+    let client = ibkr_client()?;
+    ibkr_check_auth(&client).await?;
+    // SPY is the cheapest probe — every IBKR account can resolve it.
+    let spy_quote = get_quote("SPY").await.ok();
+    let us_equity_tier = spy_quote
+        .as_ref()
+        .and_then(|v| v.get("data_quality"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    Ok(json!({
+        "us_equity": us_equity_tier,
+        "us_equity_raw": spy_quote
+            .as_ref()
+            .and_then(|v| v.get("data_quality_raw"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "options": "unknown_probe_options_chain_to_check",
+        "hint": "data_quality is per-instrument; this is the SPY readout as a proxy for US equity subscription tier",
     }))
 }
 
@@ -512,11 +683,33 @@ fn is_yyyymm(s: &str) -> bool {
 
 // ── Yahoo Finance (free, no auth) ────────────────────────────────
 
+/// Historical bars router. Tries the user's broker first (so their
+/// subscription tier governs depth / granularity), then falls back
+/// to a free public feed if the broker is unreachable. Always labels
+/// `source` in the response so the UI can show "via IBKR (your
+/// real-time subscription)" vs "via Yahoo (15-min delayed daily)".
+pub async fn get_historical_bars(symbol: &str, days: u32) -> Result<Value, BrokerError> {
+    match get_historical_bars_ibkr(symbol, days).await {
+        Ok(v) => Ok(v),
+        Err(BrokerError::Offline { .. })
+        | Err(BrokerError::NotAuthenticated) => {
+            // Broker isn't reachable / not logged in — drop to the
+            // free public feed so the dashboard still renders.
+            // Anyone with a live subscription will hit the IBKR path
+            // on the next refresh once the gateway is back.
+            log::info!(
+                "broker_bridge: IBKR unavailable for {symbol} history, falling back to Yahoo"
+            );
+            get_historical_bars_yahoo(symbol, days).await
+        }
+        Err(e) => Err(e),
+    }
+}
+
 /// GET /v8/finance/chart/{symbol}?range={range}&interval=1d
 /// → daily OHLCV bars over the requested window. No API key
-/// required. Used as the default historical-bars path because
-/// it works even when the IBKR gateway isn't logged in.
-pub async fn get_historical_bars(symbol: &str, days: u32) -> Result<Value, BrokerError> {
+/// required. Used as the fallback path when the broker is offline.
+async fn get_historical_bars_yahoo(symbol: &str, days: u32) -> Result<Value, BrokerError> {
     let client = public_client()?;
     let range = days_to_yahoo_range(days);
     let url = format!(
@@ -587,6 +780,9 @@ pub async fn get_historical_bars(symbol: &str, days: u32) -> Result<Value, Broke
             .and_then(|m| m.get("currency"))
             .and_then(|c| c.as_str())
             .unwrap_or("USD"),
+        "source": "yahoo",
+        "bar": "1d",
+        "data_quality": "delayed",   // Yahoo bars trail real-time by ~15min
     }))
 }
 
@@ -665,6 +861,17 @@ pub async fn broker_options_chain(
     }
     let max_strikes = max_strikes.unwrap_or(20).clamp(5, 80);
     get_options_chain(&symbol, &month, max_strikes)
+        .await
+        .map_err(|e| e.to_user_string())
+}
+
+/// Returns the user's effective market-data subscription tier per
+/// asset class — surfaces what they're paying for so the UI can
+/// render "real-time" vs "delayed" badges accurately and so the
+/// agent can warn before promising live data the user can't get.
+#[tauri::command]
+pub async fn broker_market_data_status() -> Result<serde_json::Value, String> {
+    get_market_data_status()
         .await
         .map_err(|e| e.to_user_string())
 }

@@ -24,6 +24,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   cmd,
   type BrokerAccountSummary,
+  type BrokerDataQuality,
+  type BrokerMarketDataStatus,
   type BrokerPosition,
   type ContainerStatus,
   type StackStatus,
@@ -58,17 +60,19 @@ export default function Dashboard() {
 function BrokerSection() {
   const [summary, setSummary] = useState<BrokerAccountSummary | null>(null);
   const [positions, setPositions] = useState<BrokerPosition[] | null>(null);
+  const [marketData, setMarketData] = useState<BrokerMarketDataStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // Parallel fan-out — neither call blocks the other. Both are
-      // best-effort: if one fails the other still renders.
-      const [s, p] = await Promise.allSettled([
+      // Parallel fan-out — neither call blocks the others. All
+      // best-effort: if one fails the rest still render.
+      const [s, p, md] = await Promise.allSettled([
         cmd.brokerAccountSummary(),
         cmd.brokerOpenPositions(),
+        cmd.brokerMarketDataStatus(),
       ]);
       if (s.status === "fulfilled") {
         setSummary(s.value);
@@ -78,6 +82,7 @@ function BrokerSection() {
         setError(String(s.reason));
       }
       setPositions(p.status === "fulfilled" ? p.value.rows : []);
+      setMarketData(md.status === "fulfilled" ? md.value : null);
     } finally {
       setLoading(false);
     }
@@ -139,6 +144,7 @@ function BrokerSection() {
     <>
       <h2 style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span>Broker</span>
+        {marketData && <DataQualityBadge quality={marketData.us_equity} />}
         {loading && (
           <span className="muted mono" style={{ fontSize: 11 }}>
             refreshing…
@@ -154,9 +160,7 @@ function BrokerSection() {
         </button>
       </h2>
       <div className="card">
-        {summary && (
-          <BrokerKpiRow summary={summary} />
-        )}
+        {summary && <BrokerKpiRow summary={summary} />}
         {positions !== null && positions.length > 0 && (
           <BrokerPositionsList positions={positions} />
         )}
@@ -167,6 +171,75 @@ function BrokerSection() {
         )}
       </div>
     </>
+  );
+}
+
+/** Compact pill showing the user's market-data subscription tier
+ *  for US equities (derived from probing the gateway with a SPY
+ *  snapshot). Renders next to the section heading so the user
+ *  always knows whether prices on this page are real-time or
+ *  trailing the tape. */
+function DataQualityBadge({ quality }: { quality: BrokerDataQuality }) {
+  const cfg: Record<
+    BrokerDataQuality,
+    { label: string; bg: string; fg: string; title: string }
+  > = {
+    realtime: {
+      label: "real-time",
+      bg: "rgba(74,222,128,0.15)",
+      fg: "#86efac",
+      title: "Live US equity data — your IBKR subscription includes real-time quotes.",
+    },
+    delayed: {
+      label: "15-min delayed",
+      bg: "rgba(251,191,36,0.15)",
+      fg: "#fcd34d",
+      title:
+        "Delayed US equity data. Upgrade your IBKR market-data subscription for real-time quotes.",
+    },
+    frozen: {
+      label: "frozen",
+      bg: "rgba(148,163,184,0.15)",
+      fg: "#cbd5e1",
+      title: "Last-known quote (market closed or feed paused).",
+    },
+    closed: {
+      label: "market closed",
+      bg: "rgba(148,163,184,0.15)",
+      fg: "#cbd5e1",
+      title: "US equity market is closed; values are the closing prices.",
+    },
+    halted: {
+      label: "halted",
+      bg: "rgba(248,113,113,0.15)",
+      fg: "#fca5a5",
+      title: "Trading is halted on at least one of the displayed symbols.",
+    },
+    unknown: {
+      label: "tier unknown",
+      bg: "rgba(148,163,184,0.15)",
+      fg: "#cbd5e1",
+      title:
+        "Couldn't determine your data tier — gateway response didn't carry the availability code.",
+    },
+  };
+  const c = cfg[quality] ?? cfg.unknown;
+  return (
+    <span
+      className="mono"
+      title={c.title}
+      style={{
+        fontSize: 10,
+        padding: "2px 8px",
+        background: c.bg,
+        color: c.fg,
+        borderRadius: 999,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+      }}
+    >
+      {c.label}
+    </span>
   );
 }
 

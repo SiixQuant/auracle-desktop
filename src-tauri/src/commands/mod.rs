@@ -12,6 +12,7 @@
 
 pub mod broker_bridge;
 pub mod broker_connections;
+pub mod broker_stream;
 pub mod dashboards;
 pub mod docker;
 pub mod forge;

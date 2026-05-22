@@ -911,7 +911,14 @@ const SYSTEM_PROMPT: &str = concat!(
     "  {tool: 'get_account_summary', args: {}}           — IBKR account metrics\n",
     "  {tool: 'get_open_positions', args: {}}            — IBKR portfolio rows\n",
     "  {tool: 'get_quote', args: {symbol: 'SPY'}}        — IBKR live quote\n",
-    "  {tool: 'get_historical_bars', args: {symbol: 'SPY', days: 90}} — Yahoo daily bars\n",
+    "  {tool: 'get_historical_bars', args: {symbol: 'SPY', days: 90}} — bars (IBKR primary \
+       when connected, Yahoo fallback). Response includes `source` and `bar` so you can tell \
+       the user what cadence they're getting (e.g. IBKR returns hourly or 5-min for short \
+       windows; Yahoo only returns daily).\n",
+    "  {tool: 'get_market_data_status', args: {}} — probe what data tier the user has on \
+       their broker. Returns {us_equity: 'realtime'|'delayed'|'unknown'}. Use this BEFORE \
+       promising live data — if delayed, the agent should warn the user that prices trail \
+       by ~15 minutes and tell them where to upgrade.\n",
     "  {tool: 'get_options_chain', args: {symbol: 'SPY', month: '202607', max_strikes: 20}} \
        — IBKR option chain (calls + puts + Greeks)\n",
     "  {tool: 'inline', args: {data: <literal>}}         — for notes / demo dashboards\n\n",
@@ -1782,13 +1789,29 @@ fn agent_tool_catalog() -> serde_json::Value {
             }
         },
         {
+            "name": "get_market_data_status",
+            "description": "Probe the user's broker for their market-data subscription tier. \
+                            Returns {us_equity: 'realtime'|'delayed'|'frozen'|'closed'|'unknown', \
+                            ...}. Call this when the user asks about live data, or before \
+                            building a streaming dashboard, so you can tell them up front \
+                            whether they'll get real-time or 15-min-delayed prices.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "get_historical_bars",
-            "description": "Daily OHLCV bars for a symbol over a window. Returns \
-                            {symbol, currency, rows: [{date (YYYY-MM-DD), timestamp (unix s), \
-                            open, high, low, close, volume}, ...]} — drops straight into a \
-                            line_chart (x_field='date', series=[{key:'close'}]) or \
-                            candlestick_chart widget. Backed by Yahoo Finance's free chart \
-                            endpoint, so this works even when the IBKR gateway is offline.",
+            "description": "OHLCV bars for a symbol over a window. Tries IBKR first (which \
+                            respects whatever historical data subscription the user has — \
+                            depth + granularity scales with their account tier; 5-min for \
+                            short windows, hourly for medium, daily for long), then falls back \
+                            to Yahoo Finance daily bars if IBKR is offline. Response includes \
+                            `source` ('ibkr'|'yahoo'), `bar` (cadence label), and \
+                            `data_quality`. Returns rows: [{date (YYYY-MM-DD), timestamp \
+                            (unix s), open, high, low, close, volume}, ...] — drops straight \
+                            into a line_chart or candlestick_chart widget.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -2013,6 +2036,7 @@ pub async fn forge_invoke_tool(
         "get_open_positions",
         "get_quote",
         "get_options_chain",
+        "get_market_data_status",
         "get_recent_fills",
         "list_connected_brokers",
         "list_universes",
@@ -2150,6 +2174,10 @@ async fn execute_agent_tool(
                 Err(e) => (format!("error: {}", e.to_user_string()), false),
             }
         }
+        "get_market_data_status" => match super::broker_bridge::get_market_data_status().await {
+            Ok(v) => (v.to_string(), true),
+            Err(e) => (format!("error: {}", e.to_user_string()), false),
+        },
         "get_recent_fills" => {
             // Still Houston-bound — IBKR's recent-fills endpoint
             // needs more wiring (per-account flex queries) than

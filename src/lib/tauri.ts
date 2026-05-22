@@ -247,6 +247,23 @@ export const cmd = {
       month,
       maxStrikes,
     }),
+  /** Returns the user's market-data subscription tier per asset
+   *  class, derived from probing the gateway's response codes. */
+  brokerMarketDataStatus: () =>
+    invoke<BrokerMarketDataStatus>("broker_market_data_status"),
+
+  // ── Real-time quote streaming ────────────────────────────────
+  //
+  // Subscribe via `brokerStreamSubscribe(symbol)`, then listen on
+  // the 'broker-tick' Tauri event for {symbol, last, bid, ask,
+  // data_quality, ts} payloads. Refcounted — call unsubscribe
+  // when you're done so the underlying poll loop can stop.
+  brokerStreamSubscribe: (symbol: string, intervalMs?: number) =>
+    invoke<void>("broker_stream_subscribe", { symbol, intervalMs }),
+  brokerStreamUnsubscribe: (symbol: string) =>
+    invoke<void>("broker_stream_unsubscribe", { symbol }),
+  brokerStreamStatus: () =>
+    invoke<BrokerStreamStatus[]>("broker_stream_status"),
 };
 
 export interface ToolInvocationResult {
@@ -473,6 +490,14 @@ export interface BrokerPositionsPayload {
   rows: BrokerPosition[];
 }
 
+export type BrokerDataQuality =
+  | "realtime"
+  | "delayed"
+  | "frozen"
+  | "closed"
+  | "halted"
+  | "unknown";
+
 export interface BrokerQuote {
   symbol: string;
   conid: number;
@@ -484,6 +509,39 @@ export interface BrokerQuote {
   low: number | null;
   open: number | null;
   ts: number;
+  data_quality: BrokerDataQuality;
+  /** Raw IBKR availability code (`R`, `D`, `Z`, `Y`, etc.) — for diagnostics. */
+  data_quality_raw: string;
+}
+
+/** Emitted by the polling stream on each tick. Subscribe via the
+ *  Tauri event 'broker-tick' after calling brokerStreamSubscribe. */
+export interface BrokerTickEvent {
+  symbol: string;
+  last: number | null;
+  bid: number | null;
+  ask: number | null;
+  data_quality: BrokerDataQuality;
+  /** Unix milliseconds — note this is the LAUNCHER's clock when the
+   *  snapshot returned, not the exchange's quote timestamp. */
+  ts: number;
+}
+
+export interface BrokerStreamStatus {
+  symbol: string;
+  refcount: number;
+  interval_ms: number;
+}
+
+export interface BrokerMarketDataStatus {
+  /** "realtime" | "delayed" | "frozen" | "unknown" — IBKR's
+   *  availability tier for US equities, derived from a SPY probe. */
+  us_equity: BrokerDataQuality;
+  us_equity_raw: string;
+  /** Reserved for future per-asset-class introspection (options,
+   *  futures, FX); currently a constant marker until we add probes. */
+  options: string;
+  hint: string;
 }
 
 export interface BrokerBar {
@@ -500,6 +558,15 @@ export interface BrokerHistoricalBars {
   symbol: string;
   currency: string;
   rows: BrokerBar[];
+  /** "ibkr" (user's subscription tier) or "yahoo" (free 15-min
+   *  delayed daily fallback). UI uses this to render a source pill. */
+  source?: "ibkr" | "yahoo";
+  /** IBKR cadence label ('1d', '1h', '5mins', etc.) when source=ibkr;
+   *  always '1d' for Yahoo. */
+  bar?: string;
+  /** Present on Yahoo path ('delayed'); IBKR path inherits the
+   *  account's tier (real-time vs delayed). */
+  data_quality?: BrokerDataQuality;
 }
 
 export interface BrokerOptionChainRow {
