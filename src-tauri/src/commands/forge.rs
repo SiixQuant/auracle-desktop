@@ -767,27 +767,17 @@ pub fn anthropic_key_set(app: AppHandle, value: String) -> Result<(), String> {
         );
     }
 
-    secret_store::put(&app, VAULT_KEY_ANTHROPIC, &v)?;
-
-    // Verify-after-save: the encrypted vault is much more reliable
-    // than the OS keychain (the whole reason we migrated), but the
-    // check is cheap and catches disk-full / permission-denied
-    // failure modes that would otherwise produce silent set-OK +
-    // read-empty bugs.
-    match secret_store::get(&app, VAULT_KEY_ANTHROPIC) {
-        Ok(Some(ref stored)) if stored == &v => Ok(()),
-        Ok(_) => Err(
-            "Saved but the vault returned a different value when re-read. \
-             This is a filesystem permission or disk-full issue. \
-             Workaround: set ANTHROPIC_API_KEY in your shell / .env — \
-             Forge reads the env var first."
-                .to_string(),
-        ),
-        Err(e) => Err(format!(
-            "Saved but vault verify-read failed: {e}. \
-             Workaround: set ANTHROPIC_API_KEY in your shell / .env."
-        )),
-    }
+    // secret_store::put encapsulates insert + Stronghold.save() and
+    // returns Err on every failure mode the old verify-after-save
+    // dance was protecting against (disk-full, permission-denied,
+    // encryption failure). The previous verify path was a paranoia
+    // hold-over from the keyring era — keyring could silently fail
+    // set, so we read it back to make sure. Stronghold's API contract
+    // is "put returned Ok ⇒ value is in the snapshot," and the
+    // cached in-memory client makes that fact trivially true on the
+    // next get. Re-locking the global vault mutex just to verify the
+    // same in-memory map was free overhead on every save.
+    secret_store::put(&app, VAULT_KEY_ANTHROPIC, &v)
 }
 
 #[tauri::command]

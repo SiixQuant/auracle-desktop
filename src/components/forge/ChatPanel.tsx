@@ -271,26 +271,31 @@ export default function ChatPanel({
     };
 
     try {
-      unlistenChunk = await onEvent<ChatChunkPayload>(
-        "forge-chat-chunk",
-        onChunk,
-      );
-      unlistenDone = await onEvent<ChatDonePayload>(
-        "forge-chat-done",
-        onDone,
-      );
-      unlistenError = await onEvent<ChatErrorPayload>(
-        "forge-chat-error",
-        onError,
-      );
-      unlistenToolCall = await onEvent<ChatToolCallPayload>(
-        "forge-chat-tool-call",
-        onToolCall,
-      );
-      unlistenToolResult = await onEvent<ChatToolResultPayload>(
-        "forge-chat-tool-result",
-        onToolResult,
-      );
+      // Subscribe to all five Tauri event types IN PARALLEL. Each
+      // onEvent() is a separate IPC roundtrip to the Rust event hub;
+      // doing them sequentially used to add ~5×IPC-RTT of dead time
+      // between the user hitting Send and the request actually
+      // leaving the machine. Promise.all collapses that into one
+      // round-trip's worth of latency.
+      //
+      // Longer term: these listeners could be hoisted to a useEffect
+      // mounted once per ChatPanel instance (handlers gated by a
+      // "currently sending?" ref). That removes ALL subscription
+      // overhead per turn. Out of scope for this perf pass — the
+      // 5×→1× win here covers the user-perceived slowness.
+      [
+        unlistenChunk,
+        unlistenDone,
+        unlistenError,
+        unlistenToolCall,
+        unlistenToolResult,
+      ] = await Promise.all([
+        onEvent<ChatChunkPayload>("forge-chat-chunk", onChunk),
+        onEvent<ChatDonePayload>("forge-chat-done", onDone),
+        onEvent<ChatErrorPayload>("forge-chat-error", onError),
+        onEvent<ChatToolCallPayload>("forge-chat-tool-call", onToolCall),
+        onEvent<ChatToolResultPayload>("forge-chat-tool-result", onToolResult),
+      ]);
 
       // Mode-aware dispatch. Agent mode runs the tool-use loop;
       // plain chat just streams text. Cancel works for both via
