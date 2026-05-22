@@ -19,6 +19,8 @@ import { useEffect, useState, type ReactElement } from "react";
 
 import { cmd, type DashboardWidget } from "@/lib/tauri";
 
+import BarChart from "./BarChart";
+import CandlestickChart from "./CandlestickChart";
 import DataTable from "./DataTable";
 import KpiGrid from "./KpiGrid";
 import LineChart from "./LineChart";
@@ -108,7 +110,14 @@ export default function WidgetRenderer({
 
     fetchOnce();
     const ms = Math.max(5, refreshIntervalSeconds) * 1000;
-    interval = setInterval(fetchOnce, ms);
+    interval = setInterval(() => {
+      // Visibility-aware: skip the tick if the window is hidden.
+      // Saves bandwidth + IBKR rate limits when the user has the
+      // app in a background space. We DON'T cancel the interval —
+      // it'll resume cleanly when they switch back.
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchOnce();
+    }, ms);
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);
@@ -166,6 +175,10 @@ function WidgetBody({ state }: { state: WidgetRenderState }): ReactElement {
       return <DataTable state={state} />;
     case "line_chart":
       return <LineChart state={state} />;
+    case "candlestick_chart":
+      return <CandlestickChart state={state} />;
+    case "bar_chart":
+      return <BarChart state={state} />;
     case "notes_md":
       return <NotesMd state={state} />;
     default:
