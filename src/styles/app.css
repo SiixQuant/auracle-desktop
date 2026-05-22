@@ -569,3 +569,99 @@ pre.logs {
   border-color: var(--accent-dim);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+
+/* ── Diff modal ─────────────────────────────────────────────── */
+
+.forge-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  z-index: 1000;
+}
+
+.forge-modal {
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 960px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+}
+
+.forge-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.forge-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.forge-diff {
+  flex: 1;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  line-height: 1.55;
+  background: var(--bg);
+  padding: var(--s-2) 0;
+}
+
+.forge-diff-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0 var(--s-3);
+  white-space: pre;
+}
+
+.forge-diff-line.context {
+  color: var(--fg-dim);
+}
+
+.forge-diff-line.add {
+  background: rgba(16, 185, 129, 0.10);
+  color: var(--fg);
+}
+.forge-diff-line.add .forge-diff-prefix { color: var(--ok); }
+
+.forge-diff-line.remove {
+  background: rgba(239, 68, 68, 0.10);
+  color: var(--fg);
+}
+.forge-diff-line.remove .forge-diff-prefix { color: var(--err); }
+
+.forge-diff-prefix {
+  display: inline-block;
+  width: 14px;
+  font-weight: 600;
+  user-select: none;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.forge-diff-content {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+}

@@ -21,6 +21,7 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
 
+import DiffModal from "@/components/forge/DiffModal";
 import { cmd, openInBrowser } from "@/lib/tauri";
 
 interface EditorProps {
@@ -40,6 +41,10 @@ export default function Editor({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pending diff: when externalContent arrives + buffer is dirty,
+  // we stash the proposed content here and render the DiffModal.
+  // null means "no modal open." See the externalContent effect.
+  const [pendingDiff, setPendingDiff] = useState<string | null>(null);
   // Track the path we last loaded so an in-flight read doesn't clobber
   // a newer open. Sequence-of-asyncs guard for the case where the user
   // clicks two files in quick succession.
@@ -73,17 +78,18 @@ export default function Editor({
 
   // AI-suggested content from the chat panel.
   //
-  // Two safety rules:
+  // Three branches:
   //
-  //   1. If the buffer is dirty (unsaved changes), confirm before
-  //      replacing — protects against the AI clobbering work
-  //      someone is in the middle of writing.
+  //   1. No file open → silently no-op. Parent's button is gated
+  //      too; this is defence-in-depth.
   //
-  //   2. If no file is open, the editor isn't mounted (we render
-  //      the empty state instead). The parent ALSO checks this and
-  //      gates the Insert button, but if a stale call slips through
-  //      we silently no-op rather than mutating state for an
-  //      invisible editor.
+  //   2. Buffer is clean (or empty) → apply directly. No need
+  //      to interrupt the flow with a modal when there's nothing
+  //      to lose.
+  //
+  //   3. Buffer is dirty + non-empty → open the DiffModal so the
+  //      operator can see the proposed change line-by-line before
+  //      committing. Apply / Cancel buttons + esc / ⌘+enter.
   //
   // Parent is responsible for resetting `externalContent` to null
   // after we consume it (so repeated Insert clicks re-trigger the
@@ -93,22 +99,13 @@ export default function Editor({
     if (!activePath) return;
 
     if (dirty && content.trim().length > 0) {
-      const ok = confirm(
-        "Replace the editor contents with the AI-generated code?\n\nYou have unsaved changes that will be lost.",
-      );
-      if (!ok) {
-        // Bail without clobbering. The parent's reset-to-null still
-        // fires from the onSaved/onApplied path; we trigger it here
-        // by calling onSaved so the slot clears even on cancel.
-        // (onSaved without an actual save is fine — it just bumps
-        // the tree refresh key.)
-        onSaved();
-        return;
-      }
+      setPendingDiff(externalContent);
+      return;
     }
 
     setContent(externalContent);
     setDirty(true);
+    onSaved();           // clear the parent's pendingCode slot
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalContent]);
 
@@ -237,6 +234,24 @@ export default function Editor({
           }}
         />
       </div>
+
+      {pendingDiff !== null && activePath && (
+        <DiffModal
+          filePath={activePath}
+          oldText={content}
+          newText={pendingDiff}
+          onApply={() => {
+            setContent(pendingDiff);
+            setDirty(true);
+            setPendingDiff(null);
+            onSaved();   // clear parent slot
+          }}
+          onCancel={() => {
+            setPendingDiff(null);
+            onSaved();   // clear parent slot even on reject
+          }}
+        />
+      )}
     </div>
   );
 }
