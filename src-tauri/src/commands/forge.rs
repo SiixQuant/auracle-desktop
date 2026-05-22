@@ -1783,27 +1783,7 @@ async fn run_agent_loop(
     let mut final_text = String::new();
     let mut response_model = model.clone();
 
-    for iteration in 0..MAX_AGENT_ITERATIONS {
-        // Cancel between iterations — gives the user a deterministic
-        // stop point even during a multi-turn agent run.
-        if iteration > 0 {
-            // tokio::select can't observe a Notify that already
-            // happened; we use try_notify-equivalent semantics by
-            // polling with a zero-duration timeout.
-            tokio::select! {
-                _ = cancel.notified() => {
-                    let _ = app.emit("forge-chat-done", ChatDonePayload {
-                        model: &response_model,
-                        full_text: &final_text,
-                        usage_in: total_in,
-                        usage_out: total_out,
-                    });
-                    return Ok(());
-                }
-                _ = tokio::time::sleep(std::time::Duration::from_millis(1)) => {}
-            }
-        }
-
+    for _iteration in 0..MAX_AGENT_ITERATIONS {
         let body = serde_json::json!({
             "model": model,
             "max_tokens": 4096,
@@ -1812,15 +1792,30 @@ async fn run_agent_loop(
             "messages": messages,
         });
 
-        let resp = client
+        // Race the Anthropic POST against the cancel notify — when
+        // the user hits Stop mid-turn, drop the in-flight request
+        // immediately instead of waiting up to 30s for the model
+        // response to come back. Before this wrap, Stop was a no-op
+        // until the current Anthropic call returned.
+        let send_fut = client
             .post(ANTHROPIC_API_URL)
             .header("x-api-key", &api_key)
             .header("anthropic-version", ANTHROPIC_VERSION)
             .header("content-type", "application/json")
             .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("network error: {e}"))?;
+            .send();
+        let resp = tokio::select! {
+            r = send_fut => r.map_err(|e| format!("network error: {e}"))?,
+            _ = cancel.notified() => {
+                let _ = app.emit("forge-chat-done", ChatDonePayload {
+                    model: &response_model,
+                    full_text: &final_text,
+                    usage_in: total_in,
+                    usage_out: total_out,
+                });
+                return Ok(());
+            }
+        };
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -1828,10 +1823,21 @@ async fn run_agent_loop(
             return Err(format!("Anthropic API {status}: {text}"));
         }
 
-        let parsed: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| format!("decode failed: {e}"))?;
+        // Same race for the body-read step. Anthropic responses can
+        // be a few KB; on slow networks this is non-trivial.
+        let json_fut = resp.json::<serde_json::Value>();
+        let parsed: serde_json::Value = tokio::select! {
+            j = json_fut => j.map_err(|e| format!("decode failed: {e}"))?,
+            _ = cancel.notified() => {
+                let _ = app.emit("forge-chat-done", ChatDonePayload {
+                    model: &response_model,
+                    full_text: &final_text,
+                    usage_in: total_in,
+                    usage_out: total_out,
+                });
+                return Ok(());
+            }
+        };
 
         if let Some(m) = parsed.get("model").and_then(|v| v.as_str()) {
             response_model = m.to_string();
