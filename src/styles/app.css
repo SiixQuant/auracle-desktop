@@ -550,3 +550,22 @@ pre.logs {
   border-color: var(--accent-dim);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+
+/* ── Settings → Forge model picker ──────────────────────────── */
+
+.forge-model-select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  cursor: pointer;
+  min-width: 240px;
+}
+.forge-model-select:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}

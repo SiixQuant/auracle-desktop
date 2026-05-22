@@ -18,12 +18,15 @@
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 use keyring::Entry;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_store::StoreExt;
+use tokio::sync::Notify;
 
 use super::to_error_string;
 
@@ -31,6 +34,7 @@ use super::to_error_string;
 
 const STORE_FILE: &str = "forge.json";
 const KEY_STRATEGIES_DIR: &str = "strategies_dir";
+const KEY_MODEL: &str = "model";
 
 const ANTHROPIC_KEY_SERVICE: &str = "com.auracle.desktop";
 const ANTHROPIC_KEY_ACCOUNT: &str = "anthropic-api-key";
@@ -38,6 +42,24 @@ const ANTHROPIC_KEY_ACCOUNT: &str = "anthropic-api-key";
 const ANTHROPIC_DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
+
+/// Model whitelist. Adding a new Anthropic model means appending it
+/// here; the frontend reads via `forge_available_models` so the
+/// dropdown stays in lockstep with the Rust enforcement layer (we
+/// reject anything outside this list to prevent a typo / stale
+/// store entry from sending an undefined model to Anthropic and
+/// getting an opaque 400).
+const ANTHROPIC_MODELS: &[&str] = &[
+    "claude-opus-4-20250514",
+    "claude-sonnet-4-20250514",
+    "claude-haiku-4-5-20250514",
+];
+
+/// Single global cancellation handle for the active chat stream.
+/// Phase 3 only supports one concurrent stream (the frontend
+/// disables Send during streaming). Phase 4 will key this by a
+/// per-request stream_id when we add multi-tab support.
+static CHAT_CANCEL: Lazy<Arc<Notify>> = Lazy::new(|| Arc::new(Notify::new()));
 
 /// Return the path the operator has configured (or the default).
 /// Doesn't create the directory if it's missing — listing returns
@@ -157,6 +179,41 @@ pub struct ChatResponse {
 }
 
 // ── File I/O commands ───────────────────────────────────────────
+
+fn resolve_model(app: &tauri::AppHandle) -> String {
+    if let Ok(store) = app.store(STORE_FILE) {
+        if let Some(v) = store.get(KEY_MODEL).and_then(|v| v.as_str().map(String::from)) {
+            if ANTHROPIC_MODELS.iter().any(|&m| m == v) {
+                return v;
+            }
+        }
+    }
+    ANTHROPIC_DEFAULT_MODEL.to_string()
+}
+
+#[tauri::command]
+pub async fn forge_available_models() -> Result<Vec<String>, String> {
+    Ok(ANTHROPIC_MODELS.iter().map(|s| s.to_string()).collect())
+}
+
+#[tauri::command]
+pub async fn forge_get_model(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(resolve_model(&app))
+}
+
+#[tauri::command]
+pub async fn forge_set_model(app: tauri::AppHandle, model: String) -> Result<(), String> {
+    if !ANTHROPIC_MODELS.iter().any(|&m| m == model) {
+        return Err(format!(
+            "unknown model {model:?} — must be one of {:?}",
+            ANTHROPIC_MODELS
+        ));
+    }
+    let store = app.store(STORE_FILE).map_err(to_error_string)?;
+    store.set(KEY_MODEL, model);
+    store.save().map_err(to_error_string)?;
+    Ok(())
+}
 
 #[tauri::command]
 pub async fn forge_strategies_dir(app: tauri::AppHandle) -> Result<String, String> {
@@ -380,7 +437,10 @@ const SYSTEM_PROMPT: &str = concat!(
 );
 
 #[tauri::command]
-pub async fn forge_chat(messages: Vec<ChatMessage>) -> Result<ChatResponse, String> {
+pub async fn forge_chat(
+    app: tauri::AppHandle,
+    messages: Vec<ChatMessage>,
+) -> Result<ChatResponse, String> {
     let entry = Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
         .map_err(to_error_string)?;
     let api_key = match entry.get_password() {
@@ -409,8 +469,9 @@ pub async fn forge_chat(messages: Vec<ChatMessage>) -> Result<ChatResponse, Stri
         return Err("empty chat — provide at least one user message".to_string());
     }
 
+    let model = resolve_model(&app);
     let body = AnthropicRequest {
-        model: ANTHROPIC_DEFAULT_MODEL,
+        model: &model,
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: messages
@@ -546,11 +607,22 @@ pub async fn forge_chat_stream(
         return Err("empty chat — provide at least one user message".to_string());
     }
 
+    // Reset the cancel handle before kicking off the new stream so
+    // a notify() from a previous turn that arrived after the task
+    // exited doesn't immediately cancel this one. tokio::Notify's
+    // semantics: if notify_one is called before notified() is
+    // awaited, the next notified() call resolves immediately. We
+    // drain that pending permit here.
+    let cancel = CHAT_CANCEL.clone();
+    cancel.notify_waiters();        // wake any stale waiters first
+    let _drain = cancel.notified(); // and consume any stored permit
+
     // Spawn the HTTP + SSE-parse task. The command itself returns
     // immediately; progress goes through Tauri events.
     let app2 = app.clone();
+    let cancel_for_task = cancel.clone();
     tokio::spawn(async move {
-        if let Err(e) = run_stream(app2.clone(), api_key, messages).await {
+        if let Err(e) = run_stream(app2.clone(), api_key, messages, cancel_for_task).await {
             let _ = app2.emit(
                 "forge-chat-error",
                 ChatErrorPayload { message: &e },
@@ -560,13 +632,24 @@ pub async fn forge_chat_stream(
     Ok(())
 }
 
+/// Tell the active chat stream to stop. Idempotent — calling when
+/// nothing is streaming is a no-op (the next stream that starts
+/// will drain the stale notify in its setup path).
+#[tauri::command]
+pub fn forge_chat_cancel() -> Result<(), String> {
+    CHAT_CANCEL.notify_waiters();
+    Ok(())
+}
+
 async fn run_stream(
     app: AppHandle,
     api_key: String,
     messages: Vec<ChatMessage>,
+    cancel: Arc<Notify>,
 ) -> Result<(), String> {
+    let model = resolve_model(&app);
     let body = AnthropicStreamRequest {
-        model: ANTHROPIC_DEFAULT_MODEL,
+        model: &model,
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: messages
@@ -584,16 +667,32 @@ async fn run_stream(
         .build()
         .map_err(to_error_string)?;
 
-    let mut resp = client
+    // Race the initial request against a cancel — if the user
+    // hits Stop while the connection is still being established
+    // (DNS, TLS handshake), bail out before we even read a byte.
+    let send_fut = client
         .post(ANTHROPIC_API_URL)
         .header("x-api-key", &api_key)
         .header("anthropic-version", ANTHROPIC_VERSION)
         .header("content-type", "application/json")
         .header("accept", "text/event-stream")
         .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("network error: {e}"))?;
+        .send();
+    let mut resp = tokio::select! {
+        r = send_fut => r.map_err(|e| format!("network error: {e}"))?,
+        _ = cancel.notified() => {
+            let _ = app.emit(
+                "forge-chat-done",
+                ChatDonePayload {
+                    model: &model,
+                    full_text: "",
+                    usage_in: 0,
+                    usage_out: 0,
+                },
+            );
+            return Ok(());
+        }
+    };
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -610,11 +709,32 @@ async fn run_stream(
     // dispatch on each \n\n boundary.
     let mut buf = String::new();
     let mut full_text = String::new();
-    let mut model = String::from(ANTHROPIC_DEFAULT_MODEL);
+    let mut response_model = model.clone(); // overwritten by message_start if Anthropic returns a different alias
     let mut usage_in: u32 = 0;
     let mut usage_out: u32 = 0;
 
-    while let Some(chunk) = resp.chunk().await.map_err(|e| format!("stream read: {e}"))? {
+    loop {
+        let chunk_result = tokio::select! {
+            r = resp.chunk() => r,
+            _ = cancel.notified() => {
+                // Drop the response — closes the TCP connection on
+                // Anthropic's side so we stop being billed for any
+                // remaining output tokens. The done event still
+                // fires below so the UI settles.
+                drop(resp);
+                let _ = app.emit(
+                    "forge-chat-done",
+                    ChatDonePayload {
+                        model: &response_model,
+                        full_text: &full_text,
+                        usage_in,
+                        usage_out,
+                    },
+                );
+                return Ok(());
+            }
+        };
+        let Some(chunk) = chunk_result.map_err(|e| format!("stream read: {e}"))? else { break };
         let s = match std::str::from_utf8(&chunk) {
             Ok(s) => s,
             // Anthropic claims UTF-8 throughout; non-UTF8 means we
@@ -665,7 +785,7 @@ async fn run_stream(
                         .and_then(|m| m.get("model"))
                         .and_then(|m| m.as_str())
                     {
-                        model = m.to_string();
+                        response_model = m.to_string();
                     }
                     if let Some(u) = parsed
                         .get("message")
@@ -708,7 +828,7 @@ async fn run_stream(
                     let _ = app.emit(
                         "forge-chat-done",
                         ChatDonePayload {
-                            model: &model,
+                            model: &response_model,
                             full_text: &full_text,
                             usage_in,
                             usage_out,
@@ -731,7 +851,7 @@ async fn run_stream(
     let _ = app.emit(
         "forge-chat-done",
         ChatDonePayload {
-            model: &model,
+            model: &response_model,
             full_text: &full_text,
             usage_in,
             usage_out,

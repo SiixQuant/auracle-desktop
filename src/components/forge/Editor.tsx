@@ -21,7 +21,7 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
 
-import { cmd } from "@/lib/tauri";
+import { cmd, openInBrowser } from "@/lib/tauri";
 
 interface EditorProps {
   /** Path relative to the strategies dir; null when no file is open. */
@@ -141,6 +141,39 @@ export default function Editor({
     }
   };
 
+  // Run Backtest — saves the file first (if dirty), then deep-links
+  // into Houston's backtest view at /ui/backtests/new with the
+  // strategy path as a query param. Houston owns the actual run +
+  // results UI; Forge just gets you there with a single click
+  // instead of "save, switch to browser, click Strategies, find
+  // the file, click Backtest." If Houston isn't running, the user
+  // hits the standard "stack offline" page from there.
+  const [backtesting, setBacktesting] = useState(false);
+  const runBacktest = async () => {
+    if (!activePath || backtesting) return;
+    setBacktesting(true);
+    setError(null);
+    try {
+      if (dirty) {
+        await cmd.forgeWriteFile(activePath, content);
+        setDirty(false);
+        onSaved();
+      }
+      // Strip the .py / .ipynb extension — Houston's URL expects
+      // the dotted module path (strategies.foo) or the file stem,
+      // not the on-disk filename. We pass the raw rel_path and
+      // let Houston resolve; the worst case is the form pre-fill
+      // doesn't land and the user picks the strategy manually.
+      const params = new URLSearchParams({ strategy: activePath });
+      const url = `http://localhost:1969/ui/backtests/new?${params}`;
+      await openInBrowser(url);
+    } catch (err) {
+      setError(`Could not start backtest: ${String(err)}`);
+    } finally {
+      setBacktesting(false);
+    }
+  };
+
   if (!activePath) {
     return (
       <div className="forge-panel">
@@ -171,6 +204,15 @@ export default function Editor({
             onClick={save}
           >
             {saving ? "Saving…" : "Save (⌘S)"}
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={backtesting}
+            onClick={runBacktest}
+            title="Save the file + open Houston's backtest form pre-filled with this strategy."
+          >
+            {backtesting ? "Opening…" : "Run Backtest"}
           </button>
         </div>
       </div>

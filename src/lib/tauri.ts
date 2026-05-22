@@ -154,6 +154,14 @@ export const cmd = {
    */
   forgeChatStream: (messages: ChatMessage[]) =>
     invoke<void>("forge_chat_stream", { messages }),
+  /** Cancel the currently-running stream. No-op if nothing is streaming. */
+  forgeChatCancel: () => invoke<void>("forge_chat_cancel"),
+
+  // Model selection
+  forgeAvailableModels: () => invoke<string[]>("forge_available_models"),
+  forgeGetModel: () => invoke<string>("forge_get_model"),
+  forgeSetModel: (model: string) =>
+    invoke<void>("forge_set_model", { model }),
 
   // Anthropic API key — separate keychain slot from the license key
   anthropicKeyGet: () => invoke<string | null>("anthropic_key_get"),

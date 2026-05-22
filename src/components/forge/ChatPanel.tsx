@@ -299,14 +299,35 @@ export default function ChatPanel({ activePath, onInsertCode }: ChatPanelProps) 
           <div className="muted mono" style={{ fontSize: 11 }}>
             ⌘+Enter to send
           </div>
-          <button
-            type="button"
-            className="primary"
-            disabled={sending || !draft.trim()}
-            onClick={send}
-          >
-            {sending ? "Sending…" : "Send"}
-          </button>
+          {sending ? (
+            <button
+              type="button"
+              className="ghost danger"
+              onClick={async () => {
+                try {
+                  await cmd.forgeChatCancel();
+                  // The Rust side fires a done event with whatever
+                  // text it has so far — our existing onDone handler
+                  // settles the bubble. No extra UI work needed
+                  // here.
+                } catch (e) {
+                  console.warn("cancel failed:", e);
+                }
+              }}
+              title="Stop the current generation. Whatever's already streamed stays in the transcript."
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="primary"
+              disabled={!draft.trim()}
+              onClick={send}
+            >
+              Send
+            </button>
+          )}
         </div>
       </div>
     </div>

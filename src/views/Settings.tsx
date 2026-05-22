@@ -170,18 +170,78 @@ function ForgeCard() {
             {savingDir ? "Saving…" : "Browse"}
           </button>
         </div>
-        <div className="row">
-          <div>
-            <div>Default model</div>
-            <div className="muted mono">claude-sonnet-4-20250514</div>
-          </div>
-          <span className="muted mono" style={{ fontSize: 11 }}>
-            model picker — coming in Phase 2
-          </span>
-        </div>
+        <ModelPickerRow />
       </div>
     </>
   );
+}
+
+function ModelPickerRow() {
+  const [available, setAvailable] = useState<string[] | null>(null);
+  const [selected, setSelected] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([cmd.forgeAvailableModels(), cmd.forgeGetModel()])
+      .then(([list, current]) => {
+        setAvailable(list);
+        setSelected(current);
+      })
+      .catch((e) => setErr(String(e)));
+  }, []);
+
+  const change = async (next: string) => {
+    setSelected(next);
+    setSaving(true);
+    setErr(null);
+    try {
+      await cmd.forgeSetModel(next);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="row">
+      <div>
+        <div>Default model</div>
+        <div className="muted mono">
+          {selected || "loading…"}
+          {saving ? " · saving…" : null}
+        </div>
+        {err && (
+          <div className="muted mono" style={{ color: "var(--err)" }}>
+            {err}
+          </div>
+        )}
+      </div>
+      {available && available.length > 1 ? (
+        <select
+          value={selected}
+          onChange={(e) => change(e.target.value)}
+          className="forge-model-select"
+        >
+          {available.map((m) => (
+            <option key={m} value={m}>
+              {modelLabel(m)}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="muted mono">{selected ? "single option" : ""}</span>
+      )}
+    </div>
+  );
+}
+
+function modelLabel(slug: string): string {
+  if (slug.includes("opus")) return "Claude Opus (highest quality)";
+  if (slug.includes("haiku")) return "Claude Haiku (fastest, cheapest)";
+  if (slug.includes("sonnet")) return "Claude Sonnet (balanced — default)";
+  return slug;
 }
 
 function ApiKeyInline({

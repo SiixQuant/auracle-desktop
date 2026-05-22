@@ -74,6 +74,14 @@ chrono = { version = "0.4", features = ["serde"] }
 # pinning it directly keeps the API surface stable for our code.
 url = "2"
 
+# Process-global state initialized lazily — Forge uses this for
+# the single cancel handle shared between the chat-stream task
+# (waiter) and the forge_chat_cancel command (notifier). Could be
+# done with OnceLock from std but we already pull in many crates
+# that re-export once_cell transitively; pinning it explicitly
+# keeps the import path stable.
+once_cell = "1.20"
+
 [features]
 # Default features omit the built-in dev-tools surface. Enable in
 # CI for debug builds: cargo build --features devtools
