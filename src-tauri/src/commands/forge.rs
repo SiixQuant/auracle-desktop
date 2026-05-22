@@ -35,6 +35,16 @@ use super::to_error_string;
 const STORE_FILE: &str = "forge.json";
 const KEY_STRATEGIES_DIR: &str = "strategies_dir";
 const KEY_MODEL: &str = "model";
+const KEY_LAYOUT_MODE: &str = "layout_mode";
+
+/// Forge's two top-level layouts:
+///
+///   * "agent" — CVForge-style 2-pane (chat + live preview). The
+///     default for fresh installs since it's the more guided UX.
+///   * "code"  — classic 3-pane (file tree + editor + chat). Power
+///     users who want manual control of files + the editor stick
+///     with this.
+const LAYOUT_MODES: &[&str] = &["agent", "code"];
 
 const ANTHROPIC_KEY_SERVICE: &str = "com.auracle.desktop";
 const ANTHROPIC_KEY_ACCOUNT: &str = "anthropic-api-key";
@@ -211,6 +221,39 @@ pub async fn forge_set_model(app: tauri::AppHandle, model: String) -> Result<(),
     }
     let store = app.store(STORE_FILE).map_err(to_error_string)?;
     store.set(KEY_MODEL, model);
+    store.save().map_err(to_error_string)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn forge_get_layout_mode(app: tauri::AppHandle) -> Result<String, String> {
+    if let Ok(store) = app.store(STORE_FILE) {
+        if let Some(v) = store.get(KEY_LAYOUT_MODE).and_then(|v| v.as_str().map(String::from)) {
+            if LAYOUT_MODES.iter().any(|&m| m == v) {
+                return Ok(v);
+            }
+        }
+    }
+    // Default to agent layout for new installs — that's the new
+    // headline UX. Customers who were already using the old 3-pane
+    // and persisted "code" in their store keep getting "code" on
+    // next launch.
+    Ok("agent".to_string())
+}
+
+#[tauri::command]
+pub async fn forge_set_layout_mode(
+    app: tauri::AppHandle,
+    mode: String,
+) -> Result<(), String> {
+    if !LAYOUT_MODES.iter().any(|&m| m == mode) {
+        return Err(format!(
+            "unknown layout mode {mode:?} — must be one of {:?}",
+            LAYOUT_MODES
+        ));
+    }
+    let store = app.store(STORE_FILE).map_err(to_error_string)?;
+    store.set(KEY_LAYOUT_MODE, mode);
     store.save().map_err(to_error_string)?;
     Ok(())
 }

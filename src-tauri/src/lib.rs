@@ -294,6 +294,8 @@ pub fn run() {
             forge_cmd::forge_available_models,
             forge_cmd::forge_get_model,
             forge_cmd::forge_set_model,
+            forge_cmd::forge_get_layout_mode,
+            forge_cmd::forge_set_layout_mode,
             forge_cmd::forge_strategy_states,
             forge_cmd::forge_set_strategy_state,
             forge_cmd::forge_new_file,

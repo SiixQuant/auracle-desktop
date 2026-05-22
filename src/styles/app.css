@@ -281,12 +281,175 @@ pre.logs {
  * The Forge view doesn't share the centered max-width column the
  * other views use — see App.tsx for the conditional render. */
 
+/* ── Forge outer shell (wraps both Agent + Code layouts) ─────
+ * The outer shell adds the Forge-specific top bar; the inner
+ * shell is the actual content grid (Agent or Code). */
+
+.forge-shell-outer {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px);  /* 56px = app top-bar */
+  background: var(--bg);
+  overflow: hidden;
+}
+
 .forge-shell {
   display: grid;
   grid-template-columns: 240px 1fr 380px;
-  height: calc(100vh - 56px);  /* 56px = top-bar height */
+  flex: 1;
+  min-height: 0;
   background: var(--bg);
   overflow: hidden;
+}
+
+/* Agent layout: 2-pane (chat + preview). Chat takes 40% so it
+ * has room for code blocks; preview takes 60% so backtest charts
+ * render at a useful size. */
+.forge-agent-shell {
+  display: grid;
+  grid-template-columns: minmax(360px, 2fr) minmax(420px, 3fr);
+  flex: 1;
+  min-height: 0;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.forge-col-agent-chat {
+  border-right: 1px solid var(--line);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.forge-col-agent-preview {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Forge top bar ──────────────────────────────────────────── */
+
+.forge-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  gap: var(--s-3);
+}
+
+.forge-topbar-left,
+.forge-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 180px;
+}
+
+.forge-topbar-right {
+  justify-content: flex-end;
+}
+
+.forge-topbar-center {
+  flex: 1;
+  text-align: center;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forge-project-name {
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+}
+
+/* Mode toggle: segmented control. */
+.forge-mode-toggle {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 2px;
+}
+
+.forge-mode-tab {
+  background: transparent;
+  border: none;
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+  letter-spacing: 0.02em;
+}
+.forge-mode-tab:hover {
+  color: var(--fg);
+}
+.forge-mode-tab.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ── Preview pane tabs (Source / Backtest) ──────────────────── */
+
+.forge-preview-head {
+  padding-top: var(--s-2);
+  padding-bottom: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.forge-preview-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+  margin-top: var(--s-1);
+}
+
+.forge-preview-tab {
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.12s, border-color 0.12s;
+  margin-bottom: -1px;
+}
+.forge-preview-tab:hover {
+  color: var(--fg-dim);
+}
+.forge-preview-tab.active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.forge-preview-source {
+  flex: 1;
+  min-height: 0;
+}
+
+.forge-preview-iframe {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--bg);
 }
 
 .forge-col {

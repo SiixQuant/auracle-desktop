@@ -163,6 +163,11 @@ export const cmd = {
   forgeSetModel: (model: string) =>
     invoke<void>("forge_set_model", { model }),
 
+  // Layout mode — "agent" (2-pane CVForge-style) or "code" (3-pane classic)
+  forgeGetLayoutMode: () => invoke<ForgeLayoutMode>("forge_get_layout_mode"),
+  forgeSetLayoutMode: (mode: ForgeLayoutMode) =>
+    invoke<void>("forge_set_layout_mode", { mode }),
+
   // Strategy lifecycle
   forgeStrategyStates: () => invoke<StrategyStates>("forge_strategy_states"),
   forgeSetStrategyState: (relPath: string, state: StrategyState) =>
@@ -259,6 +264,8 @@ export interface StrategyTemplate {
   name: string;
   description: string;
 }
+
+export type ForgeLayoutMode = "agent" | "code";
 
 // ── Misc helpers ────────────────────────────────────────────────
 

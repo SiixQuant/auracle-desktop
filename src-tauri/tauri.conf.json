@@ -28,7 +28,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: https://github.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:1969 https://localhost https://api.github.com https://api.anthropic.com https://amused-commitment-production-fb48.up.railway.app; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      "csp": "default-src 'self'; img-src 'self' data: https://github.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:1969 https://localhost https://api.github.com https://api.anthropic.com https://amused-commitment-production-fb48.up.railway.app; object-src 'none'; frame-src http://localhost:1969; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     },
     "trayIcon": {
       "iconPath": "icons/tray.png",
