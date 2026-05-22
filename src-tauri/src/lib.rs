@@ -367,9 +367,14 @@ pub fn run() {
             broker_stream_cmd::broker_stream_unsubscribe,
             broker_stream_cmd::broker_stream_status,
             // Conflict detection + remediation between the launcher-
-            // managed ibeam container and Houston's bundled IBKR
-            // gateway service. Both want port 5000 — one of them
-            // has to yield.
+            // managed ibeam container and the bundled IBKR gateway
+            // container. Both want port 5000 — one of them has to
+            // yield. docker_remove_container is the modern path
+            // (bypasses compose so it works even when the stack's
+            // .env is incomplete); stack_stop_service is the legacy
+            // wrapper kept until any cached frontend bundle stops
+            // calling it.
+            docker_cmd::docker_remove_container,
             docker_cmd::stack_stop_service,
             docker_cmd::docker_container_running,
             // ibeam supervisor — auto-managed IBKR gateway via

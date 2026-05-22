@@ -106,9 +106,13 @@ export const cmd = {
   stackPullUpdate: () => invoke<void>("stack_pull_update"),
   stackRestartContainer: (name: string) =>
     invoke<void>("stack_restart_container", { name }),
-  /** Stop one whitelisted service in the Auracle compose stack
-   *  (currently only the ibgateway/cpgateway IBKR services so the
-   *  launcher's ibeam container can take over port 5000). */
+  /** Force-remove a Docker container by name (whitelisted to the
+   *  bundled IBKR gateway containers). Bypasses compose, so works
+   *  even when the stack's .env is incomplete. */
+  dockerRemoveContainer: (name: string) =>
+    invoke<void>("docker_remove_container", { name }),
+  /** Legacy alias for dockerRemoveContainer — retained until any
+   *  cached frontend bundle stops calling it. */
   stackStopService: (name: string) =>
     invoke<void>("stack_stop_service", { name }),
   /** First name from `names` that's currently a running Docker

@@ -350,35 +350,63 @@ pub async fn stack_restart_container(name: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Stop a single compose service in the Auracle stack AND remove the
-/// container so it can't auto-restart. The service is left in the
-/// compose file — bringing up the stack again with `stack_start`
-/// will recreate it — but until then the port is permanently free
-/// for whatever wants to bind it (in practice: the launcher-managed
-/// ibeam container that wants port 5000).
+/// Force-remove a Docker container by name. Stops + removes in one
+/// call. Used by the broker-connections card to clear the bundled
+/// IBKR gateway container off port 5000 so the launcher's auto-
+/// managed ibeam container can bind it.
 ///
-/// `stop` alone wasn't enough — `restart: unless-stopped` (the
-/// default policy for Auracle's stack services) brings the container
-/// right back on the next docker event. `rm -sf` does stop + force
-/// remove in one shot, which produces a port that actually stays
-/// free.
+/// Uses bare `docker rm -f` instead of `docker compose rm` so the
+/// action works even when the compose project's `.env` is
+/// incomplete (which is the common case — many Auracle installs
+/// have missing optional env vars like POSTGRES_PASSWORD, and
+/// compose refuses to even parse the file under those conditions).
+/// Operating directly on the container name sidesteps all
+/// compose-level env-interpolation entirely.
 ///
-/// Same trust model as stack_restart_container: short whitelist, no
-/// arbitrary service names from the frontend.
+/// Whitelist is tight — only the two known IBKR gateway container
+/// names. Won't act on arbitrary names the frontend might pass.
+#[tauri::command]
+pub async fn docker_remove_container(name: String) -> Result<(), String> {
+    const ALLOWED: &[&str] = &[
+        "auracle-cpgateway",
+        "auracle-ibgateway",
+        "cpgateway",
+        "ibgateway",
+    ];
+    if !ALLOWED.contains(&name.as_str()) {
+        return Err(format!("container not in remove-allow-list: {name}"));
+    }
+    let out = Command::new("docker")
+        .args(["rm", "-f", &name])
+        .output()
+        .await
+        .map_err(|e| format!("docker rm spawn: {e}"))?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        // "No such container" means it was already gone — that's a
+        // success for our purposes (the goal state is "container is
+        // gone," not "we deleted it on this call").
+        if stderr.contains("No such container") {
+            return Ok(());
+        }
+        return Err(format!("docker rm -f {name}: {stderr}"));
+    }
+    Ok(())
+}
+
+/// Legacy wrapper — old `stack_stop_service` API kept so any cached
+/// frontend bundle doesn't break. Routes to the new
+/// docker_remove_container by mapping the service name to its
+/// project-prefixed container name. Schedule for removal after the
+/// next launcher release tag.
 #[tauri::command]
 pub async fn stack_stop_service(name: String) -> Result<(), String> {
-    let dir = installer::resolve_install_path().map_err(to_error_string)?;
-    const ALLOWED: &[&str] = &["ibgateway", "cpgateway"];
-    if !ALLOWED.contains(&name.as_str()) {
-        return Err(format!("service not in stop-allow-list: {name}"));
-    }
-    // `compose rm -sf <svc>` is stop + force-remove in one call.
-    // Idempotent: returns success even if the service was already
-    // stopped or already removed.
-    run_in("docker", &["compose", "rm", "-sf", &name], &dir)
-        .await
-        .map_err(to_error_string)?;
-    Ok(())
+    let container_name = if name.starts_with("auracle-") {
+        name
+    } else {
+        format!("auracle-{name}")
+    };
+    docker_remove_container(container_name).await
 }
 
 /// Lightweight "is this container running" probe. Doesn't go through

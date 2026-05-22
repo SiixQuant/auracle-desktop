@@ -164,12 +164,12 @@ function HoustonConflictBanner({
     setBusy(true);
     setError(null);
     try {
-      // The compose service name is usually the bare suffix
-      // (ibgateway / cpgateway); strip the project prefix
-      // ("auracle-") to translate the container name into a
-      // valid compose service identifier.
-      const service = containerName.replace(/^auracle-/, "");
-      await cmd.stackStopService(service);
+      // Operate directly on the container name we detected — no
+      // compose intermediary, so the action works even when the
+      // stack's .env is missing optional vars (POSTGRES_PASSWORD,
+      // IBKR_USER, etc.) that would otherwise cause compose to
+      // fail before it reaches the rm.
+      await cmd.dockerRemoveContainer(containerName);
       onResolved();
     } catch (err) {
       setError(String(err));

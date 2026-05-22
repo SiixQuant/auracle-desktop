@@ -368,16 +368,20 @@ async fn free_competing_gateway() -> Result<(), String> {
     for name in COMPETING {
         if running.contains(name) {
             log::info!("ibeam_start: removing competing container {name}");
+            // `docker rm -f` is stop + force-remove for a running
+            // container in one call. `-sf` was wrong — that's a
+            // `docker compose rm` flag combo, not a `docker rm` one.
             let result = Command::new("docker")
-                .args(["rm", "-sf", name])
+                .args(["rm", "-f", name])
                 .output()
                 .await
                 .map_err(|e| format!("docker rm spawn: {e}"))?;
             if !result.status.success() {
-                return Err(format!(
-                    "docker rm -sf {name}: {}",
-                    String::from_utf8_lossy(&result.stderr).trim()
-                ));
+                let stderr = String::from_utf8_lossy(&result.stderr).trim().to_string();
+                // Already gone is fine — that's the goal state.
+                if !stderr.contains("No such container") {
+                    return Err(format!("docker rm -f {name}: {stderr}"));
+                }
             }
         }
     }
