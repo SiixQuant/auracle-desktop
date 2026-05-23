@@ -75,11 +75,31 @@ export default function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Pending-stream teardown function — `send()` assigns this to its
+  // own `teardown` closure whenever it sets up Tauri event listeners,
+  // and clears it back to null when the stream finishes. A mount-time
+  // useEffect then runs whatever's parked here on unmount, so a user
+  // who navigates away mid-stream doesn't leave 5 orphan listeners
+  // attached to the Tauri event hub for every subsequent send. The
+  // ref pattern (vs. local closure) is what makes the cleanup
+  // reachable from the component lifecycle.
+  const pendingTeardownRef = useRef<(() => void) | null>(null);
+
   // Initial key probe.
   useEffect(() => {
     cmd.anthropicKeyGet()
       .then((v) => setHasKey(!!v))
       .catch(() => setHasKey(false));
+  }, []);
+
+  // Tear down any pending Tauri listeners on unmount. Idempotent —
+  // if the stream already finished, the ref is null and the call is
+  // a no-op.
+  useEffect(() => {
+    return () => {
+      pendingTeardownRef.current?.();
+      pendingTeardownRef.current = null;
+    };
   }, []);
 
   // Auto-scroll to the bottom on new messages.
@@ -145,7 +165,14 @@ export default function ChatPanel({
       try { unlistenToolResult?.(); } catch {}
       unlistenChunk = unlistenDone = unlistenError = null;
       unlistenToolCall = unlistenToolResult = null;
+      // Clear the ref so the unmount-effect doesn't double-call us.
+      pendingTeardownRef.current = null;
     };
+    // Park this stream's teardown in the component ref so the
+    // unmount-effect can run it if the user navigates away before
+    // the stream finishes. Reassigned every send — at most one
+    // pending teardown can exist at a time because sending is gated.
+    pendingTeardownRef.current = teardown;
 
     const onChunk = (payload: ChatChunkPayload) => {
       // Append to the last assistant message in the buffer.
