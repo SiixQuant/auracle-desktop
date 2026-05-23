@@ -284,17 +284,15 @@ where
 ///
 /// Cascade in priority order:
 ///
-///   1. `get_client` — pure in-memory map lookup. Works for every
-///                     call after the first per process, regardless
-///                     of whether the first call was a load or a
-///                     create. Returns the same Client object whose
-///                     Store mutations propagate via Arc'd state.
-///   2. `load_client` — pulls the client out of the just-loaded
-///                      snapshot into the in-memory map. Used on
-///                      the first call of a fresh process when the
-///                      snapshot has data for our client id.
-///   3. `create_client` — only used when nothing exists anywhere.
-///                        First save ever on a clean install.
+/// 1. `get_client` — pure in-memory map lookup. Works for every
+///    call after the first per process, regardless of whether the
+///    first call was a load or a create. Returns the same Client
+///    object whose Store mutations propagate via Arc'd state.
+/// 2. `load_client` — pulls the client out of the just-loaded
+///    snapshot into the in-memory map. Used on the first call of
+///    a fresh process when the snapshot has data for our client id.
+/// 3. `create_client` — only used when nothing exists anywhere.
+///    First save ever on a clean install.
 fn open_client(stronghold: &Stronghold) -> Result<Client, String> {
     if let Ok(c) = stronghold.get_client(CLIENT_BYTES) {
         return Ok(c);

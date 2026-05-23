@@ -482,10 +482,10 @@ fn derive_data_quality(avail: &str, last_str: &str) -> &'static str {
 /// subscription).
 ///
 /// Args:
-///   - symbol: ticker
-///   - days:   lookback window in days. Mapped to IBKR's `period`
-///             param + `bar` cadence (daily for >90d, hourly for
-///             >10d, 5-minute for the rest)
+/// - symbol: ticker
+/// - days:   lookback window in days. Mapped to IBKR's `period`
+///   param + `bar` cadence (daily for >90d, hourly for >10d,
+///   5-minute for the rest).
 async fn get_historical_bars_ibkr(symbol: &str, days: u32) -> Result<Value, BrokerError> {
     let client = ibkr_client()?;
     ibkr_check_auth(&client).await?;
@@ -554,10 +554,10 @@ fn days_to_ibkr_period_bar(days: u32) -> (String, &'static str) {
     } else if days <= 90 {
         (format!("{days}d"), "1h")
     } else if days <= 365 {
-        let m = (days + 29) / 30;
+        let m = days.div_ceil(30);
         (format!("{m}m"), "1d")
     } else {
-        let y = (days + 364) / 365;
+        let y = days.div_ceil(365);
         (format!("{y}y"), "1d")
     }
 }
@@ -648,14 +648,13 @@ async fn ibkr_option_strikes(
 /// downstream IV-surface aggregation.
 ///
 /// Args:
-///   - symbol: underlying ticker (e.g. "SPY")
-///   - month:  YYYYMM (e.g. "202606"). Required — IBKR doesn't
-///             accept a default. Caller can compute "next monthly
-///             expiry" client-side or in the agent prompt.
-///   - max_strikes: hard cap on returned strikes (default 30). Each
-///                  strike requires its own conid lookup + snapshot
-///                  roundtrip, so this is the right knob to keep
-///                  latency bounded.
+/// - symbol: underlying ticker (e.g. "SPY")
+/// - month:  YYYYMM (e.g. "202606"). Required — IBKR doesn't
+///   accept a default. Caller can compute "next monthly expiry"
+///   client-side or in the agent prompt.
+/// - max_strikes: hard cap on returned strikes (default 30). Each
+///   strike requires its own conid lookup + snapshot roundtrip,
+///   so this is the right knob to keep latency bounded.
 pub async fn get_options_chain(
     symbol: &str,
     month: &str,
