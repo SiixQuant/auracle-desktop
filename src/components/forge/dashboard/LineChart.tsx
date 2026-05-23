@@ -65,11 +65,19 @@ export default function LineChart({ state }: { state: WidgetRenderState }): Reac
 
   // Create the chart on mount; destroy on unmount. Chart instance
   // is reused across data updates — only series data is replaced.
+  //
+  // `autoSize: true` (v5+) lets the chart track its container size
+  // via the library's internal ResizeObserver. We previously
+  // pulled clientWidth/clientHeight at mount time + ran our own
+  // RO, but the initial pull lands BEFORE the parent layout
+  // settles — clientHeight=0 means the chart is born invisible
+  // and never recovers because our own RO doesn't fire until
+  // something else explicitly resizes it. autoSize avoids that
+  // race entirely.
   useEffect(() => {
     if (!container.current) return;
     const c = createChart(container.current, {
-      width: container.current.clientWidth,
-      height: container.current.clientHeight,
+      autoSize: true,
       layout: {
         background: { color: "transparent" },
         textColor: "rgba(255,255,255,0.8)",
@@ -89,19 +97,7 @@ export default function LineChart({ state }: { state: WidgetRenderState }): Reac
     });
     chart.current = c;
 
-    // Resize observer so the chart tracks its container.
-    const ro = new ResizeObserver((entries) => {
-      const e = entries[0];
-      if (!e) return;
-      c.applyOptions({
-        width: e.contentRect.width,
-        height: e.contentRect.height,
-      });
-    });
-    ro.observe(container.current);
-
     return () => {
-      ro.disconnect();
       c.remove();
       chart.current = null;
       seriesRefs.current.clear();
@@ -173,9 +169,13 @@ export default function LineChart({ state }: { state: WidgetRenderState }): Reac
     );
   }
 
+  // `position: absolute; inset: 0` on the chart-host div sidesteps
+  // `height: 100%` percentage-resolution flakiness inside flex /
+  // grid parents — the chart host always fills the relative
+  // outer, which carries the minHeight floor.
   return (
     <div style={{ position: "relative", height: "100%", minHeight: 240 }}>
-      <div ref={container} style={{ width: "100%", height: "100%" }} />
+      <div ref={container} style={{ position: "absolute", inset: 0 }} />
       {state.status === "loading" && rows.length === 0 && (
         <div
           className="muted mono"

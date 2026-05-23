@@ -44,12 +44,16 @@ export default function WidgetRenderer({
   refreshNonce = 0,
   refreshIntervalSeconds,
 }: WidgetRendererProps): ReactElement {
+  // Initial state — "inline" widgets are ready immediately (they
+  // read spec fields, not tool results); everything else starts in
+  // loading until the first fetch lands.
+  const isInline = widget.data_source?.tool === "inline";
   const [state, setState] = useState<WidgetRenderState>({
     spec: widget,
-    data: extractInlineData(widget),
+    data: isInline ? extractInlineData(widget) : null,
     error: null,
-    status: extractInlineData(widget) !== null ? "ready" : "loading",
-    updated_at: extractInlineData(widget) !== null ? Date.now() : null,
+    status: isInline ? "ready" : "loading",
+    updated_at: isInline ? Date.now() : null,
   });
 
   // Mirror the latest spec into state so re-renders see prop changes
@@ -61,12 +65,20 @@ export default function WidgetRenderer({
 
   // Live data fetch + refresh loop.
   useEffect(() => {
-    const inline = extractInlineData(widget);
-    if (inline !== null) {
-      // Inline data: no fetching needed.
+    // "inline" widgets — markdown notes, payoff diagrams, ticker
+    // grids — produce their content from spec fields, not from a
+    // tool invocation. Short-circuit before touching the IPC layer
+    // so they don't surface an "tool not invokable" error from the
+    // dashboard allow-list. Static widgets read whatever spec
+    // fields they want (notes_md → spec.body, payoff_diagram →
+    // spec.legs, etc.); the `data` payload is just `args.data` if
+    // provided, else null.
+    if (widget.data_source?.tool === "inline") {
+      const inline = extractInlineData(widget);
       setState((s) => ({
         ...s,
         data: inline,
+        error: null,
         status: "ready",
         updated_at: Date.now(),
       }));

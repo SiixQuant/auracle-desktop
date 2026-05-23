@@ -68,9 +68,10 @@ export default function CandlestickChart({
 
   useEffect(() => {
     if (!container.current) return;
+    // autoSize: see comment in LineChart for the rationale; same
+    // initial-layout race here.
     const c = createChart(container.current, {
-      width: container.current.clientWidth,
-      height: container.current.clientHeight,
+      autoSize: true,
       layout: {
         background: { color: "transparent" },
         textColor: "rgba(255,255,255,0.8)",
@@ -113,18 +114,7 @@ export default function CandlestickChart({
       });
     }
 
-    const ro = new ResizeObserver((entries) => {
-      const e = entries[0];
-      if (!e) return;
-      c.applyOptions({
-        width: e.contentRect.width,
-        height: e.contentRect.height,
-      });
-    });
-    ro.observe(container.current);
-
     return () => {
-      ro.disconnect();
       c.remove();
       chart.current = null;
       candleSeries.current = null;
@@ -174,9 +164,10 @@ export default function CandlestickChart({
     }
   }, [rows, xField, ohlc.open, ohlc.high, ohlc.low, ohlc.close, volumeField]);
 
+  // See LineChart for the position:absolute rationale.
   return (
     <div style={{ position: "relative", height: "100%", minHeight: 240 }}>
-      <div ref={container} style={{ width: "100%", height: "100%" }} />
+      <div ref={container} style={{ position: "absolute", inset: 0 }} />
       {state.status === "loading" && rows.length === 0 && (
         <div
           className="muted mono"
