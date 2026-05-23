@@ -209,17 +209,29 @@ jobs:
             "Auracle-Desktop-linux.AppImage" \
             --repo "${{ github.repository }}" --clobber
 
-      - name: Upload stable-name aliases (Windows)
+      # Windows used to invoke `gh release upload` directly, but the
+      # PowerShell/`gh` combo on windows-latest hits intermittent
+      # `HTTP 401: Bad credentials` from a known env-var propagation
+      # quirk (the same flow works fine on bash/macOS/Linux runners
+      # with the exact same secret). Switched to softprops/action-
+      # gh-release which uses Octokit directly and handles auth
+      # cleanly regardless of shell — same end state (one stable-
+      # name MSI uploaded alongside the versioned one).
+      - name: Stage Windows stable-name MSI
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi/*.msi" | Select-Object -First 1
           Copy-Item $msi.FullName "Auracle-Desktop-windows.msi"
-          gh release upload "${{ github.ref_name }}" `
-            "Auracle-Desktop-windows.msi" `
-            --repo "${{ github.repository }}" --clobber
+
+      - name: Upload stable-name MSI (Windows)
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: Auracle-Desktop-windows.msi
+          fail_on_unmatched_files: true
 
   # ── latest.json builder for the auto-updater ─────────────────
   # Runs after all three platform builds complete. tauri-action
