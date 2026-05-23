@@ -24,6 +24,21 @@ jobs:
             libgtk-3-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev librsvg2-dev libssl-dev
 
+      # tauri::generate_context!() asserts the configured frontendDist
+      # path exists at compile time and panics in clippy / cargo
+      # check if it doesn't. The path is `../dist` (the Vite output),
+      # which only exists after `npm run build`. Set up Node + build
+      # the frontend so the macro can resolve.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install frontend deps
+        run: npm ci
+      - name: Build frontend (for tauri::generate_context!)
+        run: npm run build
+
       - name: rustfmt
         working-directory: src-tauri
         run: cargo fmt --check
@@ -43,6 +58,17 @@ jobs:
           sudo apt-get install -y \
             libgtk-3-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev librsvg2-dev libssl-dev
+      # Same generate_context! constraint as rust-lint — need a
+      # frontend dist on disk before the lib test target compiles.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install frontend deps
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
       - name: cargo test
         working-directory: src-tauri
         run: cargo test --no-default-features
@@ -65,8 +91,14 @@ jobs:
         run: cargo install --locked --version 0.21.0 cargo-audit
       - name: Run cargo audit
         working-directory: src-tauri
-        # --deny=unmaintained,unsound,yanked also fails on the
-        # non-CVE advisory categories. Add --ignore RUSTSEC-XXXX-YYYY
-        # entries here (with rationale) for any advisory we've
-        # consciously accepted as not-applicable.
-        run: cargo audit --deny=unmaintained,unsound,yanked
+        # cargo-audit 0.21+ accepts each --deny category as a
+        # separate flag (the comma-list syntax was removed). Failing
+        # on unmaintained / unsound / yanked layers stricter checks
+        # over the default vulnerability-only baseline. Add
+        # `--ignore RUSTSEC-XXXX-YYYY` (with rationale) for any
+        # advisory we've consciously accepted as not-applicable.
+        run: |
+          cargo audit \
+            --deny unmaintained \
+            --deny unsound \
+            --deny yanked
