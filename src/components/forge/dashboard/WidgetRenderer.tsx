@@ -134,9 +134,29 @@ export default function WidgetRenderer({
       if (typeof document !== "undefined" && document.hidden) return;
       fetchOnce();
     }, ms);
+
+    // Force an immediate refresh the moment the tab becomes visible
+    // again. Without this, a widget that errored while the window
+    // was hidden (e.g. an "ibkr offline" transient that resolved in
+    // the background) would keep showing the stale error message
+    // until the next interval tick fires — which could be up to a
+    // full refresh_interval_seconds away. This makes the error
+    // recover the moment the user looks at the dashboard.
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        fetchOnce();
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    }
+
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
     };
     // We deliberately include refreshNonce so the parent's
     // "refresh all" button forces a re-mount of the fetch cycle.

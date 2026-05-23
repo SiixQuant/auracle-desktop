@@ -2039,18 +2039,11 @@ fn agent_tool_catalog() -> serde_json::Value {
     ])
 }
 
-/// Validate a ticker symbol — used by every broker tool that takes
-/// a symbol arg. Reject anything that's not ASCII alnum + `.-/:`
-/// (the punctuation set supported by the venues we cover) so we
-/// can't be tricked into building a URL that escapes the intended
-/// endpoint. The downstream HTTP clients also URL-encode, but
-/// defense-in-depth.
-fn is_valid_ticker(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 32
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '/' | ':'))
-}
+// Ticker-symbol validator lives in commands/mod.rs as
+// `super::is_valid_ticker` — single source of truth shared with
+// commands/broker_bridge.rs. The duplicate inline implementation
+// that used to be here was flagged by the redundancy audit;
+// removed in favor of the shared helper.
 
 /// One-shot tool invocation surface for the frontend.
 ///
@@ -2205,7 +2198,7 @@ async fn execute_agent_tool(
             let Some(symbol) = input.get("symbol").and_then(|v| v.as_str()) else {
                 return ("error: symbol required".to_string(), false);
             };
-            if !is_valid_ticker(symbol) {
+            if !super::is_valid_ticker(symbol) {
                 return (
                     format!("error: symbol {symbol:?} doesn't look like a valid ticker"),
                     false,
@@ -2223,7 +2216,7 @@ async fn execute_agent_tool(
             let Some(month) = input.get("month").and_then(|v| v.as_str()) else {
                 return ("error: month required (YYYYMM, e.g. '202606')".to_string(), false);
             };
-            if !is_valid_ticker(symbol) {
+            if !super::is_valid_ticker(symbol) {
                 return (
                     format!("error: symbol {symbol:?} doesn't look like a valid ticker"),
                     false,
@@ -2256,7 +2249,7 @@ async fn execute_agent_tool(
             let Some(symbol) = input.get("symbol").and_then(|v| v.as_str()) else {
                 return ("error: symbol required".to_string(), false);
             };
-            if !is_valid_ticker(symbol) {
+            if !super::is_valid_ticker(symbol) {
                 return (
                     format!("error: symbol {symbol:?} doesn't look like a valid ticker"),
                     false,
@@ -2700,11 +2693,17 @@ async fn run_agent_loop(
             response_model = m.to_string();
         }
         if let Some(u) = parsed.get("usage") {
+            // Saturating accumulation — a single turn easily fits in
+            // u32, but a long multi-turn agent run with cached
+            // prompts can in theory accumulate beyond u32::MAX
+            // (~4.3B input tokens). Saturating cast keeps the UI
+            // showing "the max it can render" rather than wrapping
+            // to a small number that masks a real usage spike.
             if let Some(n) = u.get("input_tokens").and_then(|v| v.as_u64()) {
-                total_in += n as u32;
+                total_in = total_in.saturating_add(u32::try_from(n).unwrap_or(u32::MAX));
             }
             if let Some(n) = u.get("output_tokens").and_then(|v| v.as_u64()) {
-                total_out += n as u32;
+                total_out = total_out.saturating_add(u32::try_from(n).unwrap_or(u32::MAX));
             }
         }
 

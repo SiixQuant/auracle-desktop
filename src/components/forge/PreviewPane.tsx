@@ -31,6 +31,7 @@ import {
   openInBrowser,
   type Dashboard,
   type DashboardSummary,
+  type ForgeDashboardOpenEvent,
 } from "@/lib/tauri";
 
 interface PreviewPaneProps {
@@ -79,7 +80,7 @@ export default function PreviewPane({ activePath, refreshKey }: PreviewPaneProps
   // emits "forge-dashboard-open" with the slug; we auto-switch tabs.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    onEvent<string>("forge-dashboard-open", (slug) => {
+    onEvent<ForgeDashboardOpenEvent>("forge-dashboard-open", (slug) => {
       setTab("dashboard");
       setActiveDashboard(slug);
       // Refresh the list too — the slug may be new.

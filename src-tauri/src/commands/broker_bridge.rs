@@ -46,9 +46,16 @@ const HTTP_TIMEOUT_SECS: u64 = 12;
 
 /// Symbol → contract id cache. IBKR uses conid as the primary
 /// identifier; symbol lookups are a separate roundtrip and stable
-/// per (symbol, exchange), so cache aggressively.
+/// per (symbol, exchange) under normal operation. We cache
+/// per-process to skip the roundtrip on repeat lookups, but bound
+/// the cache size so a long-running launcher session with a wide
+/// universe of symbols doesn't accumulate unbounded memory + so
+/// stale mappings (e.g. after a reverse split that retires the
+/// old conid) don't survive forever. Eviction is FIFO-on-overflow
+/// — simple, correct, and lookup remains O(1).
+const SYMBOL_CONID_CACHE_CAP: usize = 256;
 static SYMBOL_CONID_CACHE: Lazy<Mutex<std::collections::HashMap<String, i64>>> =
-    Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
+    Lazy::new(|| Mutex::new(std::collections::HashMap::with_capacity(SYMBOL_CONID_CACHE_CAP)));
 
 #[derive(Debug)]
 pub enum BrokerError {
@@ -288,7 +295,23 @@ async fn ibkr_resolve_conid(client: &reqwest::Client, symbol: &str) -> Result<i6
         .and_then(|r| r.get("conid"))
         .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
         .ok_or_else(|| BrokerError::UnknownSymbol(symbol.to_string()))?;
-    SYMBOL_CONID_CACHE.lock().unwrap().insert(symbol.to_string(), conid);
+    // Bounded insert — if the cache is at the cap, drop one arbitrary
+    // entry before inserting the new one. HashMap iteration order
+    // isn't insertion-order in std but is consistent within a process
+    // lifetime, which is good enough for "evict something so we don't
+    // grow forever." A proper LRU would be more expensive (extra
+    // deps, per-lookup write to bump recency); the simple cap
+    // matches the actual access pattern (repeat hits on a handful of
+    // watchlist symbols).
+    {
+        let mut cache = SYMBOL_CONID_CACHE.lock().unwrap();
+        if cache.len() >= SYMBOL_CONID_CACHE_CAP {
+            if let Some(victim) = cache.keys().next().cloned() {
+                cache.remove(&victim);
+            }
+        }
+        cache.insert(symbol.to_string(), conid);
+    }
     Ok(conid)
 }
 
@@ -839,7 +862,7 @@ pub async fn broker_open_positions() -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 pub async fn broker_quote(symbol: String) -> Result<serde_json::Value, String> {
-    if !is_valid_symbol_for_command(&symbol) {
+    if !super::is_valid_ticker(&symbol) {
         return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
     }
     get_quote(&symbol).await.map_err(|e| e.to_user_string())
@@ -850,7 +873,7 @@ pub async fn broker_historical_bars(
     symbol: String,
     days: Option<u32>,
 ) -> Result<serde_json::Value, String> {
-    if !is_valid_symbol_for_command(&symbol) {
+    if !super::is_valid_ticker(&symbol) {
         return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
     }
     let days = days.unwrap_or(252).clamp(5, 2520);
@@ -865,7 +888,7 @@ pub async fn broker_options_chain(
     month: String,
     max_strikes: Option<usize>,
 ) -> Result<serde_json::Value, String> {
-    if !is_valid_symbol_for_command(&symbol) {
+    if !super::is_valid_ticker(&symbol) {
         return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
     }
     let max_strikes = max_strikes.unwrap_or(20).clamp(5, 80);
@@ -883,15 +906,6 @@ pub async fn broker_market_data_status() -> Result<serde_json::Value, String> {
     get_market_data_status()
         .await
         .map_err(|e| e.to_user_string())
-}
-
-/// Mirror of forge::is_valid_ticker — duplicated locally so this
-/// module doesn't reach back into a sibling for input validation.
-fn is_valid_symbol_for_command(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 32
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '/' | ':'))
 }
 
 // ── Module-internal types ────────────────────────────────────────

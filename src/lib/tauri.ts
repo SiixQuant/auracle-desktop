@@ -586,6 +586,36 @@ export interface BrokerStreamStatus {
   interval_ms: number;
 }
 
+// ── Tauri event payloads (centralized) ──────────────────────────
+//
+// All `app.emit(...)` event payload shapes the frontend listens to.
+// Previously some of these (InstallerProgress, the forge-dashboard-open
+// slug, broker-tick) lived inline in their consumer components. They
+// belong here so adding a second listener for the same event doesn't
+// require duplicating the type — and so the audit can grep one file
+// to map every Rust `app.emit` to a typed consumer.
+//
+// Event name → payload type:
+//   installer-progress        → InstallerProgressEvent
+//   forge-chat-chunk          → ChatChunkPayload
+//   forge-chat-done           → ChatDonePayload
+//   forge-chat-error          → ChatErrorPayload
+//   forge-chat-tool-call      → ChatToolCallPayload
+//   forge-chat-tool-result    → ChatToolResultPayload
+//   forge-dashboard-open      → string (the dashboard slug)
+//   broker-tick               → BrokerTickEvent
+
+export interface InstallerProgressEvent {
+  phase?: string;
+  percent?: number;
+  message?: string;
+  line?: string;
+}
+
+/** Payload for the `forge-dashboard-open` event — Rust emits the
+ *  dashboard slug as a bare string. */
+export type ForgeDashboardOpenEvent = string;
+
 export interface BrokerMarketDataStatus {
   /** "realtime" | "delayed" | "frozen" | "unknown" — IBKR's
    *  availability tier for US equities, derived from a SPY probe. */

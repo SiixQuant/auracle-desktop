@@ -14,18 +14,14 @@ import {
   onEvent,
   openInBrowser,
   type DockerStatus,
+  // Aliased locally so existing references in this file don't churn —
+  // the canonical name lives in @/lib/tauri.ts.
+  type InstallerProgressEvent as InstallerProgress,
   type PreflightReport,
 } from "@/lib/tauri";
 
 interface OnboardingProps {
   onDone: () => void;
-}
-
-interface InstallerProgress {
-  phase?: string;
-  percent?: number;
-  message?: string;
-  line?: string;
 }
 
 export default function Onboarding({ onDone }: OnboardingProps) {

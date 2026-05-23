@@ -38,3 +38,24 @@ pub(crate) fn to_error_string<E: std::fmt::Debug>(err: E) -> String {
     log::warn!("command error: {}", msg);
     msg
 }
+
+/// Shared ticker-symbol shape validator used across every place
+/// that takes a user/agent-supplied symbol and either embeds it
+/// in a broker REST URL or hands it to a downstream tool. Lives
+/// here (vs. duplicated in forge.rs + broker_bridge.rs as it was
+/// pre-consolidation) so there's a single rule the audit can
+/// point at.
+///
+/// Accepts: 1..=32 ASCII alphanumeric characters plus the few
+/// punctuation characters real tickers carry — `.` (BRK.B style
+/// share classes), `-` (some option symbols), `/` (some
+/// FX / futures roots), `:` (crypto perp suffixes). Rejects
+/// everything else so the symbol can't carry a shell metachar,
+/// URL fragment separator, or path separator into downstream
+/// commands.
+pub(crate) fn is_valid_ticker(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 32
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '/' | ':'))
+}
