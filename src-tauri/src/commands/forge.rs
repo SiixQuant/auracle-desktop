@@ -826,20 +826,11 @@ pub fn anthropic_key_clear(app: AppHandle) -> Result<(), String> {
 }
 
 // ── Chat (single-shot, non-streaming MVP) ──────────────────────
-
-#[derive(Serialize)]
-struct AnthropicRequest<'a> {
-    model: &'a str,
-    max_tokens: u32,
-    system: &'a str,
-    messages: Vec<AnthropicMessage<'a>>,
-}
-
-#[derive(Serialize)]
-struct AnthropicMessage<'a> {
-    role: &'a str,
-    content: &'a str,
-}
+//
+// Request bodies are built inline with `serde_json::json!()` rather
+// than typed Serialize structs so we can include the prompt-cache
+// `cache_control` markers (see cached_system_block / tools_with_cache).
+// Response shapes stay strongly typed below.
 
 #[derive(Deserialize)]
 struct AnthropicResponse {
@@ -971,18 +962,19 @@ pub async fn forge_chat(
     }
 
     let model = resolve_model(&app);
-    let body = AnthropicRequest {
-        model: &model,
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: messages
-            .iter()
-            .map(|m| AnthropicMessage {
-                role: m.role.as_str(),
-                content: m.content.as_str(),
-            })
-            .collect(),
-    };
+    // json! body instead of the typed struct so we can include the
+    // cache_control marker on the system block — see
+    // cached_system_block + its surrounding comment for the
+    // rate-limit context.
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": 4096,
+        "system": cached_system_block(),
+        "messages": messages.iter().map(|m| serde_json::json!({
+            "role": m.role,
+            "content": m.content,
+        })).collect::<Vec<_>>(),
+    });
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(90))
@@ -1047,14 +1039,9 @@ pub async fn forge_chat(
 // everything else (event headers, message_start, message_stop,
 // pings) is structural and the frontend doesn't need it.
 
-#[derive(Serialize)]
-struct AnthropicStreamRequest<'a> {
-    model: &'a str,
-    max_tokens: u32,
-    system: &'a str,
-    messages: Vec<AnthropicMessage<'a>>,
-    stream: bool,
-}
+// Stream request body is also built inline now (see comment above
+// AnthropicRequest's deletion). Removed AnthropicStreamRequest
+// struct since it's no longer constructed anywhere.
 
 #[derive(Serialize, Clone)]
 struct ChatChunkPayload<'a> {
@@ -1290,19 +1277,20 @@ async fn run_stream(
     cancel: Arc<Notify>,
 ) -> Result<(), String> {
     let model = resolve_model(&app);
-    let body = AnthropicStreamRequest {
-        model: &model,
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: messages
-            .iter()
-            .map(|m| AnthropicMessage {
-                role: m.role.as_str(),
-                content: m.content.as_str(),
-            })
-            .collect(),
-        stream: true,
-    };
+    // json! body instead of the typed struct so we can include the
+    // cache_control marker on the system block — see
+    // cached_system_block + its surrounding comment for the
+    // rate-limit context.
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": 4096,
+        "system": cached_system_block(),
+        "messages": messages.iter().map(|m| serde_json::json!({
+            "role": m.role,
+            "content": m.content,
+        })).collect::<Vec<_>>(),
+        "stream": true,
+    });
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
@@ -1597,6 +1585,62 @@ async fn houston_get(path_and_query: &str) -> (String, bool) {
             false,
         ),
     }
+}
+
+// ── Prompt caching helpers ───────────────────────────────────────
+//
+// The system prompt + the tool catalog don't change between turns
+// within an agent run. Both run thousands of tokens (the system
+// prompt now teaches widget schemas, dashboard authoring patterns,
+// strategy authoring; the catalog lists every tool with its full
+// description + JSON schema). On every iteration of the agent loop,
+// those tokens currently count against the per-minute input-token
+// limit on the user's Anthropic account — a couple of tool turns
+// is enough to trip the 10K/min ceiling on Tier 1 accounts.
+//
+// Anthropic's prompt-caching API ("ephemeral" cache_control) lets
+// us mark long static prefixes as cacheable. Subsequent calls with
+// the same prefix within a 5-minute window are billed at ~10% of
+// the normal input-token rate and counted accordingly against the
+// per-minute ceiling. After the first call in any agent session,
+// every following turn pays a fraction of what it used to.
+//
+// Requirements (per Anthropic docs):
+//   * Cached content must be at least 1024 tokens (Sonnet) /
+//     2048 tokens (Opus) — our system prompt + tools both clear
+//     this comfortably.
+//   * cache_control must appear on the LAST cached block in the
+//     prefix — we mark the system prompt's single text block and
+//     the last tool definition.
+//   * messages stay outside the cached prefix — those vary turn
+//     to turn so caching them isn't useful.
+
+/// Wrap SYSTEM_PROMPT as a single-element array carrying the
+/// ephemeral cache marker. Anthropic accepts both string and
+/// array form on `system`; only the array form supports
+/// cache_control per block.
+fn cached_system_block() -> serde_json::Value {
+    serde_json::json!([{
+        "type": "text",
+        "text": SYSTEM_PROMPT,
+        "cache_control": { "type": "ephemeral" }
+    }])
+}
+
+/// Take the tool-catalog array and stamp `cache_control` on the
+/// last entry. That marks the entire tools array as a cacheable
+/// prefix from Anthropic's POV. No-op when the catalog is empty.
+fn tools_with_cache(tools: &serde_json::Value) -> serde_json::Value {
+    let mut arr = tools.as_array().cloned().unwrap_or_default();
+    if let Some(last) = arr.last_mut() {
+        if let Some(obj) = last.as_object_mut() {
+            obj.insert(
+                "cache_control".to_string(),
+                serde_json::json!({ "type": "ephemeral" }),
+            );
+        }
+    }
+    serde_json::Value::Array(arr)
 }
 
 /// Static tool catalog. Serialized into the Anthropic request body
@@ -2586,12 +2630,20 @@ async fn run_agent_loop(
     let mut final_text = String::new();
     let mut response_model = model.clone();
 
+    // Build the cached tools array once outside the loop — same
+    // tools every iteration, so the cache_control marker stays on
+    // the same block. Anthropic returns cached input tokens in
+    // the `cache_read_input_tokens` usage field on the second+
+    // call within the cache TTL.
+    let cached_tools = tools_with_cache(&tools);
+    let cached_system = cached_system_block();
+
     for _iteration in 0..MAX_AGENT_ITERATIONS {
         let body = serde_json::json!({
             "model": model,
             "max_tokens": 4096,
-            "system": SYSTEM_PROMPT,
-            "tools": tools,
+            "system": cached_system,
+            "tools": cached_tools,
             "messages": messages,
         });
 
