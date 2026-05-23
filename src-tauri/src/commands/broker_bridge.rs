@@ -518,8 +518,14 @@ async fn ibkr_option_strikes(
     underlying_conid: i64,
     month: &str,
 ) -> Result<Vec<f64>, BrokerError> {
+    // urlencoding::encode is redundant given is_yyyymm-validated input
+    // (digits only, nothing to encode), but match what we do for
+    // `symbol` everywhere else so a future change that weakens the
+    // validator doesn't open an injection path through the
+    // is_yyyymm regression.
     let url = format!(
-        "{IBKR_GATEWAY_BASE}/iserver/secdef/strikes?conid={underlying_conid}&sectype=OPT&month={month}"
+        "{IBKR_GATEWAY_BASE}/iserver/secdef/strikes?conid={underlying_conid}&sectype=OPT&month={}",
+        urlencoding::encode(month),
     );
     let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
@@ -612,8 +618,11 @@ pub async fn get_options_chain(
         let mut row = serde_json::Map::new();
         row.insert("strike".to_string(), Value::from(*strike));
         for right in &["C", "P"] {
+            // Same encoding rationale as the strikes URL above —
+            // defense-in-depth against a future is_yyyymm regression.
             let info_url = format!(
-                "{IBKR_GATEWAY_BASE}/iserver/secdef/info?conid={underlying_conid}&sectype=OPT&month={month}&strike={strike}&right={right}"
+                "{IBKR_GATEWAY_BASE}/iserver/secdef/info?conid={underlying_conid}&sectype=OPT&month={}&strike={strike}&right={right}",
+                urlencoding::encode(month),
             );
             let info_resp = match client.get(&info_url).send().await {
                 Ok(r) => r,

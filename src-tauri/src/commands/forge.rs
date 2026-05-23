@@ -1410,12 +1410,21 @@ async fn run_stream(
 
             match event_type {
                 "message_start" => {
-                    if let Some(m) = parsed
+                    // Upstream sometimes returns a more specific model
+                    // alias than what we requested (e.g. "claude-sonnet-4"
+                    // → "claude-sonnet-4-20250514"). Log a warning if
+                    // the field is missing entirely so usage attribution
+                    // drift to "the request model" becomes visible in
+                    // the launcher log instead of silently masquerading.
+                    match parsed
                         .get("message")
                         .and_then(|m| m.get("model"))
                         .and_then(|m| m.as_str())
                     {
-                        response_model = m.to_string();
+                        Some(m) => response_model = m.to_string(),
+                        None => log::warn!(
+                            "stream: message_start without model field — usage attributed to request model {model}"
+                        ),
                     }
                     if let Some(u) = parsed
                         .get("message")
@@ -2090,10 +2099,13 @@ pub async fn forge_invoke_tool(
         "get_quote",
         "get_options_chain",
         "get_market_data_status",
-        "get_recent_fills",
-        "list_connected_brokers",
-        "list_universes",
         "get_historical_bars",
+        // get_recent_fills / list_connected_brokers / list_universes
+        // were here for an earlier dashboard-refresh story; their
+        // dispatch arms were removed alongside (no backend route),
+        // so leaving them in the allow-list would let the frontend
+        // call into `unknown tool: ...` errors. Re-add together
+        // with the catalog entry + dispatch arm.
     ];
     if !DASHBOARD_INVOKABLE.contains(&name.as_str()) {
         return Err(format!(
@@ -2231,21 +2243,15 @@ async fn execute_agent_tool(
             Ok(v) => (v.to_string(), true),
             Err(e) => (format!("error: {}", e.to_user_string()), false),
         },
-        "get_recent_fills" => {
-            // Still Houston-bound — IBKR's recent-fills endpoint
-            // needs more wiring (per-account flex queries) than
-            // Phase 2 covers. Returns the standard "endpoint not
-            // shipped yet" message until Houston catches up OR
-            // we add an IBKR Trades endpoint in a later phase.
-            let days = input
-                .get("days")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(30)
-                .clamp(1, 365);
-            houston_get(&format!("/api/broker/fills?days={days}")).await
-        }
-        "list_connected_brokers" => houston_get("/api/connections").await,
-        "list_universes" => houston_get("/api/master/universes").await,
+        // Earlier phases had dispatch arms for `get_recent_fills`,
+        // `list_connected_brokers`, `list_universes` here that
+        // routed through Houston endpoints not shipped in any
+        // current backend version. Anthropic only lets the agent
+        // call tools that are advertised in the catalog, and these
+        // weren't, so the arms were unreachable from the agent
+        // loop. Removed to drop dead code; re-add the arms AND the
+        // catalog entries together in whichever release ships the
+        // matching backend routes.
         "get_historical_bars" => {
             let Some(symbol) = input.get("symbol").and_then(|v| v.as_str()) else {
                 return ("error: symbol required".to_string(), false);
@@ -2481,8 +2487,7 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
         | "list_deployments"
         | "get_account_summary"
         | "get_open_positions"
-        | "list_connected_brokers"
-        | "list_universes" => String::new(),
+        | "get_market_data_status" => String::new(),
         "read_strategy" | "write_strategy" | "run_backtest" | "deploy_strategy" => input
             .get("rel_path")
             .and_then(|v| v.as_str())
@@ -2499,11 +2504,8 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
             .and_then(|v| v.as_str())
             .map(String::from)
             .unwrap_or_else(|| "?".to_string()),
-        "get_recent_fills" => input
-            .get("days")
-            .and_then(|v| v.as_u64())
-            .map(|d| format!("last {d}d"))
-            .unwrap_or_else(|| "last 30d".to_string()),
+        // get_recent_fills summary entry removed alongside its
+        // dispatch arm; restore in lockstep if the tool comes back.
         "get_quote" => input
             .get("symbol")
             .and_then(|v| v.as_str())

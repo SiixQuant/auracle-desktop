@@ -242,14 +242,28 @@ pub async fn stack_status() -> Result<StackStatus, String> {
         .map_err(to_error_string)?;
 
     let mut containers = Vec::new();
+    // Track parse failures so a corrupted/garbled `docker compose ps`
+    // output (newer / older docker versions sometimes emit slightly
+    // different JSON shapes, or a non-JSON warning line gets mixed in)
+    // doesn't silently render an empty stack. If we fail to parse
+    // even one line we log it; if EVERY line fails we surface that
+    // as a hard error so the UI can show "stack status unreadable"
+    // instead of "stack is empty."
+    let mut total_lines = 0usize;
+    let mut parse_failures = 0usize;
     for line in raw.lines() {
         let line = line.trim();
         if line.is_empty() {
             continue;
         }
+        total_lines += 1;
         let v: serde_json::Value = match serde_json::from_str(line) {
             Ok(v) => v,
-            Err(_) => continue,
+            Err(e) => {
+                parse_failures += 1;
+                log::warn!("stack_status: ps line parse failed: {e} on {line:?}");
+                continue;
+            }
         };
         let name = v
             .get("Name")
@@ -278,6 +292,17 @@ pub async fn stack_status() -> Result<StackStatus, String> {
         });
     }
 
+    // If every non-empty line failed to parse AND we had at least
+    // one line to parse, that's an unreadable upstream — surface
+    // it instead of returning an empty container list (which the
+    // frontend would render as "stack is down").
+    if total_lines > 0 && parse_failures == total_lines {
+        return Err(format!(
+            "docker compose ps emitted {total_lines} lines, none of which parsed as JSON — \
+             stack status is unreadable on this docker version. Check the launcher log \
+             for the raw output."
+        ));
+    }
     let overall = derive_overall(&containers);
     Ok(StackStatus {
         containers,
