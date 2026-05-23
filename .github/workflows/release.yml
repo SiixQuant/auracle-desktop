@@ -96,6 +96,23 @@ jobs:
             libssl-dev \
             patchelf
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # tauri-action invokes `npm run tauri build`, which resolves
+      # `tauri` from node_modules/.bin (provided by the
+      # @tauri-apps/cli devDep). Without this explicit install step
+      # the action skips installing for projects with a custom build
+      # command, so `tauri` is unresolvable at script-run time and
+      # the build aborts with `sh: tauri: command not found`. `npm ci`
+      # uses the committed lockfile so dep versions are reproducible
+      # across runs.
+      - name: Install frontend deps
+        run: npm ci
+
       - name: Build + bundle (Tauri)
         uses: tauri-apps/tauri-action@v0
         env:
