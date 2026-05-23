@@ -15,6 +15,8 @@
 // get_historical_bars already returns exactly this).
 
 import {
+  CandlestickSeries,
+  HistogramSeries,
   createChart,
   type IChartApi,
   type ISeriesApi,
@@ -88,12 +90,11 @@ export default function CandlestickChart({
     });
     chart.current = c;
 
-    // Cast to avoid type-import flake on addCandlestickSeries / addHistogramSeries.
-    const cAny = c as unknown as {
-      addCandlestickSeries: (opts: Record<string, unknown>) => ISeriesApi<"Candlestick">;
-      addHistogramSeries: (opts: Record<string, unknown>) => ISeriesApi<"Histogram">;
-    };
-    candleSeries.current = cAny.addCandlestickSeries({
+    // v5 unified series-add API: chart.addSeries(definition, options).
+    // The per-type helpers (addCandlestickSeries / addHistogramSeries)
+    // that v4 had are gone — passing the `CandlestickSeries` /
+    // `HistogramSeries` series-definition imports is the v5 path.
+    candleSeries.current = c.addSeries(CandlestickSeries, {
       upColor: "#4ade80",
       downColor: "#f87171",
       borderUpColor: "#4ade80",
@@ -102,7 +103,7 @@ export default function CandlestickChart({
       wickDownColor: "#f87171",
     });
     if (volumeField) {
-      volumeSeries.current = cAny.addHistogramSeries({
+      volumeSeries.current = c.addSeries(HistogramSeries, {
         color: "rgba(96,165,250,0.4)",
         priceFormat: { type: "volume" },
         priceScaleId: "",

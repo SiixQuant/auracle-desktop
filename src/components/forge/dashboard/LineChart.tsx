@@ -23,6 +23,7 @@
 
 import {
   createChart,
+  LineSeries,
   type IChartApi,
   type ISeriesApi,
   type LineSeriesPartialOptions,
@@ -120,7 +121,10 @@ export default function LineChart({ state }: { state: WidgetRenderState }): Reac
         seriesRefs.current.delete(key);
       }
     }
-    // Add missing series.
+    // Add missing series. v5 of lightweight-charts replaced the
+    // per-type `addLineSeries` helper with a single generic
+    // `addSeries(SeriesDefinition, options)` call — pass the
+    // `LineSeries` definition import.
     for (const spec of seriesSpecs) {
       if (seriesRefs.current.has(spec.key)) continue;
       const opts: LineSeriesPartialOptions = {
@@ -130,12 +134,7 @@ export default function LineChart({ state }: { state: WidgetRenderState }): Reac
         priceLineVisible: false,
         lastValueVisible: true,
       };
-      // addLineSeries exists at runtime (the type might lag if
-      // @types is older). Cast-via-unknown to keep TS strict mode
-      // happy without disabling the lint everywhere.
-      const series = (c as unknown as {
-        addLineSeries: (o: LineSeriesPartialOptions) => ISeriesApi<"Line">;
-      }).addLineSeries(opts);
+      const series = c.addSeries(LineSeries, opts);
       seriesRefs.current.set(spec.key, series);
     }
 

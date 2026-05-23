@@ -28,6 +28,7 @@ import NotesMd from "./NotesMd";
 import OptionChainTable from "./OptionChainTable";
 import PayoffDiagram from "./PayoffDiagram";
 import TickersGrid from "./TickersGrid";
+import WidgetErrorBoundary from "./WidgetErrorBoundary";
 import type { WidgetRenderState } from "./types";
 
 interface WidgetRendererProps {
@@ -164,7 +165,11 @@ export default function WidgetRenderer({
         <RefreshIndicator state={state} />
       </header>
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-        <WidgetBody state={state} />
+        <WidgetErrorBoundary
+          widgetLabel={widget.title || widget.type}
+        >
+          <WidgetBody state={state} />
+        </WidgetErrorBoundary>
       </div>
     </section>
   );
