@@ -447,7 +447,13 @@ function DashboardView({ spec }: { spec: Dashboard }) {
             gap: 12,
             gridTemplateColumns:
               spec.layout === "grid" ? "repeat(12, 1fr)" : undefined,
-            gridAutoRows: spec.layout === "grid" ? "minmax(80px, auto)" : undefined,
+            // Fixed row height (was minmax(80px, auto), which created
+            // dead space when chart widgets reserved h:6 cells but
+            // the chart canvas inside auto-sized smaller). Each grid
+            // unit now produces exactly 90px of vertical room — so
+            // a kpi_grid at h:2 is ~180px, a chart at h:6 is ~540px,
+            // a notes panel at h:3 is ~270px. Predictable, no gaps.
+            gridAutoRows: spec.layout === "grid" ? "90px" : undefined,
             alignContent: spec.layout === "grid" ? "start" : undefined,
           }}
         >
