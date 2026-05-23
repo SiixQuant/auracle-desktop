@@ -1932,7 +1932,7 @@ fn agent_tool_catalog() -> serde_json::Value {
                             widgets (array, max 32). Each widget has: id (string, unique \
                             within the dashboard), type ('kpi_grid'|'data_table'|'line_chart'|\
                             'bar_chart'|'candlestick_chart'|'option_chain_table'|\
-                            'iv_surface_3d'|'payoff_diagram'|'scanner_table'|'notes_md'), \
+                            'payoff_diagram'|'tickers_grid'|'notes_md'), \
                             title (optional string), data_source ({tool: string, args: object} \
                             — the tool name must be one of the broker/data tools you have \
                             access to, OR a literal data injection via tool='inline' with \

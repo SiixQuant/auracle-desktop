@@ -282,6 +282,35 @@ pub async fn ibeam_install(
     Ok(())
 }
 
+/// RAII guard for the credential tempfile. Removes the file on Drop
+/// no matter how the surrounding function exits (success, early Err,
+/// panic). The previous pattern relied on a manually-placed
+/// `remove_file` call at the end of `ibeam_start` plus a duplicate
+/// in the one early-return branch, which left two-plus uncovered
+/// failure paths (panics, future early returns) where the plaintext
+/// IBKR credential file would persist in /tmp until the OS cleared
+/// it. Wrapping the path in a Drop type makes that class of bug
+/// impossible to reintroduce.
+struct CredEnvFile {
+    path: PathBuf,
+}
+
+impl Drop for CredEnvFile {
+    fn drop(&mut self) {
+        if let Err(e) = std::fs::remove_file(&self.path) {
+            // Don't fail the parent op for a cleanup failure — but
+            // log it so an operator triaging "tempfile growing"
+            // alerts has a thread to pull.
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!(
+                    "ibeam: credential tempfile cleanup failed at {:?}: {e}",
+                    self.path
+                );
+            }
+        }
+    }
+}
+
 /// Start (or recreate) the ibeam container. Credentials are injected
 /// at start time via `--env-file` pointing at a tempfile so they
 /// never land on disk in plaintext under the project dir.
@@ -303,12 +332,18 @@ pub async fn ibeam_start(app: AppHandle) -> Result<(), String> {
         .await?
         .ok_or_else(|| "ibeam credentials aren't set — run ibeam_install first".to_string())?;
 
-    let env_path = write_env_file(&creds)?;
+    // Wrap the tempfile path in the RAII guard immediately on
+    // creation. Every return path below — including the early-Err
+    // branch when free_competing_gateway fails, and any future
+    // refactor that adds another early return — gets cleanup for
+    // free via Drop.
+    let env_guard = CredEnvFile { path: write_env_file(&creds)? };
+    let env_path = &env_guard.path;
 
     // First try.
-    let first = run_compose(&dir, &["up", "-d", "--remove-orphans"], Some(&env_path)).await;
+    let first = run_compose(&dir, &["up", "-d", "--remove-orphans"], Some(env_path)).await;
 
-    let result = match first {
+    match first {
         Ok(()) => Ok(()),
         Err(err) if err.contains("address already in use") || err.contains("port is already") => {
             // Port collision — almost always the Auracle stack's
@@ -316,8 +351,6 @@ pub async fn ibeam_start(app: AppHandle) -> Result<(), String> {
             // the port + retry once.
             log::info!("ibeam_start: port 5000 in use, attempting to free competing container");
             if let Err(free_err) = free_competing_gateway().await {
-                // Couldn't free — surface a clear actionable error.
-                let _ = std::fs::remove_file(&env_path);
                 return Err(format!(
                     "Port 5000 is held by another container and couldn't be freed automatically: {free_err}. \
                      Stop the container manually and try again."
@@ -327,13 +360,11 @@ pub async fn ibeam_start(app: AppHandle) -> Result<(), String> {
             // docker's "container removed" event fires before the
             // listening socket actually goes away.
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-            run_compose(&dir, &["up", "-d", "--remove-orphans"], Some(&env_path)).await
+            run_compose(&dir, &["up", "-d", "--remove-orphans"], Some(env_path)).await
         }
         Err(other) => Err(other),
-    };
-
-    let _ = std::fs::remove_file(&env_path);
-    result
+    }
+    // env_guard drops here on every path → tempfile removed.
 }
 
 /// Look for the Auracle stack's bundled IBKR gateway containers and

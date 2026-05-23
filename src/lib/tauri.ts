@@ -435,11 +435,15 @@ export interface DashboardWidget {
     | "bar_chart"
     | "candlestick_chart"
     | "option_chain_table"
-    | "iv_surface_3d"
     | "payoff_diagram"
-    | "scanner_table"
     | "tickers_grid"
     | "notes_md";
+  // iv_surface_3d and scanner_table were declared here in an earlier
+  // phase but never got renderers — removed from the union so the
+  // type system stops promising shapes the WidgetRenderer can't
+  // actually draw. Re-add to the union, the agent system prompt,
+  // and the save_dashboard tool schema string in the same commit
+  // that ships their renderers.
   title?: string;
   /** Where the data comes from. `tool` is the name of an agent
    *  broker/data tool; `args` are passed through to it on each
