@@ -54,19 +54,29 @@ const HTTP_TIMEOUT_SECS: u64 = 12;
 /// old conid) don't survive forever. Eviction is FIFO-on-overflow
 /// — simple, correct, and lookup remains O(1).
 const SYMBOL_CONID_CACHE_CAP: usize = 256;
-static SYMBOL_CONID_CACHE: Lazy<Mutex<std::collections::HashMap<String, i64>>> =
-    Lazy::new(|| Mutex::new(std::collections::HashMap::with_capacity(SYMBOL_CONID_CACHE_CAP)));
+static SYMBOL_CONID_CACHE: Lazy<Mutex<std::collections::HashMap<String, i64>>> = Lazy::new(|| {
+    Mutex::new(std::collections::HashMap::with_capacity(
+        SYMBOL_CONID_CACHE_CAP,
+    ))
+});
 
 #[derive(Debug)]
 pub enum BrokerError {
     /// Source isn't reachable (connection refused, DNS, etc.).
     /// Includes which source so the dispatcher can render a useful
     /// "start X" instruction.
-    Offline { source: &'static str, detail: String },
+    Offline {
+        source: &'static str,
+        detail: String,
+    },
     /// IBKR gateway is up but the session isn't authenticated.
     NotAuthenticated,
     /// Source returned a non-2xx HTTP status.
-    BadStatus { source: &'static str, status: u16, body: String },
+    BadStatus {
+        source: &'static str,
+        status: u16,
+        body: String,
+    },
     /// Source returned 2xx but the response shape is wrong (missing
     /// expected fields, can't parse JSON, etc.).
     BadResponse(String),
@@ -85,17 +95,19 @@ impl BrokerError {
                  and log in. For Yahoo Finance data: check your internet \
                  connection."
             ),
-            BrokerError::NotAuthenticated => {
-                "IBKR Client Portal Gateway is up but not logged in. \
+            BrokerError::NotAuthenticated => "IBKR Client Portal Gateway is up but not logged in. \
                  Open https://localhost:5000 in a browser and log in to \
                  your IBKR account, then retry."
-                    .to_string()
-            }
-            BrokerError::BadStatus { source, status, body } => format!(
-                "{source} returned HTTP {status}. Body: {body}"
-            ),
+                .to_string(),
+            BrokerError::BadStatus {
+                source,
+                status,
+                body,
+            } => format!("{source} returned HTTP {status}. Body: {body}"),
             BrokerError::BadResponse(s) => format!("upstream returned unexpected shape: {s}"),
-            BrokerError::UnknownSymbol(s) => format!("symbol {s:?} not recognized by the data source"),
+            BrokerError::UnknownSymbol(s) => {
+                format!("symbol {s:?} not recognized by the data source")
+            }
         }
     }
 }
@@ -135,7 +147,11 @@ fn classify(source: &'static str, e: reqwest::Error) -> BrokerError {
 /// GET /iserver/auth/status — returns `{authenticated: bool, ...}`.
 async fn ibkr_check_auth(client: &reqwest::Client) -> Result<(), BrokerError> {
     let url = format!("{IBKR_GATEWAY_BASE}/iserver/auth/status");
-    let resp = client.post(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    let resp = client
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "IBKR gateway",
@@ -143,7 +159,10 @@ async fn ibkr_check_auth(client: &reqwest::Client) -> Result<(), BrokerError> {
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let v: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("auth/status JSON: {e}")))?;
+    let v: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("auth/status JSON: {e}")))?;
     if v.get("authenticated").and_then(|x| x.as_bool()) != Some(true) {
         return Err(BrokerError::NotAuthenticated);
     }
@@ -153,7 +172,11 @@ async fn ibkr_check_auth(client: &reqwest::Client) -> Result<(), BrokerError> {
 /// GET /iserver/accounts → pick the first account id.
 async fn ibkr_first_account(client: &reqwest::Client) -> Result<String, BrokerError> {
     let url = format!("{IBKR_GATEWAY_BASE}/iserver/accounts");
-    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "IBKR gateway",
@@ -161,7 +184,10 @@ async fn ibkr_first_account(client: &reqwest::Client) -> Result<String, BrokerEr
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let v: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("accounts JSON: {e}")))?;
+    let v: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("accounts JSON: {e}")))?;
     let accounts = v
         .get("accounts")
         .and_then(|a| a.as_array())
@@ -182,7 +208,11 @@ pub async fn get_account_summary() -> Result<Value, BrokerError> {
     ibkr_check_auth(&client).await?;
     let account = ibkr_first_account(&client).await?;
     let url = format!("{IBKR_GATEWAY_BASE}/portfolio/{account}/summary");
-    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "IBKR gateway",
@@ -190,7 +220,10 @@ pub async fn get_account_summary() -> Result<Value, BrokerError> {
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let raw: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("summary JSON: {e}")))?;
+    let raw: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("summary JSON: {e}")))?;
     // IBKR's summary shape: `{netliquidation: {amount: 12345, currency: "USD", ...}, ...}`.
     let pluck = |key: &str| -> Option<f64> {
         raw.get(key)
@@ -229,7 +262,11 @@ pub async fn get_open_positions() -> Result<Value, BrokerError> {
     ibkr_check_auth(&client).await?;
     let account = ibkr_first_account(&client).await?;
     let url = format!("{IBKR_GATEWAY_BASE}/portfolio/{account}/positions/0");
-    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "IBKR gateway",
@@ -237,7 +274,10 @@ pub async fn get_open_positions() -> Result<Value, BrokerError> {
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let raw: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("positions JSON: {e}")))?;
+    let raw: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("positions JSON: {e}")))?;
     let arr = raw
         .as_array()
         .ok_or_else(|| BrokerError::BadResponse("positions response not an array".to_string()))?;
@@ -288,12 +328,18 @@ async fn ibkr_resolve_conid(client: &reqwest::Client, symbol: &str) -> Result<i6
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let arr: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("secdef/search JSON: {e}")))?;
+    let arr: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("secdef/search JSON: {e}")))?;
     let conid = arr
         .as_array()
         .and_then(|a| a.first())
         .and_then(|r| r.get("conid"))
-        .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        })
         .ok_or_else(|| BrokerError::UnknownSymbol(symbol.to_string()))?;
     // Bounded insert — if the cache is at the cap, drop one arbitrary
     // entry before inserting the new one. HashMap iteration order
@@ -335,7 +381,11 @@ pub async fn get_quote(symbol: &str) -> Result<Value, BrokerError> {
     let url = format!(
         "{IBKR_GATEWAY_BASE}/iserver/marketdata/snapshot?conids={conid}&fields=31,84,86,7295,7762,7763,7637,6509"
     );
-    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "IBKR gateway",
@@ -343,7 +393,10 @@ pub async fn get_quote(symbol: &str) -> Result<Value, BrokerError> {
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let arr: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("snapshot JSON: {e}")))?;
+    let arr: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("snapshot JSON: {e}")))?;
     let row = arr
         .as_array()
         .and_then(|a| a.first())
@@ -441,7 +494,11 @@ async fn get_historical_bars_ibkr(symbol: &str, days: u32) -> Result<Value, Brok
     let url = format!(
         "{IBKR_GATEWAY_BASE}/iserver/marketdata/history?conid={conid}&period={period}&bar={bar}&outsideRth=false"
     );
-    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "IBKR gateway",
@@ -449,7 +506,10 @@ async fn get_historical_bars_ibkr(symbol: &str, days: u32) -> Result<Value, Brok
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let v: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("history JSON: {e}")))?;
+    let v: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("history JSON: {e}")))?;
     // Shape: { symbol, text, priceFactor, startTime, points, data: [{t, o, h, l, c, v}, ...] }
     let data = v
         .get("data")
@@ -550,7 +610,11 @@ async fn ibkr_option_strikes(
         "{IBKR_GATEWAY_BASE}/iserver/secdef/strikes?conid={underlying_conid}&sectype=OPT&month={}",
         urlencoding::encode(month),
     );
-    let resp = client.get(&url).send().await.map_err(|e| classify("IBKR gateway", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| classify("IBKR gateway", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "IBKR gateway",
@@ -558,7 +622,10 @@ async fn ibkr_option_strikes(
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let v: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("strikes JSON: {e}")))?;
+    let v: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("strikes JSON: {e}")))?;
     // Combine call + put strikes into one sorted unique list.
     let mut strikes: Vec<f64> = Vec::new();
     for key in &["call", "put"] {
@@ -613,16 +680,17 @@ pub async fn get_options_chain(
     // price) so we don't waste roundtrips on deep OTM tails. Quote
     // the underlying first to get spot.
     let spot_quote = get_quote(symbol).await?;
-    let spot = spot_quote.get("last").and_then(|v| v.as_f64()).unwrap_or_else(|| {
-        // Fall back to median strike if no quote (after-hours edge
-        // case). Better than refusing to render.
-        strikes[strikes.len() / 2]
-    });
+    let spot = spot_quote
+        .get("last")
+        .and_then(|v| v.as_f64())
+        .unwrap_or_else(|| {
+            // Fall back to median strike if no quote (after-hours edge
+            // case). Better than refusing to render.
+            strikes[strikes.len() / 2]
+        });
 
-    let mut strikes_with_dist: Vec<(f64, f64)> = strikes
-        .iter()
-        .map(|&k| (k, (k - spot).abs()))
-        .collect();
+    let mut strikes_with_dist: Vec<(f64, f64)> =
+        strikes.iter().map(|&k| (k, (k - spot).abs())).collect();
     strikes_with_dist.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
     let mut picked: Vec<f64> = strikes_with_dist
         .iter()
@@ -662,7 +730,10 @@ pub async fn get_options_chain(
                 .as_array()
                 .and_then(|a| a.first())
                 .and_then(|r| r.get("conid"))
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())));
+                .and_then(|v| {
+                    v.as_i64()
+                        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+                });
             let Some(opt_conid) = opt_conid else { continue };
             // Snapshot fields: 31=last, 84=bid, 86=ask, 7295=volume,
             // 7280=imp vol, 7283=delta, 7308=gamma, 7311=theta, 7310=vega.
@@ -677,7 +748,11 @@ pub async fn get_options_chain(
                 Ok(v) => v,
                 Err(_) => continue,
             };
-            let snap_row = snap.as_array().and_then(|a| a.first()).cloned().unwrap_or_default();
+            let snap_row = snap
+                .as_array()
+                .and_then(|a| a.first())
+                .cloned()
+                .unwrap_or_default();
             let pull = |k: &str| -> Option<f64> {
                 snap_row.get(k).and_then(|v| match v {
                     Value::Number(n) => n.as_f64(),
@@ -687,15 +762,42 @@ pub async fn get_options_chain(
             };
             let prefix = if *right == "C" { "call" } else { "put" };
             row.insert(format!("{prefix}_conid"), Value::from(opt_conid));
-            row.insert(format!("{prefix}_last"), pull("31").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_bid"), pull("84").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_ask"), pull("86").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_volume"), pull("7295").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_iv"), pull("7280").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_delta"), pull("7283").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_gamma"), pull("7308").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_theta"), pull("7311").map(Value::from).unwrap_or(Value::Null));
-            row.insert(format!("{prefix}_vega"), pull("7310").map(Value::from).unwrap_or(Value::Null));
+            row.insert(
+                format!("{prefix}_last"),
+                pull("31").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_bid"),
+                pull("84").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_ask"),
+                pull("86").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_volume"),
+                pull("7295").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_iv"),
+                pull("7280").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_delta"),
+                pull("7283").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_gamma"),
+                pull("7308").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_theta"),
+                pull("7311").map(Value::from).unwrap_or(Value::Null),
+            );
+            row.insert(
+                format!("{prefix}_vega"),
+                pull("7310").map(Value::from).unwrap_or(Value::Null),
+            );
         }
         rows.push(Value::Object(row));
     }
@@ -723,8 +825,7 @@ fn is_yyyymm(s: &str) -> bool {
 pub async fn get_historical_bars(symbol: &str, days: u32) -> Result<Value, BrokerError> {
     match get_historical_bars_ibkr(symbol, days).await {
         Ok(v) => Ok(v),
-        Err(BrokerError::Offline { .. })
-        | Err(BrokerError::NotAuthenticated) => {
+        Err(BrokerError::Offline { .. }) | Err(BrokerError::NotAuthenticated) => {
             // Broker isn't reachable / not logged in — drop to the
             // free public feed so the dashboard still renders.
             // Anyone with a live subscription will hit the IBKR path
@@ -748,7 +849,11 @@ async fn get_historical_bars_yahoo(symbol: &str, days: u32) -> Result<Value, Bro
         "{YAHOO_CHART_BASE}/{}?range={range}&interval=1d&includePrePost=false&events=div,splits",
         urlencoding::encode(symbol),
     );
-    let resp = client.get(&url).send().await.map_err(|e| classify("Yahoo Finance", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| classify("Yahoo Finance", e))?;
     if !resp.status().is_success() {
         return Err(BrokerError::BadStatus {
             source: "Yahoo Finance",
@@ -756,7 +861,10 @@ async fn get_historical_bars_yahoo(symbol: &str, days: u32) -> Result<Value, Bro
             body: resp.text().await.unwrap_or_default(),
         });
     }
-    let raw: Value = resp.json().await.map_err(|e| BrokerError::BadResponse(format!("yahoo JSON: {e}")))?;
+    let raw: Value = resp
+        .json()
+        .await
+        .map_err(|e| BrokerError::BadResponse(format!("yahoo JSON: {e}")))?;
     // Shape: chart.result[0] has timestamp[] + indicators.quote[0].{open, high, low, close, volume}.
     let result = raw
         .get("chart")
@@ -775,11 +883,31 @@ async fn get_historical_bars_yahoo(symbol: &str, days: u32) -> Result<Value, Bro
         .and_then(|q| q.as_array())
         .and_then(|a| a.first())
         .ok_or_else(|| BrokerError::BadResponse("missing indicators.quote[0]".to_string()))?;
-    let opens = quote.get("open").and_then(|a| a.as_array()).cloned().unwrap_or_default();
-    let highs = quote.get("high").and_then(|a| a.as_array()).cloned().unwrap_or_default();
-    let lows = quote.get("low").and_then(|a| a.as_array()).cloned().unwrap_or_default();
-    let closes = quote.get("close").and_then(|a| a.as_array()).cloned().unwrap_or_default();
-    let volumes = quote.get("volume").and_then(|a| a.as_array()).cloned().unwrap_or_default();
+    let opens = quote
+        .get("open")
+        .and_then(|a| a.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let highs = quote
+        .get("high")
+        .and_then(|a| a.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let lows = quote
+        .get("low")
+        .and_then(|a| a.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let closes = quote
+        .get("close")
+        .and_then(|a| a.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let volumes = quote
+        .get("volume")
+        .and_then(|a| a.as_array())
+        .cloned()
+        .unwrap_or_default();
 
     let rows: Vec<Value> = timestamps
         .iter()
@@ -863,7 +991,9 @@ pub async fn broker_open_positions() -> Result<serde_json::Value, String> {
 #[tauri::command]
 pub async fn broker_quote(symbol: String) -> Result<serde_json::Value, String> {
     if !super::is_valid_ticker(&symbol) {
-        return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
+        return Err(format!(
+            "symbol {symbol:?} doesn't look like a valid ticker"
+        ));
     }
     get_quote(&symbol).await.map_err(|e| e.to_user_string())
 }
@@ -874,7 +1004,9 @@ pub async fn broker_historical_bars(
     days: Option<u32>,
 ) -> Result<serde_json::Value, String> {
     if !super::is_valid_ticker(&symbol) {
-        return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
+        return Err(format!(
+            "symbol {symbol:?} doesn't look like a valid ticker"
+        ));
     }
     let days = days.unwrap_or(252).clamp(5, 2520);
     get_historical_bars(&symbol, days)
@@ -889,7 +1021,9 @@ pub async fn broker_options_chain(
     max_strikes: Option<usize>,
 ) -> Result<serde_json::Value, String> {
     if !super::is_valid_ticker(&symbol) {
-        return Err(format!("symbol {symbol:?} doesn't look like a valid ticker"));
+        return Err(format!(
+            "symbol {symbol:?} doesn't look like a valid ticker"
+        ));
     }
     let max_strikes = max_strikes.unwrap_or(20).clamp(5, 80);
     get_options_chain(&symbol, &month, max_strikes)

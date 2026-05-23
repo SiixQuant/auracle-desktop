@@ -35,7 +35,9 @@
 //!
 //! Password derivation:
 //!
-//!     vault_password = "auracle:" + machine_uid + ":" + install_uuid
+//! ```text
+//! vault_password = "auracle:" + machine_uid + ":" + install_uuid
+//! ```
 //!
 //!   - machine_uid: stable per-machine. macOS = IOPlatformUUID,
 //!     Linux = /etc/machine-id, Windows = MachineGuid registry key.
@@ -103,8 +105,7 @@ static VAULT: Lazy<Mutex<Option<Stronghold>>> = Lazy::new(|| Mutex::new(None));
 /// Cache the machine-derived password too — `machine_uid::get()` is
 /// the most expensive call in the whole open path (ioreg subprocess
 /// on macOS). Once per process is enough.
-static CACHED_PASSWORD: Lazy<Mutex<Option<String>>> =
-    Lazy::new(|| Mutex::new(None));
+static CACHED_PASSWORD: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 
 /// Disables scrypt-based key strengthening on snapshot writes.
 ///
@@ -393,9 +394,7 @@ fn migrate_from_keyring(
     // alone — better to have the secret only in the keyring than to
     // delete it before we've persisted it elsewhere.
     if let Err(err) = put(app, stronghold_key, &value) {
-        log::warn!(
-            "secret_store: migration from keyring failed for {stronghold_key}: {err}"
-        );
+        log::warn!("secret_store: migration from keyring failed for {stronghold_key}: {err}");
         return Some(value);
     }
 

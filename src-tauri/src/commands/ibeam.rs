@@ -120,12 +120,10 @@ async fn read_credentials(app: &AppHandle) -> Result<Option<IbeamCredentials>, S
     let username = secret_store::get(app, KEY_IBKR_USERNAME)?;
     let password = secret_store::get(app, KEY_IBKR_PASSWORD)?;
     match (username, password) {
-        (Some(u), Some(p)) if !u.is_empty() && !p.is_empty() => {
-            Ok(Some(IbeamCredentials {
-                username: u,
-                password: p,
-            }))
-        }
+        (Some(u), Some(p)) if !u.is_empty() && !p.is_empty() => Ok(Some(IbeamCredentials {
+            username: u,
+            password: p,
+        })),
         _ => Ok(None),
     }
 }
@@ -245,10 +243,7 @@ async fn probe_auth_status() -> Result<bool, ()> {
 /// Idempotent: running this twice updates the credentials in
 /// the vault and re-writes the compose file.
 #[tauri::command]
-pub async fn ibeam_install(
-    app: AppHandle,
-    creds: IbeamCredentials,
-) -> Result<(), String> {
+pub async fn ibeam_install(app: AppHandle, creds: IbeamCredentials) -> Result<(), String> {
     if creds.username.is_empty() || creds.password.is_empty() {
         return Err("username and password are both required".to_string());
     }
@@ -273,11 +268,7 @@ pub async fn ibeam_install(
 
     // README so a user who SSHes in and finds this directory has
     // context about what it is + how to manage it manually.
-    std::fs::write(
-        dir.join("README.md"),
-        readme_template(),
-    )
-    .map_err(to_error_string)?;
+    std::fs::write(dir.join("README.md"), readme_template()).map_err(to_error_string)?;
 
     Ok(())
 }
@@ -337,7 +328,9 @@ pub async fn ibeam_start(app: AppHandle) -> Result<(), String> {
     // branch when free_competing_gateway fails, and any future
     // refactor that adds another early return — gets cleanup for
     // free via Drop.
-    let env_guard = CredEnvFile { path: write_env_file(&creds)? };
+    let env_guard = CredEnvFile {
+        path: write_env_file(&creds)?,
+    };
     let env_path = &env_guard.path;
 
     // First try.
@@ -534,7 +527,9 @@ fn write_env_file(creds: &IbeamCredentials) -> Result<PathBuf, String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&path).map_err(to_error_string)?.permissions();
+        let mut perms = std::fs::metadata(&path)
+            .map_err(to_error_string)?
+            .permissions();
         perms.set_mode(0o600);
         std::fs::set_permissions(&path, perms).map_err(to_error_string)?;
     }

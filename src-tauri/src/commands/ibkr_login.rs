@@ -62,22 +62,16 @@ pub async fn open_ibkr_login(app: AppHandle, url: String) -> Result<(), String> 
         return Ok(());
     }
 
-    let parsed = url::Url::parse(&url).map_err(|e| {
-        format!("invalid login URL {url:?}: {e}")
-    })?;
+    let parsed = url::Url::parse(&url).map_err(|e| format!("invalid login URL {url:?}: {e}"))?;
 
-    WebviewWindowBuilder::new(
-        &app,
-        LOGIN_WINDOW_LABEL,
-        WebviewUrl::External(parsed),
-    )
-    .title("Interactive Brokers — Sign in")
-    .inner_size(600.0, 760.0)
-    .min_inner_size(480.0, 620.0)
-    .center()
-    .resizable(true)
-    .build()
-    .map_err(to_error_string)?;
+    WebviewWindowBuilder::new(&app, LOGIN_WINDOW_LABEL, WebviewUrl::External(parsed))
+        .title("Interactive Brokers — Sign in")
+        .inner_size(600.0, 760.0)
+        .min_inner_size(480.0, 620.0)
+        .center()
+        .resizable(true)
+        .build()
+        .map_err(to_error_string)?;
 
     Ok(())
 }

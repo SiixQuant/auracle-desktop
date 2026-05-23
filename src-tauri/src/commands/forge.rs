@@ -97,15 +97,16 @@ static CHAT_CANCEL: Lazy<Arc<Notify>> = Lazy::new(|| Arc::new(Notify::new()));
 /// Public wrapper so sibling modules (dashboards.rs, eventually the
 /// dashboard refresh loop) can derive paths from the same configured
 /// root without re-implementing the lookup logic.
-pub(crate) fn resolve_strategies_dir_public(
-    app: &tauri::AppHandle,
-) -> Result<PathBuf, String> {
+pub(crate) fn resolve_strategies_dir_public(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     resolve_strategies_dir(app)
 }
 
 fn resolve_strategies_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if let Ok(store) = app.store(STORE_FILE) {
-        if let Some(v) = store.get(KEY_STRATEGIES_DIR).and_then(|v| v.as_str().map(String::from)) {
+        if let Some(v) = store
+            .get(KEY_STRATEGIES_DIR)
+            .and_then(|v| v.as_str().map(String::from))
+        {
             if !v.is_empty() {
                 return Ok(PathBuf::from(v));
             }
@@ -219,7 +220,10 @@ pub struct ChatResponse {
 
 fn resolve_model(app: &tauri::AppHandle) -> String {
     if let Ok(store) = app.store(STORE_FILE) {
-        if let Some(v) = store.get(KEY_MODEL).and_then(|v| v.as_str().map(String::from)) {
+        if let Some(v) = store
+            .get(KEY_MODEL)
+            .and_then(|v| v.as_str().map(String::from))
+        {
             if ANTHROPIC_MODELS.iter().any(|&m| m == v) {
                 return v;
             }
@@ -255,7 +259,10 @@ pub async fn forge_set_model(app: tauri::AppHandle, model: String) -> Result<(),
 #[tauri::command]
 pub async fn forge_get_layout_mode(app: tauri::AppHandle) -> Result<String, String> {
     if let Ok(store) = app.store(STORE_FILE) {
-        if let Some(v) = store.get(KEY_LAYOUT_MODE).and_then(|v| v.as_str().map(String::from)) {
+        if let Some(v) = store
+            .get(KEY_LAYOUT_MODE)
+            .and_then(|v| v.as_str().map(String::from))
+        {
             if LAYOUT_MODES.iter().any(|&m| m == v) {
                 return Ok(v);
             }
@@ -269,10 +276,7 @@ pub async fn forge_get_layout_mode(app: tauri::AppHandle) -> Result<String, Stri
 }
 
 #[tauri::command]
-pub async fn forge_set_layout_mode(
-    app: tauri::AppHandle,
-    mode: String,
-) -> Result<(), String> {
+pub async fn forge_set_layout_mode(app: tauri::AppHandle, mode: String) -> Result<(), String> {
     if !LAYOUT_MODES.iter().any(|&m| m == mode) {
         return Err(format!(
             "unknown layout mode {mode:?} — must be one of {:?}",
@@ -292,10 +296,7 @@ pub async fn forge_strategies_dir(app: tauri::AppHandle) -> Result<String, Strin
 }
 
 #[tauri::command]
-pub async fn forge_set_strategies_dir(
-    app: tauri::AppHandle,
-    path: String,
-) -> Result<(), String> {
+pub async fn forge_set_strategies_dir(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let p = PathBuf::from(&path);
     if !p.is_dir() {
         return Err(format!("not a directory: {path}"));
@@ -307,9 +308,7 @@ pub async fn forge_set_strategies_dir(
 }
 
 #[tauri::command]
-pub async fn forge_list_strategies(
-    app: tauri::AppHandle,
-) -> Result<Vec<StrategyFile>, String> {
+pub async fn forge_list_strategies(app: tauri::AppHandle) -> Result<Vec<StrategyFile>, String> {
     let root = resolve_strategies_dir(&app)?;
     if !root.is_dir() {
         return Ok(vec![]);
@@ -384,10 +383,7 @@ fn walk_into(
 }
 
 #[tauri::command]
-pub async fn forge_read_file(
-    app: tauri::AppHandle,
-    rel_path: String,
-) -> Result<String, String> {
+pub async fn forge_read_file(app: tauri::AppHandle, rel_path: String) -> Result<String, String> {
     let root = resolve_strategies_dir(&app)?;
     let abs = safe_resolve(&root, &rel_path)?;
     fs::read_to_string(&abs).map_err(|e| format!("read failed: {e}"))
@@ -440,9 +436,7 @@ pub async fn forge_new_file(
         Some("py") | Some("ipynb")
     );
     if !ext_ok {
-        return Err(
-            "new strategy files must end in .py or .ipynb".to_string(),
-        );
+        return Err("new strategy files must end in .py or .ipynb".to_string());
     }
 
     if let Some(parent) = abs.parent() {
@@ -476,10 +470,7 @@ pub async fn forge_rename_file(
 }
 
 #[tauri::command]
-pub async fn forge_delete_file(
-    app: tauri::AppHandle,
-    rel_path: String,
-) -> Result<(), String> {
+pub async fn forge_delete_file(app: tauri::AppHandle, rel_path: String) -> Result<(), String> {
     let root = resolve_strategies_dir(&app)?;
     let abs = safe_resolve(&root, &rel_path)?;
     if !abs.exists() {
@@ -529,7 +520,8 @@ pub async fn forge_available_templates() -> Result<Vec<StrategyTemplate>, String
         StrategyTemplate {
             id: "ma_crossover".into(),
             name: "MA Crossover".into(),
-            description: "Classic 50/200 simple-moving-average crossover on SPY. Long when 50 > 200.".into(),
+            description:
+                "Classic 50/200 simple-moving-average crossover on SPY. Long when 50 > 200.".into(),
         },
         StrategyTemplate {
             id: "rsi_mean_reversion".into(),
@@ -539,7 +531,9 @@ pub async fn forge_available_templates() -> Result<Vec<StrategyTemplate>, String
         StrategyTemplate {
             id: "momentum".into(),
             name: "Cross-Sectional Momentum".into(),
-            description: "Top-N 12-1 momentum on a US equities universe. Equal-weight, monthly rebalance.".into(),
+            description:
+                "Top-N 12-1 momentum on a US equities universe. Equal-weight, monthly rebalance."
+                    .into(),
         },
     ])
 }
@@ -723,7 +717,11 @@ fn to_pascal_case(s: &str) -> String {
             out.push(ch);
         }
     }
-    if out.is_empty() { "MyStrategy".to_string() } else { out }
+    if out.is_empty() {
+        "MyStrategy".to_string()
+    } else {
+        out
+    }
 }
 
 // ── Anthropic API key (separate keychain slot from license) ─────
@@ -817,9 +815,7 @@ pub fn anthropic_key_clear(app: AppHandle) -> Result<(), String> {
     // or permission denied) the customer-visible state is correct
     // because the vault wins on read regardless.
     secret_store::delete(&app, VAULT_KEY_ANTHROPIC)?;
-    if let Ok(entry) =
-        keyring::Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT)
-    {
+    if let Ok(entry) = keyring::Entry::new(ANTHROPIC_KEY_SERVICE, ANTHROPIC_KEY_ACCOUNT) {
         let _ = entry.delete_credential();
     }
     Ok(())
@@ -943,8 +939,7 @@ pub async fn forge_chat(
     app: tauri::AppHandle,
     messages: Vec<ChatMessage>,
 ) -> Result<ChatResponse, String> {
-    let api_key = resolve_anthropic_key(&app)?
-        .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
+    let api_key = resolve_anthropic_key(&app)?.ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     // Validate roles before sending — Anthropic 400s on anything
     // outside {user, assistant} and the error JSON it returns is
@@ -993,14 +988,20 @@ pub async fn forge_chat(
 
     let status = resp.status();
     if !status.is_success() {
-        let text = resp.text().await.unwrap_or_else(|_| String::from("(no body)"));
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| String::from("(no body)"));
         // Anthropic returns clear structured error bodies — surface
         // the message verbatim so the user can act on it (rate
         // limits, expired key, etc.).
         return Err(format!("Anthropic API {status}: {text}"));
     }
 
-    let parsed: AnthropicResponse = resp.json().await.map_err(|e| format!("decode failed: {e}"))?;
+    let parsed: AnthropicResponse = resp
+        .json()
+        .await
+        .map_err(|e| format!("decode failed: {e}"))?;
 
     let mut text = String::new();
     for block in parsed.content {
@@ -1062,16 +1063,12 @@ struct ChatErrorPayload<'a> {
 }
 
 #[tauri::command]
-pub async fn forge_chat_stream(
-    app: AppHandle,
-    messages: Vec<ChatMessage>,
-) -> Result<(), String> {
+pub async fn forge_chat_stream(app: AppHandle, messages: Vec<ChatMessage>) -> Result<(), String> {
     // Resolve the API key up-front so we can fail synchronously
     // with a clear message — by the time the task is spawned the
     // frontend has already committed to the streaming UI path and
     // a delayed error feels jarring.
-    let api_key = resolve_anthropic_key(&app)?
-        .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
+    let api_key = resolve_anthropic_key(&app)?.ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     for m in &messages {
         if m.role != "user" && m.role != "assistant" {
@@ -1092,7 +1089,7 @@ pub async fn forge_chat_stream(
     // awaited, the next notified() call resolves immediately. We
     // drain that pending permit here.
     let cancel = CHAT_CANCEL.clone();
-    cancel.notify_waiters();        // wake any stale waiters first
+    cancel.notify_waiters(); // wake any stale waiters first
     let _drain = cancel.notified(); // and consume any stored permit
 
     // Spawn the HTTP + SSE-parse task. The command itself returns
@@ -1101,10 +1098,7 @@ pub async fn forge_chat_stream(
     let cancel_for_task = cancel.clone();
     tokio::spawn(async move {
         if let Err(e) = run_stream(app2.clone(), api_key, messages, cancel_for_task).await {
-            let _ = app2.emit(
-                "forge-chat-error",
-                ChatErrorPayload { message: &e },
-            );
+            let _ = app2.emit("forge-chat-error", ChatErrorPayload { message: &e });
         }
     });
     Ok(())
@@ -1143,13 +1137,7 @@ pub fn forge_chat_cancel() -> Result<(), String> {
 const KEY_STATE_CACHE: &str = "strategy_state_cache";
 const HOUSTON_BASE_URL: &str = "http://localhost:1969";
 
-const VALID_STATES: &[&str] = &[
-    "draft",
-    "backtested",
-    "paper",
-    "live",
-    "archived",
-];
+const VALID_STATES: &[&str] = &["draft", "backtested", "paper", "live", "archived"];
 
 fn read_cache(app: &tauri::AppHandle) -> serde_json::Map<String, serde_json::Value> {
     if let Ok(store) = app.store(STORE_FILE) {
@@ -1165,7 +1153,10 @@ fn read_cache(app: &tauri::AppHandle) -> serde_json::Map<String, serde_json::Val
 fn write_cache_entry(app: &tauri::AppHandle, rel_path: &str, state: &str) {
     if let Ok(store) = app.store(STORE_FILE) {
         let mut cache = read_cache(app);
-        cache.insert(rel_path.to_string(), serde_json::Value::String(state.to_string()));
+        cache.insert(
+            rel_path.to_string(),
+            serde_json::Value::String(state.to_string()),
+        );
         store.set(KEY_STATE_CACHE, serde_json::Value::Object(cache));
         let _ = store.save();
     }
@@ -1209,10 +1200,12 @@ pub async fn forge_strategy_states(app: tauri::AppHandle) -> Result<StrategyStat
             // the stack next goes offline.
             let parsed: serde_json::Value = match resp.json().await {
                 Ok(v) => v,
-                Err(_) => return Ok(StrategyStates {
-                    states: read_cache(&app),
-                    from_houston: false,
-                }),
+                Err(_) => {
+                    return Ok(StrategyStates {
+                        states: read_cache(&app),
+                        from_houston: false,
+                    })
+                }
             };
             let states = parsed
                 .get("states")
@@ -1220,7 +1213,10 @@ pub async fn forge_strategy_states(app: tauri::AppHandle) -> Result<StrategyStat
                 .cloned()
                 .unwrap_or_default();
             write_cache_bulk(&app, &states);
-            Ok(StrategyStates { states, from_houston: true })
+            Ok(StrategyStates {
+                states,
+                from_houston: true,
+            })
         }
         // 404 (Auracle pre-dates the endpoint) or any non-success
         // status → cache fallback, same as offline.
@@ -1364,7 +1360,9 @@ async fn run_stream(
                 return Ok(());
             }
         };
-        let Some(chunk) = chunk_result.map_err(|e| format!("stream read: {e}"))? else { break };
+        let Some(chunk) = chunk_result.map_err(|e| format!("stream read: {e}"))? else {
+            break;
+        };
         let s = match std::str::from_utf8(&chunk) {
             Ok(s) => s,
             // Anthropic claims UTF-8 throughout; non-UTF8 means we
@@ -1426,10 +1424,7 @@ async fn run_stream(
                             "stream: message_start without model field — usage attributed to request model {model}"
                         ),
                     }
-                    if let Some(u) = parsed
-                        .get("message")
-                        .and_then(|m| m.get("usage"))
-                    {
+                    if let Some(u) = parsed.get("message").and_then(|m| m.get("usage")) {
                         if let Some(n) = u.get("input_tokens").and_then(|v| v.as_u64()) {
                             usage_in = n as u32;
                         }
@@ -1445,10 +1440,7 @@ async fn run_stream(
                         .and_then(|t| t.as_str())
                     {
                         full_text.push_str(text);
-                        let _ = app.emit(
-                            "forge-chat-chunk",
-                            ChatChunkPayload { text },
-                        );
+                        let _ = app.emit("forge-chat-chunk", ChatChunkPayload { text });
                     }
                 }
                 "message_delta" => {
@@ -2147,13 +2139,7 @@ async fn execute_agent_tool(
             // they expect "write this" to mean "save it, replacing
             // whatever is there." We go through forge_write_file
             // (not forge_new_file) for exactly this reason.
-            match forge_write_file(
-                app.clone(),
-                rel_path.to_string(),
-                contents.to_string(),
-            )
-            .await
-            {
+            match forge_write_file(app.clone(), rel_path.to_string(), contents.to_string()).await {
                 Ok(()) => (
                     format!("wrote {} bytes to {rel_path}", contents.len()),
                     true,
@@ -2214,7 +2200,10 @@ async fn execute_agent_tool(
                 return ("error: symbol required".to_string(), false);
             };
             let Some(month) = input.get("month").and_then(|v| v.as_str()) else {
-                return ("error: month required (YYYYMM, e.g. '202606')".to_string(), false);
+                return (
+                    "error: month required (YYYYMM, e.g. '202606')".to_string(),
+                    false,
+                );
             };
             if !super::is_valid_ticker(symbol) {
                 return (
@@ -2510,10 +2499,7 @@ fn summarize_tool_input(name: &str, input: &serde_json::Value) -> String {
             format!("{symbol} · {month}")
         }
         "get_historical_bars" => {
-            let symbol = input
-                .get("symbol")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
+            let symbol = input.get("symbol").and_then(|v| v.as_str()).unwrap_or("?");
             let days = input.get("days").and_then(|v| v.as_u64()).unwrap_or(252);
             format!("{symbol} · {days}d")
         }
@@ -2557,12 +2543,8 @@ fn summarize_tool_result(result: &str, ok: bool) -> String {
 }
 
 #[tauri::command]
-pub async fn forge_agent_run(
-    app: AppHandle,
-    messages: Vec<ChatMessage>,
-) -> Result<(), String> {
-    let api_key = resolve_anthropic_key(&app)?
-        .ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
+pub async fn forge_agent_run(app: AppHandle, messages: Vec<ChatMessage>) -> Result<(), String> {
+    let api_key = resolve_anthropic_key(&app)?.ok_or_else(|| MISSING_KEY_ERROR.to_string())?;
 
     for m in &messages {
         if m.role != "user" && m.role != "assistant" {
@@ -2584,9 +2566,7 @@ pub async fn forge_agent_run(
     let app2 = app.clone();
     let cancel_for_task = cancel.clone();
     tokio::spawn(async move {
-        if let Err(e) =
-            run_agent_loop(app2.clone(), api_key, messages, cancel_for_task).await
-        {
+        if let Err(e) = run_agent_loop(app2.clone(), api_key, messages, cancel_for_task).await {
             let _ = app2.emit("forge-chat-error", ChatErrorPayload { message: &e });
         }
     });
@@ -2707,7 +2687,10 @@ async fn run_agent_loop(
             }
         }
 
-        let stop_reason = parsed.get("stop_reason").and_then(|v| v.as_str()).unwrap_or("");
+        let stop_reason = parsed
+            .get("stop_reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let content = parsed
             .get("content")
             .and_then(|v| v.as_array())
@@ -2743,10 +2726,7 @@ async fn run_agent_loop(
                         .and_then(|v| v.as_str())
                         .unwrap_or("unknown")
                         .to_string();
-                    let tool_input = block
-                        .get("input")
-                        .cloned()
-                        .unwrap_or(serde_json::json!({}));
+                    let tool_input = block.get("input").cloned().unwrap_or(serde_json::json!({}));
 
                     let input_summary = summarize_tool_input(&tool_name, &tool_input);
                     let _ = app.emit(
@@ -2759,8 +2739,7 @@ async fn run_agent_loop(
                         },
                     );
 
-                    let (result_str, ok) =
-                        execute_agent_tool(&app, &tool_name, &tool_input).await;
+                    let (result_str, ok) = execute_agent_tool(&app, &tool_name, &tool_input).await;
                     let result_summary = summarize_tool_result(&result_str, ok);
 
                     let _ = app.emit(

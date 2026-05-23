@@ -441,9 +441,7 @@ pub async fn stack_stop_service(name: String) -> Result<(), String> {
 ///
 /// Returns the running container's name when found, or None.
 #[tauri::command]
-pub async fn docker_container_running(
-    names: Vec<String>,
-) -> Result<Option<String>, String> {
+pub async fn docker_container_running(names: Vec<String>) -> Result<Option<String>, String> {
     // Refuse empty / huge inputs — defense in depth.
     if names.is_empty() || names.len() > 32 {
         return Err("provide 1-32 container names to check".to_string());
@@ -455,7 +453,9 @@ pub async fn docker_container_running(
         // though Command::arg already quotes properly.
         if n.is_empty()
             || n.len() > 64
-            || !n.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            || !n
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
         {
             return Err(format!("invalid container name: {n:?}"));
         }

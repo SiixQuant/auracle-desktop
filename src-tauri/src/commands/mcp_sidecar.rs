@@ -79,10 +79,7 @@ fn resolve_sidecar_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     // platform-specific binary into the resource dir at bundle
     // time; in dev, the operator either runs PyInstaller manually
     // or accepts the NotBundled status.
-    let resource_dir = app
-        .path()
-        .resource_dir()
-        .map_err(to_error_string)?;
+    let resource_dir = app.path().resource_dir().map_err(to_error_string)?;
     Ok(resource_dir.join(SIDECAR_BIN))
 }
 

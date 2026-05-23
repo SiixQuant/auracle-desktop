@@ -159,7 +159,10 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     //    installer script's prompt-for-key step skips. Operator who
     //    wants to install without a key (Community tier) can clear
     //    the key in Settings before running install.
-    let license = keychain::license_get(app.clone()).ok().flatten().unwrap_or_default();
+    let license = keychain::license_get(app.clone())
+        .ok()
+        .flatten()
+        .unwrap_or_default();
 
     emit_progress(
         &app,

@@ -183,12 +183,9 @@ fn maybe_seed_welcome(app: &AppHandle) {
     // any JSON.
     let has_any = std::fs::read_dir(&dir)
         .map(|entries| {
-            entries.flatten().any(|e| {
-                e.path()
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    == Some("json")
-            })
+            entries
+                .flatten()
+                .any(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
         })
         .unwrap_or(true); // if read_dir fails, assume populated; safer
     if has_any {
@@ -339,9 +336,8 @@ pub async fn forge_read_dashboard(app: AppHandle, slug: String) -> Result<Dashbo
         std::io::ErrorKind::NotFound => format!("dashboard {slug:?} doesn't exist"),
         _ => to_error_string(e),
     })?;
-    let dash: Dashboard = serde_json::from_slice(&bytes).map_err(|e| {
-        format!("dashboard {slug:?} on disk is corrupt: {e}")
-    })?;
+    let dash: Dashboard = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("dashboard {slug:?} on disk is corrupt: {e}"))?;
     Ok(dash)
 }
 
@@ -379,9 +375,9 @@ pub async fn forge_save_dashboard(
         ));
     }
     for (i, w) in dashboard.widgets.iter().enumerate() {
-        let obj = w.as_object().ok_or_else(|| {
-            format!("widget #{i} is not a JSON object")
-        })?;
+        let obj = w
+            .as_object()
+            .ok_or_else(|| format!("widget #{i} is not a JSON object"))?;
         for required in ["id", "type", "data_source"] {
             if !obj.contains_key(required) {
                 return Err(format!(
@@ -453,6 +449,7 @@ pub async fn forge_open_dashboard(app: AppHandle, slug: String) -> Result<(), St
     // Verify it exists + parses before emitting — better to error
     // here than to have the frontend try to open a missing one.
     let _ = forge_read_dashboard(app.clone(), slug.clone()).await?;
-    app.emit("forge-dashboard-open", slug).map_err(to_error_string)?;
+    app.emit("forge-dashboard-open", slug)
+        .map_err(to_error_string)?;
     Ok(())
 }

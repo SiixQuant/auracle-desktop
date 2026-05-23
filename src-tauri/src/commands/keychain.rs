@@ -64,8 +64,7 @@ pub fn license_set(app: AppHandle, value: String) -> Result<(), String> {
     // store the string, not gate it.
     if value.len() < 16 {
         return Err(
-            "license key looks too short — paste the full key from your purchase email"
-                .to_string(),
+            "license key looks too short — paste the full key from your purchase email".to_string(),
         );
     }
 
