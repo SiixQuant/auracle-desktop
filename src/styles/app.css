@@ -302,16 +302,37 @@ pre.logs {
   overflow: hidden;
 }
 
-/* Agent layout: 2-pane (chat + preview). Chat takes 40% so it
- * has room for code blocks; preview takes 60% so backtest charts
- * render at a useful size. */
+/* Agent layout: 2-pane (chat + preview). The visualization side
+ * is where the substantive work lives now (dashboards, charts,
+ * option chains, payoff diagrams) so the preview pane gets the
+ * larger share. Chat compresses gracefully — 280px is enough for
+ * the input + a code block to render, and the agent's tool-call
+ * activity cards fit comfortably below.
+ *
+ * Ratio (default): roughly 28% chat / 72% preview. On wide
+ * monitors the preview pane keeps absorbing the extra room
+ * since the chat doesn't need more than ~500px to be useful.
+ *
+ * Previous setting was 40% / 60% with a 360px chat floor — on
+ * 900-1100px windows that made the preview pane uncomfortably
+ * narrow for the dashboard widgets it's hosting now. */
 .forge-agent-shell {
   display: grid;
-  grid-template-columns: minmax(360px, 2fr) minmax(420px, 3fr);
+  grid-template-columns: minmax(280px, 1fr) minmax(480px, 2.6fr);
   flex: 1;
   min-height: 0;
   background: var(--bg);
   overflow: hidden;
+}
+
+/* Cap the chat column on wide monitors so it doesn't sprawl
+ * past the point of usefulness when the preview pane has
+ * already absorbed everything it needs. Past ~500px wide the
+ * chat column is just extra whitespace around an input. */
+@media (min-width: 1600px) {
+  .forge-agent-shell {
+    grid-template-columns: minmax(280px, 500px) 1fr;
+  }
 }
 
 .forge-col-agent-chat {
