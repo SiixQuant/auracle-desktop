@@ -4,6 +4,21 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.3.1]
+
+Quick polish on top of 0.3.0 — same surface, better defaults.
+
+### Fixed
+- Dashboard grid layout no longer leaves dead vertical space
+  inside chart widgets. Cells now use a deterministic 90px row
+  height so the cell allocation matches what a widget actually
+  needs.
+- Agent + Code layout split rebalanced from 40/60 to roughly
+  28/72 in favor of the preview pane, which is where the
+  substantive output (dashboards, charts, option chains) lives.
+  Chat panel min-width dropped from 360px to 280px so the
+  visualization side has more room at typical window sizes.
+
 ## [0.3.0]
 
 A large feature release. The Forge authoring surface goes from
