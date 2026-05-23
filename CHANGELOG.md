@@ -4,7 +4,79 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.3.0]
+
+A large feature release. The Forge authoring surface goes from
+"agent that writes strategy files" to a full visual-analytics
+workspace, broker integration moves into the launcher itself,
+and a persistent-session path for the broker connection removes
+the daily re-login that was the biggest day-to-day friction.
+
 ### Added
+- **Persistent visual dashboards.** The agent authors named JSON
+  specs that render inline as composable grids of components —
+  KPI cards, sortable tables, time-series line charts, OHLC
+  candles, multi-leg option payoff diagrams, market-maker-style
+  option chain tables, live multi-symbol ticker grids, markdown
+  notes. Specs round-trip through version control, persist
+  across sessions, refresh on a configurable interval.
+- **In-app broker connection management.** A new Settings card is
+  the single global place to wire up a broker — see live
+  connection state, connect, test, disconnect. Coming-soon rows
+  for additional brokers under development.
+- **Persistent broker session via an auto-managed supervisor
+  container.** Optional Docker-based path that re-authenticates
+  the local broker gateway automatically when the daily session
+  expires, removing the daily manual login cycle.
+- **Subscription-aware data quality indicators.** Every quote and
+  bar payload now carries a tier flag (real-time / delayed /
+  frozen / closed / halted) derived from the broker's own
+  availability codes. The launcher's home view shows the active
+  tier as a pill so the user always knows what they're looking
+  at.
+- **Real-time tick streaming surface.** Frontend can subscribe to
+  symbol-level tick updates at a configurable cadence; the live
+  ticker-grid component consumes this for streaming watchlists.
+- **Out-of-box welcome view.** First-launch users see a tour
+  dashboard seeded with two market-data components and a
+  markdown intro so the workspace isn't empty.
+- **Atomic broker connect flow.** Connect detects and resolves
+  port conflicts with the legacy bundled gateway in one click.
+- **Password-manager autofill** on the credential form.
+- **Conflict detection** between the launcher-managed and stack-
+  managed broker gateway, with a one-click "free the port" action.
+
+### Changed
+- Broker data is now a launcher-global resource, callable from
+  every surface (the home view, the agent loop, the visualization
+  layer) rather than tunneled through one specific consumer.
+- Agent prompt and tool catalog now include the visual-component
+  schemas so the agent can author dashboards as a first-class
+  output type, not just code.
+- Agent system prompt + tool definitions are now marked
+  cacheable, cutting per-turn input-token cost roughly tenfold
+  after the first call in a session and largely sidestepping
+  per-minute rate limits.
+- The launcher's home view now shows the active broker account
+  summary and top open positions, refreshed on a 30-second
+  cadence.
+
+### Fixed
+- Encrypted-vault save flow: removed a regression where the key
+  appeared to save but the next read returned empty.
+- Encrypted-vault save latency: the previous flow could take
+  tens of seconds on busier hardware; saves now complete in
+  milliseconds.
+- Credential tempfile cleanup is now structurally guaranteed
+  across every error path via an RAII guard.
+- Long-running launcher sessions no longer accumulate unbounded
+  symbol-to-contract-id cache entries.
+- Many in-component subscription and refresh-loop lifecycle
+  fixes — listeners get torn down on unmount, refresh loops
+  pause when the window is hidden and refresh immediately when
+  it comes back, charts size correctly to their containers.
+
+### Earlier (pre-0.3.0) baseline
 - Phase 0 scaffolding: Tauri 2.x shell, Rust command modules
   (docker / healthcheck / installer / keychain / tray / update),
   vanilla HTML/CSS/JS frontend (dashboard / diagnostics / logs /
