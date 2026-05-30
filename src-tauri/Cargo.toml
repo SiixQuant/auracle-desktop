@@ -112,7 +112,7 @@ urlencoding = "2"
 # identifier (used as entropy for the password derivation);
 # uuid generates the per-install random suffix that's mixed into
 # the password so reinstalls produce a fresh vault.
-sha2 = "0.10"
+sha2 = "0.11"
 machine-uid = "0.5"
 uuid = { version = "1.10", features = ["v4"] }
 
