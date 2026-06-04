@@ -386,8 +386,11 @@ export interface ChatToolResultPayload {
 
 // ── Strategy lifecycle ──────────────────────────────────────────
 
+// Lifecycle belt — matches Houston's auracle.framework.lifecycle.ORDER
+// (+ archived) so the desktop and the web product share one lifecycle.
 export type StrategyState =
   | "draft"
+  | "research"
   | "backtested"
   | "paper"
   | "live"
@@ -395,6 +398,7 @@ export type StrategyState =
 
 export const STRATEGY_STATES: StrategyState[] = [
   "draft",
+  "research",
   "backtested",
   "paper",
   "live",
@@ -666,6 +670,36 @@ export interface BrokerOptionsChain {
 }
 
 // ── Misc helpers ────────────────────────────────────────────────
+
+/**
+ * The web product served through Caddy (TLS). The workspace must be
+ * opened via this origin — NOT http://localhost:1969 — because the
+ * embedded JupyterLab panel is only same-origin under Caddy, and
+ * Jupyter's `frame-ancestors 'self'` refuses to be framed cross-origin.
+ * (Direct :1969 redirects /jupyter to :8888, a different origin, which
+ * the browser blocks → a blank panel.)
+ *
+ * Note: this is the DISPLAY origin (what a browser/webview loads). API
+ * calls from the Rust core stay on http://localhost:1969 — they don't
+ * need TLS and avoid the self-signed-cert hop.
+ */
+export const WORKSPACE_URL = "https://localhost";
+
+/**
+ * Open the unified Auracle workspace (the web shell) — optionally at a
+ * sub-path. This is how the desktop reflects "we are one product": the
+ * native launcher and the web UI are the same Auracle.
+ *   openWorkspace()            → the shell (/ui)
+ *   openWorkspace("/ui/forge") → Forge (composer + board + Seer)
+ */
+export async function openWorkspace(path = "/ui"): Promise<void> {
+  return openInBrowser(`${WORKSPACE_URL}${path}`);
+}
+
+/** Open the unified Forge research surface (composer, board, Seer). */
+export async function openResearch(): Promise<void> {
+  return openWorkspace("/ui/forge");
+}
 
 /**
  * Open a URL in the user's default browser via the opener plugin.

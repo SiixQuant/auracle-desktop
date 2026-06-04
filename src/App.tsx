@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 
-import { cmd, type HealthSnapshot } from "@/lib/tauri";
+import { cmd, openWorkspace, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
 import Forge from "@/views/Forge";
 import Onboarding from "@/views/Onboarding";
@@ -126,6 +126,21 @@ export default function App() {
               Settings
             </button>
           </nav>
+        )}
+
+        {/* The launcher is a window onto the one web product — this
+            opens the unified Auracle workspace (Forge, Research, Seer,
+            Strategies) so desktop and web read as the same Auracle. */}
+        {!needsOnboarding && (
+          <button
+            type="button"
+            className="tab"
+            style={{ marginLeft: "auto" }}
+            title="Open the unified Auracle workspace (Forge · Research · Seer · Strategies)"
+            onClick={() => openWorkspace()}
+          >
+            Open Workspace ↗
+          </button>
         )}
       </header>
 
