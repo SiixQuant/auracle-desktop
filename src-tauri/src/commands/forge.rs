@@ -1139,7 +1139,14 @@ const HOUSTON_BASE_URL: &str = "http://localhost:1969";
 
 // Lifecycle belt — must match Houston's auracle.framework.lifecycle.ORDER
 // so the desktop and the web product agree on a single strategy lifecycle.
-const VALID_STATES: &[&str] = &["draft", "research", "backtested", "paper", "live", "archived"];
+const VALID_STATES: &[&str] = &[
+    "draft",
+    "research",
+    "backtested",
+    "paper",
+    "live",
+    "archived",
+];
 
 fn read_cache(app: &tauri::AppHandle) -> serde_json::Map<String, serde_json::Value> {
     if let Ok(store) = app.store(STORE_FILE) {
