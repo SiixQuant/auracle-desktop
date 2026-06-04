@@ -68,7 +68,7 @@ pub struct StackStatus {
 ///
 /// Returns the first path that successfully runs `docker --version`,
 /// or None when Docker really isn't installed.
-async fn resolve_docker_bin() -> Option<String> {
+pub(crate) async fn resolve_docker_bin() -> Option<String> {
     let candidates = [
         "docker", // PATH (works in dev / when launched from terminal)
         "/usr/local/bin/docker",

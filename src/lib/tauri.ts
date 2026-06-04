@@ -144,6 +144,13 @@ export const cmd = {
   setViewMode: (mode: ViewMode) => invoke<void>("set_view_mode", { mode }),
   openEmbeddedAuracle: () => invoke<void>("open_embedded_auracle"),
 
+  // Local-CA trust (macOS) — trusting Caddy's per-install root lets the
+  // embedded webview load https://localhost (the workspace + same-origin
+  // Jupyter panel). open_embedded_auracle calls these automatically on
+  // first open; exposed here for a Settings "trust certificate" action.
+  caddyCaTrusted: () => invoke<boolean>("caddy_ca_trusted"),
+  trustCaddyCa: () => invoke<void>("trust_caddy_ca"),
+
   // IBKR Client Portal login (embedded webview)
   openIbkrLogin: (url: string) => invoke<void>("open_ibkr_login", { url }),
   closeIbkrLogin: () => invoke<void>("close_ibkr_login"),

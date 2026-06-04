@@ -117,6 +117,12 @@ pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> 
         existing.set_focus().map_err(to_error_string)?;
         return Ok(());
     }
+    // The embedded window loads https://localhost (Caddy) so the Jupyter
+    // panel is same-origin. WKWebView needs Caddy's local CA trusted —
+    // do it once, on first embed-open (native admin prompt).
+    if !super::cert_trust::caddy_ca_trusted().await.unwrap_or(false) {
+        super::cert_trust::trust_caddy_ca().await?;
+    }
     let url = tauri::Url::parse(AURACLE_URL).map_err(to_error_string)?;
     WebviewWindowBuilder::new(&app, EMBEDDED_LABEL, WebviewUrl::External(url))
         .title("Auracle")
