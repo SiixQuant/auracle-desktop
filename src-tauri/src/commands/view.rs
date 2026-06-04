@@ -33,7 +33,12 @@ const STORE_FILE: &str = "view-mode.json";
 const KEY_MODE: &str = "mode";
 const DEFAULT_MODE: &str = "browser";
 const EMBEDDED_LABEL: &str = "auracle-embedded";
-const AURACLE_URL: &str = "http://localhost:1969/ui/dashboard";
+// Load the workspace through Caddy (TLS), NOT http://localhost:1969 —
+// the embedded JupyterLab panel is only same-origin under Caddy, and
+// Jupyter refuses cross-origin framing, so a direct :1969 embed leaves
+// the notebooks panel blank. Requires Caddy's local CA to be trusted on
+// the host (see the launcher's first-run cert step / docs).
+const AURACLE_URL: &str = "https://localhost/ui";
 
 #[tauri::command]
 pub async fn get_view_mode(app: tauri::AppHandle) -> Result<String, String> {
