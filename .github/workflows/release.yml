@@ -243,7 +243,10 @@ jobs:
   publish-updater:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    # Run even if a platform build leg failed (e.g. Windows): the manifest
+    # is built from whatever platforms DID succeed, so a single bad leg can
+    # no longer take down auto-update for macOS/Linux.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     permissions:
       contents: write
     steps:
@@ -277,9 +280,13 @@ jobs:
           MSI_NAME="Auracle-Desktop-windows.msi"
           APPIMG_NAME="Auracle-Desktop-linux.AppImage"
 
+          # Download whatever platform installers DID build. A failed leg
+          # (e.g. Windows) simply leaves its file absent — skip it rather
+          # than aborting the whole manifest.
           for f in "$APP_TARGZ_NAME" "$MSI_NAME" "$APPIMG_NAME"; do
             echo "Downloading $f..."
-            gh release download "$TAG" --repo "$REPO" --pattern "$f" --clobber
+            gh release download "$TAG" --repo "$REPO" --pattern "$f" --clobber \
+              || echo "  ($f absent — skipping)"
           done
 
           # Write signing key to a file
@@ -297,6 +304,7 @@ jobs:
           # unset before invoking so only the explicit --private-key-path
           # arg wins.
           for f in "$APP_TARGZ_NAME" "$MSI_NAME" "$APPIMG_NAME"; do
+            [ -f "$f" ] || { echo "Skipping $f (not built)"; continue; }
             echo "Signing $f..."
             env -u TAURI_SIGNING_PRIVATE_KEY \
               cargo tauri signer sign \
@@ -305,34 +313,46 @@ jobs:
                 "$f"
           done
 
-          MAC_SIG=$(cat "${APP_TARGZ_NAME}.sig")
-          WIN_SIG=$(cat "${MSI_NAME}.sig")
-          LIN_SIG=$(cat "${APPIMG_NAME}.sig")
+          read_sig() { [ -f "$1" ] && cat "$1" || true; }
+          MAC_SIG=$(read_sig "${APP_TARGZ_NAME}.sig")
+          WIN_SIG=$(read_sig "${MSI_NAME}.sig")
+          LIN_SIG=$(read_sig "${APPIMG_NAME}.sig")
+
+          # macOS is the primary target — if it didn't sign, there's no
+          # point publishing a manifest. Other platforms are best-effort.
+          if [ -z "$MAC_SIG" ]; then
+            echo "::error::macOS artifact missing/unsigned — cannot publish updater manifest"
+            exit 1
+          fi
 
           # Strip leading 'v' from tag for the version field
           VERSION="${TAG#v}"
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+
+          # Build the platforms map from ONLY the platforms that signed, so a
+          # failed leg can't blank auto-update for the platforms that worked.
+          PLATFORMS=""
+          add_platform() { PLATFORMS="${PLATFORMS:+$PLATFORMS,}$1"; }
+          add_platform "\"darwin-x86_64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${BASE}/${APP_TARGZ_NAME}\" }"
+          add_platform "\"darwin-aarch64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${BASE}/${APP_TARGZ_NAME}\" }"
+          [ -n "$LIN_SIG" ] && add_platform "\"linux-x86_64\": { \"signature\": \"${LIN_SIG}\", \"url\": \"${BASE}/${APPIMG_NAME}\" }"
+          [ -n "$WIN_SIG" ] && add_platform "\"windows-x86_64\": { \"signature\": \"${WIN_SIG}\", \"url\": \"${BASE}/${MSI_NAME}\" }"
 
           cat > latest.json <<EOF
           {
             "version": "${VERSION}",
             "notes": "See the release page for changelog and per-platform install notes.",
             "pub_date": "${PUB_DATE}",
-            "platforms": {
-              "darwin-x86_64":  { "signature": "${MAC_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${APP_TARGZ_NAME}" },
-              "darwin-aarch64": { "signature": "${MAC_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${APP_TARGZ_NAME}" },
-              "linux-x86_64":   { "signature": "${LIN_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${APPIMG_NAME}" },
-              "windows-x86_64": { "signature": "${WIN_SIG}", "url": "https://github.com/${REPO}/releases/download/${TAG}/${MSI_NAME}" }
-            }
+            "platforms": { ${PLATFORMS} }
           }
           EOF
 
-          gh release upload "$TAG" --repo "$REPO" \
-            latest.json \
-            "${APP_TARGZ_NAME}.sig" \
-            "${MSI_NAME}.sig" \
-            "${APPIMG_NAME}.sig" \
-            --clobber
+          UPLOADS=(latest.json)
+          for s in "${APP_TARGZ_NAME}.sig" "${MSI_NAME}.sig" "${APPIMG_NAME}.sig"; do
+            [ -f "$s" ] && UPLOADS+=("$s")
+          done
+          gh release upload "$TAG" --repo "$REPO" "${UPLOADS[@]}" --clobber
 
           # Promote the draft to published so /releases/latest/download
           # actually resolves to this tag.
