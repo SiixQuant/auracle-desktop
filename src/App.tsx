@@ -132,15 +132,25 @@ export default function App() {
             opens the unified Auracle workspace (Forge, Research, Seer,
             Strategies) so desktop and web read as the same Auracle. */}
         {!needsOnboarding && (
-          <button
-            type="button"
-            className="tab"
-            style={{ marginLeft: "auto" }}
-            title="Open the unified Auracle workspace (Forge · Research · Seer · Strategies)"
-            onClick={() => openWorkspace()}
-          >
-            Open Workspace ↗
-          </button>
+          <>
+            <button
+              type="button"
+              className="tab"
+              style={{ marginLeft: "auto" }}
+              title="Open JupyterLab in its own window (renders reliably top-level, unlike the inline panel)"
+              onClick={() => { void cmd.openJupyter().catch(() => {}); }}
+            >
+              Notebooks ↗
+            </button>
+            <button
+              type="button"
+              className="tab"
+              title="Open the unified Auracle workspace (Forge · Research · Seer · Strategies)"
+              onClick={() => openWorkspace()}
+            >
+              Open Workspace ↗
+            </button>
+          </>
         )}
       </header>
 

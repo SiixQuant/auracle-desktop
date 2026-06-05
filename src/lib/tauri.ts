@@ -143,6 +143,9 @@ export const cmd = {
   getViewMode: () => invoke<ViewMode>("get_view_mode"),
   setViewMode: (mode: ViewMode) => invoke<void>("set_view_mode", { mode }),
   openEmbeddedAuracle: () => invoke<void>("open_embedded_auracle"),
+  // Open JupyterLab in its own top-level window (the inline iframe panel
+  // doesn't render in WKWebView; a top-level window does).
+  openJupyter: () => invoke<void>("open_jupyter"),
 
   // Local-CA trust (macOS) — trusting Caddy's per-install root lets the
   // embedded webview load https://localhost (the workspace + same-origin

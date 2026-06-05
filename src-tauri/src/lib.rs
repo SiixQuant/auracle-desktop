@@ -299,6 +299,7 @@ pub fn run() {
             view_cmd::get_view_mode,
             view_cmd::set_view_mode,
             view_cmd::open_embedded_auracle,
+            view_cmd::open_jupyter,
             cert_cmd::caddy_ca_trusted,
             cert_cmd::trust_caddy_ca,
             // IBKR Client Portal embedded login window

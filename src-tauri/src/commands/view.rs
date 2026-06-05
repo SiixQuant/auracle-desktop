@@ -39,6 +39,13 @@ const EMBEDDED_LABEL: &str = "auracle-embedded";
 // the notebooks panel blank. Requires Caddy's local CA to be trusted on
 // the host (see the launcher's first-run cert step / docs).
 const AURACLE_URL: &str = "https://localhost/ui";
+// JupyterLab opens as its OWN top-level window (not an iframe inside the
+// workspace): WKWebView renders a heavy SPA like Lab reliably as a top-level
+// page but not nested in an iframe, so the inline Research panel goes blank in
+// the embed. A dedicated window sidesteps that — same Caddy origin so the SSO
+// cookie still authenticates it.
+const JUPYTER_LABEL: &str = "auracle-jupyter";
+const JUPYTER_URL: &str = "https://localhost/jupyter/lab";
 
 #[tauri::command]
 pub async fn get_view_mode(app: tauri::AppHandle) -> Result<String, String> {
@@ -127,6 +134,35 @@ pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> 
     WebviewWindowBuilder::new(&app, EMBEDDED_LABEL, WebviewUrl::External(url))
         .title("Auracle")
         .inner_size(1280.0, 800.0)
+        .min_inner_size(800.0, 600.0)
+        .resizable(true)
+        .decorations(true)
+        .initialization_script(EMBEDDED_INIT_SCRIPT)
+        .build()
+        .map_err(to_error_string)?;
+    Ok(())
+}
+
+/// Open JupyterLab in its own top-level window. The inline iframe panel in
+/// the workspace's Research view doesn't render in WKWebView (heavy nested
+/// SPA), but a top-level window does. Same Caddy origin so the Auracle
+/// session cookie authenticates Lab — no second login. Reuses an existing
+/// window if already open (focuses it).
+#[tauri::command]
+pub async fn open_jupyter(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(existing) = app.get_webview_window(JUPYTER_LABEL) {
+        existing.show().map_err(to_error_string)?;
+        existing.set_focus().map_err(to_error_string)?;
+        return Ok(());
+    }
+    // Same Caddy CA trust the embedded window needs (one-time native prompt).
+    if !super::cert_trust::caddy_ca_trusted().await.unwrap_or(false) {
+        super::cert_trust::trust_caddy_ca().await?;
+    }
+    let url = tauri::Url::parse(JUPYTER_URL).map_err(to_error_string)?;
+    WebviewWindowBuilder::new(&app, JUPYTER_LABEL, WebviewUrl::External(url))
+        .title("Auracle — JupyterLab")
+        .inner_size(1280.0, 860.0)
         .min_inner_size(800.0, 600.0)
         .resizable(true)
         .decorations(true)
