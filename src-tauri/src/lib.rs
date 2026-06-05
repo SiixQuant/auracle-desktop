@@ -65,8 +65,8 @@ use tauri::Builder;
 
 use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
-    broker_stream as broker_stream_cmd, dashboards as dash_cmd, docker as docker_cmd,
-    forge as forge_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
+    broker_stream as broker_stream_cmd, cert_trust as cert_cmd, dashboards as dash_cmd,
+    docker as docker_cmd, forge as forge_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
     ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
     mcp_sidecar as mcp_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
     tray as tray_cmd, update as update_cmd, view as view_cmd,
@@ -299,6 +299,8 @@ pub fn run() {
             view_cmd::get_view_mode,
             view_cmd::set_view_mode,
             view_cmd::open_embedded_auracle,
+            cert_cmd::caddy_ca_trusted,
+            cert_cmd::trust_caddy_ca,
             // IBKR Client Portal embedded login window
             ibkr_login_cmd::open_ibkr_login,
             ibkr_login_cmd::close_ibkr_login,

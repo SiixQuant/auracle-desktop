@@ -33,7 +33,12 @@ const STORE_FILE: &str = "view-mode.json";
 const KEY_MODE: &str = "mode";
 const DEFAULT_MODE: &str = "browser";
 const EMBEDDED_LABEL: &str = "auracle-embedded";
-const AURACLE_URL: &str = "http://localhost:1969/ui/dashboard";
+// Load the workspace through Caddy (TLS), NOT http://localhost:1969 —
+// the embedded JupyterLab panel is only same-origin under Caddy, and
+// Jupyter refuses cross-origin framing, so a direct :1969 embed leaves
+// the notebooks panel blank. Requires Caddy's local CA to be trusted on
+// the host (see the launcher's first-run cert step / docs).
+const AURACLE_URL: &str = "https://localhost/ui";
 
 #[tauri::command]
 pub async fn get_view_mode(app: tauri::AppHandle) -> Result<String, String> {
@@ -111,6 +116,12 @@ pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> 
         existing.show().map_err(to_error_string)?;
         existing.set_focus().map_err(to_error_string)?;
         return Ok(());
+    }
+    // The embedded window loads https://localhost (Caddy) so the Jupyter
+    // panel is same-origin. WKWebView needs Caddy's local CA trusted —
+    // do it once, on first embed-open (native admin prompt).
+    if !super::cert_trust::caddy_ca_trusted().await.unwrap_or(false) {
+        super::cert_trust::trust_caddy_ca().await?;
     }
     let url = tauri::Url::parse(AURACLE_URL).map_err(to_error_string)?;
     WebviewWindowBuilder::new(&app, EMBEDDED_LABEL, WebviewUrl::External(url))
