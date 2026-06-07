@@ -129,8 +129,8 @@ export default function App() {
         )}
 
         {/* The launcher is a window onto the one web product — this
-            opens the unified Auracle workspace (Forge, Research, Seer,
-            Strategies) so desktop and web read as the same Auracle. */}
+            opens the unified Auracle workspace (Home · Build · Research ·
+            Trade · Seer) so desktop and web read as the same Auracle. */}
         {!needsOnboarding && (
           <>
             <button
@@ -145,7 +145,7 @@ export default function App() {
             <button
               type="button"
               className="tab"
-              title="Open the unified Auracle workspace (Forge · Research · Seer · Strategies)"
+              title="Open the unified Auracle workspace (Home · Build · Research · Trade · Seer)"
               onClick={() => openWorkspace()}
             >
               Open Workspace ↗
