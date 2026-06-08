@@ -20,11 +20,10 @@ export default function Settings() {
   return (
     <>
       <h1>Settings</h1>
-      <ViewModeCard />
+      <WorkspaceCard />
       <ForgeCard />
       <BrokerConnectionsCard />
-      <InstallCard />
-      <UpdatesCard />
+      <SystemCard />
     </>
   );
 }
@@ -315,9 +314,14 @@ function ApiKeyInline({
   );
 }
 
-// ── View mode ───────────────────────────────────────────────────
+// ── Workspace ───────────────────────────────────────────────────
+//
+// How the one platform door ("Open Auracle") opens. A binary choice
+// — rendered as a compact segmented toggle (same control language as
+// Forge's Agent|Code switch) instead of a two-radio block, with a
+// one-line caption describing the active choice.
 
-function ViewModeCard() {
+function WorkspaceCard() {
   const [mode, setMode] = useState<ViewMode>("browser");
 
   useEffect(() => {
@@ -337,84 +341,65 @@ function ViewModeCard() {
 
   return (
     <>
-      <h2>View Mode</h2>
+      <h2>Workspace</h2>
       <div className="card">
-        <p className="muted" style={{ margin: "0 0 12px" }}>
-          Choose how the Auracle dashboard opens when you click{" "}
-          <strong>Open Auracle</strong>.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <ViewModeRadio
-            label="External browser"
-            description="Opens in your default browser. Lower memory; any browser you want."
-            value="browser"
-            current={mode}
-            onChange={change}
-          />
-          <ViewModeRadio
-            label="Embedded window"
-            description="Opens inside a second Auracle Desktop window. Feels more like one app; costs a bit more RAM."
-            value="embedded"
-            current={mode}
-            onChange={change}
-          />
+        <div className="row" style={{ alignItems: "center" }}>
+          <div>
+            <div>How “Open Auracle” opens</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+              {mode === "embedded"
+                ? "Inside a second Auracle window — feels like one app, costs a bit more RAM."
+                : "In your default browser — lower memory, any browser you want."}
+            </div>
+          </div>
+          <div className="seg-toggle" role="tablist" aria-label="Open Auracle in">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "browser"}
+              className={`seg-tab ${mode === "browser" ? "active" : ""}`}
+              onClick={() => change("browser")}
+            >
+              Browser
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "embedded"}
+              className={`seg-tab ${mode === "embedded" ? "active" : ""}`}
+              onClick={() => change("embedded")}
+            >
+              Embedded
+            </button>
+          </div>
         </div>
       </div>
     </>
   );
 }
 
-function ViewModeRadio({
-  label,
-  description,
-  value,
-  current,
-  onChange,
-}: {
-  label: string;
-  description: string;
-  value: ViewMode;
-  current: ViewMode;
-  onChange: (next: ViewMode) => void;
-}) {
-  return (
-    <label
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 10,
-        cursor: "pointer",
-      }}
-    >
-      <input
-        type="radio"
-        name="view-mode"
-        value={value}
-        checked={current === value}
-        onChange={() => onChange(value)}
-        style={{ marginTop: 3 }}
-      />
-      <div>
-        <div>
-          <strong>{label}</strong>
-        </div>
-        <div className="muted" style={{ fontSize: 13 }}>
-          {description}
-        </div>
-      </div>
-    </label>
-  );
-}
+// ── System (install · docker · launcher updates) ────────────────
+//
+// Installation and Updates were two sections for one concern —
+// "system & maintenance." Merged into a single card: install
+// directory, Docker state, and the launcher version + update
+// control, in that order.
 
-// ── Installation + Docker ───────────────────────────────────────
-
-function InstallCard() {
+function SystemCard() {
+  // Install + Docker
   const [installPath, setInstallPath] = useState("checking…");
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installLabel, setInstallLabel] = useState("Run First-Time Install");
   const [docker, setDocker] = useState<DockerStatus | null | "error">(null);
   const [dockerError, setDockerError] = useState<string | null>(null);
+
+  // Launcher updates
+  const [version, setVersion] = useState("?");
+  const [checking, setChecking] = useState(false);
+  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [resultText, setResultText] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     cmd.installPath()
@@ -436,6 +421,8 @@ function InstallCard() {
         setDocker("error");
         setDockerError(String(err));
       });
+
+    cmd.currentVersion().then(setVersion).catch(() => setVersion("?"));
   }, []);
 
   const runInstall = async () => {
@@ -450,9 +437,46 @@ function InstallCard() {
     }
   };
 
+  const check = async () => {
+    setChecking(true);
+    setResultText("");
+    try {
+      const got = await cmd.checkForUpdate();
+      setInfo(got);
+      if (!got.available) {
+        setResultText(`Up to date (v${got.current}).`);
+      }
+    } catch (err) {
+      setResultText("Error: " + String(err));
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const installUpdate = async () => {
+    setUpdating(true);
+    setResultText("Downloading…");
+    try {
+      await cmd.installUpdate();
+      setResultText(
+        "Installed but restart did not fire — quit + relaunch manually.",
+      );
+    } catch (err) {
+      const msg = String(err);
+      if (/closed|connection/i.test(msg)) {
+        setResultText("Restarting on the new version…");
+      } else {
+        setResultText("Install failed: " + msg);
+        setUpdating(false);
+      }
+    }
+  };
+
+  const updateAvailable = info?.available && !!info.version;
+
   return (
     <>
-      <h2>Installation</h2>
+      <h2>System</h2>
       <div className="card">
         <div className="row">
           <div>
@@ -471,6 +495,36 @@ function InstallCard() {
         <div className="row">
           <div>Docker Desktop</div>
           <DockerStatusBadge status={docker} error={dockerError} />
+        </div>
+        <div className="row">
+          <div>
+            <div>Auracle Desktop launcher version</div>
+            <div className="muted mono">v{version}</div>
+            {resultText && (
+              <div className="muted mono" style={{ marginTop: 6 }}>
+                {resultText}
+              </div>
+            )}
+          </div>
+          {updateAvailable ? (
+            <button
+              type="button"
+              className="primary"
+              disabled={updating}
+              onClick={installUpdate}
+            >
+              {updating ? "Installing…" : `Download + Install v${info!.version}`}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ghost"
+              disabled={checking}
+              onClick={check}
+            >
+              {checking ? "Checking…" : "Check for Update"}
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -536,98 +590,3 @@ function DockerStatusBadge({
   );
 }
 
-// ── Updates ─────────────────────────────────────────────────────
-
-function UpdatesCard() {
-  const [version, setVersion] = useState("?");
-  const [checking, setChecking] = useState(false);
-  const [info, setInfo] = useState<UpdateInfo | null>(null);
-  const [resultText, setResultText] = useState("");
-  const [installing, setInstalling] = useState(false);
-
-  useEffect(() => {
-    cmd.currentVersion().then(setVersion).catch(() => setVersion("?"));
-  }, []);
-
-  const check = async () => {
-    setChecking(true);
-    setResultText("");
-    try {
-      const got = await cmd.checkForUpdate();
-      setInfo(got);
-      if (!got.available) {
-        setResultText(`Up to date (v${got.current}).`);
-      }
-    } catch (err) {
-      setResultText("Error: " + String(err));
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const install = async () => {
-    setInstalling(true);
-    setResultText("Downloading…");
-    try {
-      await cmd.installUpdate();
-      setResultText(
-        "Installed but restart did not fire — quit + relaunch manually.",
-      );
-    } catch (err) {
-      const msg = String(err);
-      if (/closed|connection/i.test(msg)) {
-        setResultText("Restarting on the new version…");
-      } else {
-        setResultText("Install failed: " + msg);
-        setInstalling(false);
-      }
-    }
-  };
-
-  const updateAvailable = info?.available && !!info.version;
-
-  return (
-    <>
-      <h2>Updates</h2>
-      <div className="card">
-        <div className="row">
-          <div>
-            <div>Auracle Desktop launcher version</div>
-            <div className="muted mono">v{version}</div>
-          </div>
-          {updateAvailable ? (
-            <button
-              type="button"
-              className="primary"
-              disabled={installing}
-              onClick={install}
-            >
-              {installing
-                ? "Installing…"
-                : `Download + Install v${info!.version}`}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ghost"
-              disabled={checking}
-              onClick={check}
-            >
-              {checking ? "Checking…" : "Check for Update"}
-            </button>
-          )}
-        </div>
-        {resultText && (
-          <div className="muted mono" style={{ marginTop: 8 }}>
-            {resultText}
-          </div>
-        )}
-        {updateAvailable && !resultText && (
-          <div className="muted mono" style={{ marginTop: 8 }}>
-            <span className="badge ok">v{info!.version} available</span>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}

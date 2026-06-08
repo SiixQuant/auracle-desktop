@@ -23,6 +23,7 @@ import ChatPanel from "@/components/forge/ChatPanel";
 import Editor from "@/components/forge/Editor";
 import FileTree from "@/components/forge/FileTree";
 import ForgeTopBar from "@/components/forge/ForgeTopBar";
+import LifecycleBelt from "@/components/forge/LifecycleBelt";
 import NewStrategyModal from "@/components/forge/NewStrategyModal";
 import ForgeAgent from "@/views/ForgeAgent";
 import {
@@ -116,6 +117,17 @@ export default function Forge({ onExit }: { onExit?: () => void }) {
         onExit={onExit}
       />
 
+      {/* The conveyor belt — one lifecycle spine for the active strategy,
+          spanning both modes. Owns stage transitions + the single next
+          action (backtest → deploy → live), routed to Houston. */}
+      <LifecycleBelt
+        activePath={activePath}
+        state={activePath ? states[activePath] ?? "draft" : "draft"}
+        onChangeState={(next) => {
+          if (activePath) onChangeState(activePath, next);
+        }}
+      />
+
       {mode === "agent" ? (
         <ForgeAgent
           activePath={activePath}
@@ -159,12 +171,6 @@ export default function Forge({ onExit }: { onExit?: () => void }) {
             <Editor
               activePath={activePath}
               externalContent={pendingCode}
-              currentState={
-                activePath ? states[activePath] ?? "draft" : "draft"
-              }
-              onChangeState={(next) => {
-                if (activePath) onChangeState(activePath, next);
-              }}
               onSaved={() => {
                 setTreeRefreshKey((k) => k + 1);
                 setPreviewRefreshKey((k) => k + 1);

@@ -25,10 +25,10 @@ import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useState } from "react";
 
 import WidgetRenderer from "@/components/forge/dashboard/WidgetRenderer";
+import { probeHouston } from "@/lib/lifecycle";
 import {
   cmd,
   onEvent,
-  openInBrowser,
   type Dashboard,
   type DashboardSummary,
   type ForgeDashboardOpenEvent,
@@ -549,6 +549,10 @@ function SourceView({ path, refreshKey }: { path: string; refreshKey: number }) 
 
 // ── Backtest tab ─────────────────────────────────────────────────
 
+// View-only: the lifecycle belt above owns the "run backtest" action
+// (one path, no duplicate button here). This tab reports Houston's
+// reachability and is where inline results will render once Houston
+// ships the runs endpoint.
 function BacktestView({ path }: { path: string }) {
   const [houstonStatus, setHoustonStatus] = useState<
     "checking" | "online" | "offline"
@@ -558,24 +562,14 @@ function BacktestView({ path }: { path: string }) {
     let cancelled = false;
     setHoustonStatus("checking");
     const controller = new AbortController();
-    fetch("http://localhost:1969/healthz", {
-      signal: controller.signal,
-      mode: "no-cors",
-    })
-      .then(() => {
-        if (!cancelled) setHoustonStatus("online");
-      })
-      .catch(() => {
-        if (!cancelled) setHoustonStatus("offline");
-      });
+    probeHouston(controller.signal).then((s) => {
+      if (!cancelled) setHoustonStatus(s);
+    });
     return () => {
       cancelled = true;
       controller.abort();
     };
   }, [path]);
-
-  const params = new URLSearchParams({ strategy: path });
-  const newRunUrl = `http://localhost:1969/ui/backtests/new?${params}`;
 
   return (
     <div className="forge-empty" style={{ padding: 32, textAlign: "center" }}>
@@ -603,16 +597,9 @@ function BacktestView({ path }: { path: string }) {
       {houstonStatus === "online" && (
         <>
           <p style={{ margin: 0, color: "var(--fg-dim)", fontSize: 14 }}>
-            Run a backtest in Houston to see results.
+            Use the <strong>lifecycle belt</strong> above to run a backtest —
+            it opens Houston pre-filled with this strategy.
           </p>
-          <button
-            type="button"
-            className="primary"
-            style={{ marginTop: 16 }}
-            onClick={() => openInBrowser(newRunUrl)}
-          >
-            Run Backtest in Houston
-          </button>
           <p
             className="muted"
             style={{ fontSize: 11, marginTop: 16, lineHeight: 1.6 }}
