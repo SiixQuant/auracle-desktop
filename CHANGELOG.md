@@ -4,6 +4,40 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.5.0]
+
+Minimal Settings + the strategy conveyor belt. Same north star as the
+v0.4.0 launcher: one cohesive product, no redundancy, every surface
+flowing into the next.
+
+### Changed
+- **Settings, minimalized.** Five sections collapse to four. *View Mode*
+  becomes a compact **Workspace** segmented toggle (Browser | Embedded)
+  instead of a two-radio block. *Installation* and *Updates* merge into
+  one **System** section (install dir · Docker · launcher version/update).
+- **Brokers, de-cluttered.** The three "coming soon" broker blocks
+  (Alpaca, Tradier, Hyperliquid) collapse into a single quiet
+  "on the roadmap" line, so the card is all signal.
+
+### Added
+- **The conveyor belt.** A lifecycle spine renders under the Forge top
+  bar in both Agent and Code modes: the active strategy's stage
+  (draft → research → backtested → paper → live) as clickable nodes, plus
+  the single contextual next action — Run backtest → Deploy to paper →
+  Promote to live. Houston-aware: the CTA routes to Houston's working
+  deep-link when the stack is up, and disables with a clear hint when it
+  isn't (never a dead button). Promoting to live is a gated, explicit
+  confirmation that opens Houston — the desktop never places an order.
+- **One source of truth** (`src/lib/lifecycle.ts`) for the stage model,
+  the Houston deep-links, and the health probe.
+
+### Removed
+- **Redundant backtest entry points.** The Editor's "Run Backtest" button
+  and inline state dropdown, and the PreviewPane "Backtest" tab's duplicate
+  button, are gone — the belt is the single place to see where a strategy
+  is and move it forward. The agent's run/deploy tools (a separate
+  natural-language modality) are unchanged.
+
 ## [0.4.0]
 
 Launcher rework: a minimal, de-duplicated shell.

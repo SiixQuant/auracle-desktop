@@ -22,30 +22,25 @@ import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
 
 import DiffModal from "@/components/forge/DiffModal";
-import {
-  cmd,
-  openInBrowser,
-  STRATEGY_STATES,
-  type StrategyState,
-} from "@/lib/tauri";
+import { cmd } from "@/lib/tauri";
 
 interface EditorProps {
   /** Path relative to the strategies dir; null when no file is open. */
   activePath: string | null;
   /** Set by the parent so the chat panel can inject AI-generated code. */
   externalContent: string | null;
-  /** Lifecycle state of the currently-open file. */
-  currentState: StrategyState;
-  /** Fires when the operator changes the state via the toolbar dropdown. */
-  onChangeState: (next: StrategyState) => void;
   onSaved: () => void;
 }
+
+// Lifecycle state + the "Run Backtest" action used to live in this
+// toolbar; both now belong to the LifecycleBelt (the conveyor-belt spine
+// rendered above the editor in both Forge modes), so there's one place
+// to see where a strategy is and advance it — not a dropdown here AND a
+// belt there.
 
 export default function Editor({
   activePath,
   externalContent,
-  currentState,
-  onChangeState,
   onSaved,
 }: EditorProps) {
   const [content, setContent] = useState<string>("");
@@ -149,39 +144,6 @@ export default function Editor({
     }
   };
 
-  // Run Backtest — saves the file first (if dirty), then deep-links
-  // into Houston's backtest view at /ui/backtests/new with the
-  // strategy path as a query param. Houston owns the actual run +
-  // results UI; Forge just gets you there with a single click
-  // instead of "save, switch to browser, click Strategies, find
-  // the file, click Backtest." If Houston isn't running, the user
-  // hits the standard "stack offline" page from there.
-  const [backtesting, setBacktesting] = useState(false);
-  const runBacktest = async () => {
-    if (!activePath || backtesting) return;
-    setBacktesting(true);
-    setError(null);
-    try {
-      if (dirty) {
-        await cmd.forgeWriteFile(activePath, content);
-        setDirty(false);
-        onSaved();
-      }
-      // Strip the .py / .ipynb extension — Houston's URL expects
-      // the dotted module path (strategies.foo) or the file stem,
-      // not the on-disk filename. We pass the raw rel_path and
-      // let Houston resolve; the worst case is the form pre-fill
-      // doesn't land and the user picks the strategy manually.
-      const params = new URLSearchParams({ strategy: activePath });
-      const url = `http://localhost:1969/ui/backtests/new?${params}`;
-      await openInBrowser(url);
-    } catch (err) {
-      setError(`Could not start backtest: ${String(err)}`);
-    } finally {
-      setBacktesting(false);
-    }
-  };
-
   if (!activePath) {
     return (
       <div className="forge-panel">
@@ -205,20 +167,6 @@ export default function Editor({
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {error && <span className="muted mono forge-error">{error}</span>}
-          <select
-            value={currentState}
-            onChange={(e) =>
-              onChangeState(e.target.value as StrategyState)
-            }
-            className={`forge-state-select state-${currentState}`}
-            title="Strategy lifecycle state — synced to Houston when the stack is running."
-          >
-            {STRATEGY_STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
           <button
             type="button"
             className="ghost"
@@ -226,15 +174,6 @@ export default function Editor({
             onClick={save}
           >
             {saving ? "Saving…" : "Save (⌘S)"}
-          </button>
-          <button
-            type="button"
-            className="primary"
-            disabled={backtesting}
-            onClick={runBacktest}
-            title="Save the file + open Houston's backtest form pre-filled with this strategy."
-          >
-            {backtesting ? "Opening…" : "Run Backtest"}
           </button>
         </div>
       </div>

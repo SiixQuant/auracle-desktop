@@ -274,6 +274,40 @@ h2 {
 .launch-card--primary .launch-card__arrow { color: var(--accent-dim); }
 .launch-card--primary:hover .launch-card__arrow { color: var(--accent); }
 
+/* ── Segmented toggle (Settings → Workspace) ─────────────────────
+ * Compact binary control — same language as Forge's Agent|Code switch,
+ * used where a two-radio block would be overkill. */
+.seg-toggle {
+  display: inline-flex;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 2px;
+  flex-shrink: 0;
+}
+.seg-tab {
+  background: transparent;
+  border: none;
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+.seg-tab:hover { color: var(--fg); }
+.seg-tab.active { background: var(--accent-soft); color: var(--accent); }
+
+/* Collapsed "more brokers coming" line (Settings → Brokers) — replaces
+ * three full not-implemented broker blocks with one quiet line. */
+.broker-soon {
+  padding: 10px 0 2px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
 /* ── Buttons ────────────────────────────────────────────────────── */
 
 button.primary {
@@ -476,6 +510,131 @@ pre.logs {
   color: var(--fg);
   background: var(--surface-2);
   border-color: var(--line-strong);
+}
+
+/* ── Strategy conveyor belt ──────────────────────────────────────
+ * One lifecycle spine under the Forge top bar, spanning both modes:
+ * clickable stage nodes (draft → … → live) + a single contextual
+ * next-action CTA routed to Houston. */
+.belt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  min-height: 42px;
+  flex-wrap: wrap;
+}
+.belt--empty { justify-content: flex-start; }
+.belt--empty .muted { font-size: var(--t-sm); }
+
+.belt-track {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.belt-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+/* Connector line between stages — makes it read as a belt, not a row. */
+.belt-node:not(:first-child)::before {
+  content: "";
+  width: 16px;
+  height: 1px;
+  background: var(--line-strong);
+  margin-right: 4px;
+}
+.belt-node:hover { color: var(--fg); }
+
+.belt-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--fg-faint);
+  background: transparent;
+  flex-shrink: 0;
+  transition: background-color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.belt-node--past { color: var(--fg-dim); }
+.belt-node--past .belt-dot {
+  background: var(--fg-muted);
+  border-color: var(--fg-muted);
+}
+.belt-node--current { color: var(--fg); font-weight: 600; }
+.belt-node--current .belt-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.belt-archive {
+  margin-left: var(--s-3);
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background-color 0.12s;
+}
+.belt-archive:hover { color: var(--fg); border-color: var(--line-strong); }
+.belt-archive.active { color: var(--fg-dim); background: var(--surface-2); }
+
+.belt-action {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-shrink: 0;
+}
+.belt-hint { font-size: 11px; }
+
+.belt-cta {
+  background: var(--accent);
+  color: #000;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  padding: 6px var(--s-4);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.belt-cta:hover:not(:disabled) {
+  background: #34d399;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.belt-cta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Live promotion — amber, so the heaviest step reads differently from
+ * the routine emerald advances. */
+.belt-cta--live {
+  background: transparent;
+  color: var(--warn);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+.belt-cta--live:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.10);
+  box-shadow: none;
 }
 
 .forge-topbar-center {

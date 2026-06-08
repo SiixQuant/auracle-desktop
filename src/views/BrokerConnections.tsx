@@ -111,8 +111,35 @@ export default function BrokerConnectionsCard() {
             probing brokers…
           </div>
         )}
-        {statuses?.map((b) => <BrokerRow key={b.id} broker={b} onRefresh={refresh} />)}
+        {statuses && <BrokerList statuses={statuses} onRefresh={refresh} />}
       </div>
+    </>
+  );
+}
+
+/** Splits brokers into real integrations (full rows) and not-yet-shipped
+ *  ones. The latter used to render three full label/description/pill
+ *  blocks that did nothing but take space — they now collapse into a
+ *  single muted "on the roadmap" line, so the card is all signal. */
+function BrokerList({
+  statuses,
+  onRefresh,
+}: {
+  statuses: BrokerStatus[];
+  onRefresh: () => void;
+}) {
+  const real = statuses.filter((b) => b.state.state !== "not_implemented");
+  const soon = statuses.filter((b) => b.state.state === "not_implemented");
+  return (
+    <>
+      {real.map((b) => (
+        <BrokerRow key={b.id} broker={b} onRefresh={onRefresh} />
+      ))}
+      {soon.length > 0 && (
+        <div className="broker-soon">
+          More brokers on the roadmap — {soon.map((b) => b.label).join(" · ")}.
+        </div>
+      )}
     </>
   );
 }
