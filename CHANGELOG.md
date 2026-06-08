@@ -4,6 +4,37 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.4.0]
+
+Launcher rework: a minimal, de-duplicated shell.
+
+### Changed
+- The top bar collapses from five doors to two — **Home · Settings**.
+  The `Forge` tab, `Notebooks ↗`, and `Open Workspace ↗` buttons are
+  gone: each duplicated something the web platform already exposes the
+  moment you open it. The brand wordmark trims to "Auracle".
+- **One door into the platform.** The Home view's "Open Auracle" is now
+  the single canonical way into the web product (Home · Build · Research
+  · Trade · Seer). The parallel "Open Workspace" implementation was
+  removed so the two can't drift apart.
+- **Home → Workspaces.** A calm two-up entry grid replaces the old
+  "Quick Actions" card: "Open Auracle" (the platform) + "Forge" (native
+  authoring). License, broker glance, and container status are unchanged.
+
+### Kept
+- The native **Forge** workspace (Agent/Code, local Claude authoring +
+  dashboards) — the most-complete authoring surface today. It's now a
+  drill-in opened from the Home "Forge" card, with a "‹ Home" exit,
+  instead of a competing top-level tab.
+- The dedicated JupyterLab window capability (`open_jupyter`) — only its
+  top-bar shortcut was retired; notebooks live in the platform's
+  Build → Code, and the command remains for re-surfacing inside Forge.
+
+### Removed
+- Dead code: `openWorkspace()`, `openResearch()`, and `WORKSPACE_URL`
+  in the Tauri bridge — the redundant second "open the workspace" path,
+  whose only caller was the removed top-bar button.
+
 ## [0.3.1]
 
 Quick polish on top of 0.3.0 — same surface, better defaults.

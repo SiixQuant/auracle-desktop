@@ -4,9 +4,11 @@
 //   1. Run the first-launch gate — if the stack isn't installed
 //      yet, force the Onboarding wizard and hide the tab nav.
 //   2. Host the top bar (logo dot + version + tabs).
-//   3. Route between Dashboard / Settings (and Forge once Phase 1
-//      lands) via a tiny in-memory router. No URL routing needed
-//      because the window is a single-page app.
+//   3. Route between Home / Settings via a tiny in-memory router.
+//      Forge is a drill-in *under* Home (opened from a Home card),
+//      not a top-level tab — the chrome stays minimal (two doors)
+//      and the single platform door lives on Home as "Open Auracle".
+//      No URL routing needed because the window is a single-page app.
 //
 // The 5-second poll of /current_health that paints the top-bar
 // status dot lives here so the dot updates regardless of which
@@ -14,7 +16,7 @@
 
 import { useEffect, useState } from "react";
 
-import { cmd, openWorkspace, type HealthSnapshot } from "@/lib/tauri";
+import { cmd, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
 import Forge from "@/views/Forge";
 import Onboarding from "@/views/Onboarding";
@@ -98,25 +100,25 @@ export default function App() {
             className={`logo-dot ${health?.state ?? ""}`}
             title={health?.state ? `Stack: ${health.state}` : "Stack health"}
           />
-          <strong>Auracle Desktop</strong>
+          <strong>Auracle</strong>
           <span className="version">v{version}</span>
         </div>
 
+        {/* Minimal chrome: two doors only. Forge is reached from a
+            Home card (a drill-in under Home), and the one door into
+            the web product is Home's "Open Auracle" — so the top bar
+            never re-lists destinations the platform already owns.
+            Home stays lit while drilled into Forge. */}
         {!needsOnboarding && (
           <nav className="tabs">
             <button
               type="button"
-              className={`tab ${view === "dashboard" ? "active" : ""}`}
+              className={`tab ${
+                view === "dashboard" || view === "forge" ? "active" : ""
+              }`}
               onClick={() => setView("dashboard")}
             >
-              Dashboard
-            </button>
-            <button
-              type="button"
-              className={`tab ${view === "forge" ? "active" : ""}`}
-              onClick={() => setView("forge")}
-            >
-              Forge
+              Home
             </button>
             <button
               type="button"
@@ -127,38 +129,13 @@ export default function App() {
             </button>
           </nav>
         )}
-
-        {/* The launcher is a window onto the one web product — this
-            opens the unified Auracle workspace (Home · Build · Research ·
-            Trade · Seer) so desktop and web read as the same Auracle. */}
-        {!needsOnboarding && (
-          <>
-            <button
-              type="button"
-              className="tab"
-              style={{ marginLeft: "auto" }}
-              title="Open JupyterLab in its own window (renders reliably top-level, unlike the inline panel)"
-              onClick={() => { void cmd.openJupyter().catch(() => {}); }}
-            >
-              Notebooks ↗
-            </button>
-            <button
-              type="button"
-              className="tab"
-              title="Open the unified Auracle workspace (Home · Build · Research · Trade · Seer)"
-              onClick={() => openWorkspace()}
-            >
-              Open Workspace ↗
-            </button>
-          </>
-        )}
       </header>
 
       {/* Forge uses a different layout — it fills the viewport
           rather than the centered max-width column. Render it
           outside <main> so it can claim full width. */}
       {view === "forge" ? (
-        <Forge />
+        <Forge onExit={() => setView("dashboard")} />
       ) : (
         <main>
           {view === "onboarding" && (
@@ -169,7 +146,9 @@ export default function App() {
               }}
             />
           )}
-          {view === "dashboard" && <Dashboard />}
+          {view === "dashboard" && (
+            <Dashboard onOpenForge={() => setView("forge")} />
+          )}
           {view === "settings" && <Settings />}
         </main>
       )}

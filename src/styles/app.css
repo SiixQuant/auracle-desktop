@@ -190,6 +190,90 @@ h2 {
 
 .row + .row { border-top: 1px solid var(--line); }
 
+/* ── Launch cards (Home → Workspaces) ────────────────────────────
+ * Two-up entry grid: the one platform door (primary) + native Forge.
+ * The whole card is a button — the arrow + hover accent signal it,
+ * so there's no nested-button or repeated CTA noise. */
+
+.launch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+
+@media (max-width: 640px) {
+  .launch-grid { grid-template-columns: 1fr; }
+}
+
+.launch-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  text-align: left;
+  padding: var(--s-4);
+  min-height: 120px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.launch-card:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+.launch-card:focus-visible {
+  outline: none;
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Primary = the one door into the platform. Emerald edge so the eye
+ * lands here first without shouting. */
+.launch-card--primary {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+}
+.launch-card--primary:hover {
+  border-color: var(--accent);
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.launch-card__title {
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding-right: var(--s-5);
+}
+.launch-card--primary .launch-card__title { color: var(--accent); }
+
+.launch-card__desc {
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--fg-dim);
+  margin: 0;
+}
+
+.launch-card__arrow {
+  position: absolute;
+  top: var(--s-4);
+  right: var(--s-4);
+  font-size: var(--t-lg);
+  line-height: 1;
+  color: var(--fg-muted);
+  transition: transform 0.15s, color 0.15s;
+}
+.launch-card:hover .launch-card__arrow {
+  transform: translateX(3px);
+  color: var(--fg);
+}
+.launch-card--primary .launch-card__arrow { color: var(--accent-dim); }
+.launch-card--primary:hover .launch-card__arrow { color: var(--accent); }
+
 /* ── Buttons ────────────────────────────────────────────────────── */
 
 button.primary {
@@ -371,6 +455,27 @@ pre.logs {
 
 .forge-topbar-right {
   justify-content: flex-end;
+}
+
+/* "‹ Home" exit — Forge is a drill-in under Home (not a top-level
+ * tab), so it carries its own way back next to the mode toggle. */
+.forge-exit {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+.forge-exit:hover {
+  color: var(--fg);
+  background: var(--surface-2);
+  border-color: var(--line-strong);
 }
 
 .forge-topbar-center {

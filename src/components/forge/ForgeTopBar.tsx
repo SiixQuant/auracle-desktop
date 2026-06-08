@@ -2,9 +2,11 @@
 //
 // Three regions:
 //
-//   Left:   Mode toggle (Agent | Code). Persisted in Tauri store
-//           via forge_set_layout_mode. Agent is the new default;
-//           Code preserves the 3-pane classic for power users.
+//   Left:   "‹ Home" exit (Forge is a drill-in under Home, not a
+//           top-level tab) + the Mode toggle (Agent | Code).
+//           Mode is persisted in Tauri store via forge_set_layout_mode.
+//           Agent is the new default; Code preserves the 3-pane
+//           classic for power users.
 //
 //   Center: Active project / file name. Mirrors CVForge's project
 //           label (e.g. "noko"). Empty when no file is open.
@@ -23,6 +25,9 @@ interface ForgeTopBarProps {
   onModeChange: (mode: ForgeLayoutMode) => void;
   activePath: string | null;
   onNewSession: () => void;
+  /** Return to Home. Forge is opened from a Home card rather than a
+   *  top-level tab, so it carries its own way back. */
+  onExit?: () => void;
 }
 
 export default function ForgeTopBar({
@@ -30,10 +35,21 @@ export default function ForgeTopBar({
   onModeChange,
   activePath,
   onNewSession,
+  onExit,
 }: ForgeTopBarProps) {
   return (
     <div className="forge-topbar">
       <div className="forge-topbar-left">
+        {onExit && (
+          <button
+            type="button"
+            className="forge-exit"
+            onClick={onExit}
+            title="Back to Home"
+          >
+            ‹ Home
+          </button>
+        )}
         <div
           className="forge-mode-toggle"
           role="tablist"
