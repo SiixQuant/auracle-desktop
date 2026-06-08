@@ -146,9 +146,7 @@ export default function App() {
               }}
             />
           )}
-          {view === "dashboard" && (
-            <Dashboard onOpenForge={() => setView("forge")} />
-          )}
+          {view === "dashboard" && <Dashboard />}
           {view === "settings" && <Settings />}
         </main>
       )}
