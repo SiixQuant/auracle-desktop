@@ -65,11 +65,11 @@ use tauri::Builder;
 
 use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
-    broker_stream as broker_stream_cmd, cert_trust as cert_cmd,
-    docker as docker_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
-    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
-    mcp_sidecar as mcp_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
-    tray as tray_cmd, update as update_cmd, view as view_cmd,
+    broker_stream as broker_stream_cmd, cert_trust as cert_cmd, docker as docker_cmd,
+    healthcheck as health_cmd, ibeam as ibeam_cmd, ibkr_login as ibkr_login_cmd,
+    installer as installer_cmd, keychain as keychain_cmd, mcp_sidecar as mcp_cmd,
+    preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, tray as tray_cmd,
+    update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
