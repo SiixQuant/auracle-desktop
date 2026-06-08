@@ -5,10 +5,9 @@
 //      yet, force the Onboarding wizard and hide the tab nav.
 //   2. Host the top bar (logo dot + version + tabs).
 //   3. Route between Home / Settings via a tiny in-memory router.
-//      Forge is a drill-in *under* Home (opened from a Home card),
-//      not a top-level tab — the chrome stays minimal (two doors)
-//      and the single platform door lives on Home as "Open Auracle".
-//      No URL routing needed because the window is a single-page app.
+//      The single platform door lives on Home as "Open Auracle";
+//      strategy authoring (Compose) lives in the web product, not the
+//      launcher. No URL routing needed — the window is a single-page app.
 //
 // The 5-second poll of /current_health that paints the top-bar
 // status dot lives here so the dot updates regardless of which
@@ -18,11 +17,10 @@ import { useEffect, useState } from "react";
 
 import { cmd, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
-import Forge from "@/views/Forge";
 import Onboarding from "@/views/Onboarding";
 import Settings from "@/views/Settings";
 
-type View = "dashboard" | "forge" | "settings" | "onboarding";
+type View = "dashboard" | "settings" | "onboarding";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -113,9 +111,7 @@ export default function App() {
           <nav className="tabs">
             <button
               type="button"
-              className={`tab ${
-                view === "dashboard" || view === "forge" ? "active" : ""
-              }`}
+              className={`tab ${view === "dashboard" ? "active" : ""}`}
               onClick={() => setView("dashboard")}
             >
               Home
@@ -131,25 +127,18 @@ export default function App() {
         )}
       </header>
 
-      {/* Forge uses a different layout — it fills the viewport
-          rather than the centered max-width column. Render it
-          outside <main> so it can claim full width. */}
-      {view === "forge" ? (
-        <Forge onExit={() => setView("dashboard")} />
-      ) : (
-        <main>
-          {view === "onboarding" && (
-            <Onboarding
-              onDone={() => {
-                setNeedsOnboarding(false);
-                setView("dashboard");
-              }}
-            />
-          )}
-          {view === "dashboard" && <Dashboard />}
-          {view === "settings" && <Settings />}
-        </main>
-      )}
+      <main>
+        {view === "onboarding" && (
+          <Onboarding
+            onDone={() => {
+              setNeedsOnboarding(false);
+              setView("dashboard");
+            }}
+          />
+        )}
+        {view === "dashboard" && <Dashboard />}
+        {view === "settings" && <Settings />}
+      </main>
     </>
   );
 }
