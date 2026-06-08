@@ -121,7 +121,7 @@ function ForgeCard() {
                 onClick={async () => {
                   if (
                     !confirm(
-                      "Remove the stored Anthropic key? Chat in Forge will stop working until you set it again.",
+                      "Remove the Anthropic key? Forge chat stops until you add one again.",
                     )
                   )
                     return;
@@ -345,11 +345,11 @@ function WorkspaceCard() {
       <div className="card">
         <div className="row" style={{ alignItems: "center" }}>
           <div>
-            <div>How “Open Auracle” opens</div>
+            <div>Where Open Auracle opens</div>
             <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
               {mode === "embedded"
-                ? "Inside a second Auracle window — feels like one app, costs a bit more RAM."
-                : "In your default browser — lower memory, any browser you want."}
+                ? "In its own window. Feels native, uses a bit more memory."
+                : "In your default browser. Uses less memory."}
             </div>
           </div>
           <div className="seg-toggle" role="tablist" aria-label="Open Auracle in">

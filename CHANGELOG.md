@@ -4,6 +4,16 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.5.1]
+
+Settings polish — same layout, tighter copy.
+
+### Changed
+- Trimmed the Settings copy to plain, straight-to-the-point lines: the
+  Workspace toggle descriptions, and the Brokers card's "one connection"
+  banner + port-conflict notice are now one crisp line each instead of
+  multi-sentence paragraphs. Less bulk, same meaning.
+
 ## [0.5.0]
 
 Minimal Settings + the strategy conveyor belt. Same north star as the

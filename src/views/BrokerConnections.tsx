@@ -162,12 +162,9 @@ function CanonicalSourceBanner() {
         color: "var(--fg-dim)",
       }}
     >
-      <strong style={{ color: "var(--fg)" }}>One connection, every surface.</strong>
+      <strong style={{ color: "var(--fg)" }}>One connection, everywhere.</strong>
       {" "}
-      The launcher manages your broker session here; the Forge agent, the
-      launcher&apos;s Dashboard view, and the Auracle web UI all read from it.
-      Configure once in this card and the same connection is available
-      everywhere.
+      Set up your broker once here — the launcher, Forge, and the web UI all use it.
     </div>
   );
 }
@@ -224,11 +221,9 @@ function HoustonConflictBanner({
         (<code>localhost:5000</code>).
       </div>
       <div style={{ color: "var(--fg-dim)", marginBottom: 8 }}>
-        Free the port and the launcher-managed connection can host the
-        session for every surface — including the Auracle web UI, which
-        will read from the same gateway transparently. The launcher-managed
-        variant adds automatic re-authentication on the daily IBKR session
-        reset so you don&apos;t have to log in every 24 hours.
+        Free it and the launcher hosts the connection for every surface —
+        and re-logs in for you on IBKR&apos;s daily reset, so no more 24-hour
+        re-login.
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button
@@ -241,7 +236,7 @@ function HoustonConflictBanner({
           {busy ? "Stopping…" : "Free the port"}
         </button>
         <span className="muted mono" style={{ fontSize: 10 }}>
-          stops <code>{containerName}</code> so the launcher can bring its own up
+          stops <code>{containerName}</code>
         </span>
       </div>
       {error && (
