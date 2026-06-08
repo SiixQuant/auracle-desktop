@@ -32,20 +32,17 @@ import {
   openInBrowser,
 } from "@/lib/tauri";
 
-export default function Dashboard({
-  onOpenForge,
-}: {
-  onOpenForge?: () => void;
-}) {
+export default function Dashboard() {
   return (
     <>
       <h1>Auracle</h1>
       <LicenseSection />
 
-      {/* Two destinations, no repetition: the single door into the
-          web product (Open Auracle) + the native Forge authoring
-          workspace. Everything else the platform owns lives one click
-          inside it, so the launcher doesn't re-list it. */}
+      {/* The launcher is the parent shell; the web product is the child
+          surface it opens. ONE door — "Open Auracle" — into the platform
+          (Home, Build incl. Compose, Research, Trade, Seer). Strategy
+          authoring (Compose) lives inside the web product, so the launcher
+          no longer carries a duplicate native Forge. */}
       <h2>Workspaces</h2>
       <div className="launch-grid">
         <LaunchCard
@@ -56,13 +53,6 @@ export default function Dashboard({
             void openAuracle();
           }}
         />
-        {onOpenForge && (
-          <LaunchCard
-            title="Forge"
-            description="Build & iterate on strategies with Claude, locally."
-            onClick={onOpenForge}
-          />
-        )}
       </div>
 
       <BrokerSection />
@@ -165,6 +155,17 @@ function BrokerSection() {
     <>
       <h2 style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span>Broker</span>
+        {/* Quick-glance only — full portfolio + order management lives in
+            the web Trade view (R-4: keep the glance, link out for depth). */}
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => { void openAuracle("/blotter"); }}
+          style={{ fontSize: 12, padding: "4px 10px" }}
+          title="Open the full Trade view in Auracle"
+        >
+          Open Trade →
+        </button>
         {marketData && <DataQualityBadge quality={marketData.us_equity} />}
         {loading && (
           <span className="muted mono" style={{ fontSize: 11 }}>
@@ -451,7 +452,12 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
  *  embedded WebviewWindow (native feel) or external browser.
  *  Preference lives in view-mode.json; default is 'browser' for fresh
  *  installs (matches pre-v0.2.0 behavior). */
-async function openAuracle(): Promise<void> {
+async function openAuracle(path: string = ""): Promise<void> {
+  // ``path`` deep-links a specific web surface (e.g. "/blotter" for Trade)
+  // in browser mode. Embedded mode opens the platform window at /ui (the
+  // embedded webview is reused/focused, so it doesn't deep-link).
+  const safePath = path.startsWith("/") ? path : "";
+
   let mode: "browser" | "embedded" = "browser";
   try {
     mode = await cmd.getViewMode();
@@ -470,13 +476,15 @@ async function openAuracle(): Promise<void> {
     }
   }
 
-  // Browser path: prefer the dashboard URL if the stack is healthy,
+  // Browser path: deep-link the requested surface if the stack is healthy,
   // otherwise drop the user on /ui/setup so they can diagnose the
   // failed startup.
   let url = "http://localhost:1969/ui/setup";
   try {
     const h = await cmd.currentHealth();
-    if (h?.state === "healthy") url = "http://localhost:1969/ui/dashboard";
+    if (h?.state === "healthy") {
+      url = "http://localhost:1969/ui" + (safePath || "/dashboard");
+    }
   } catch {
     // ignore
   }
