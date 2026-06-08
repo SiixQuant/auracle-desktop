@@ -31,7 +31,7 @@ import {
   type StrategyState,
 } from "@/lib/tauri";
 
-export default function Forge() {
+export default function Forge({ onExit }: { onExit?: () => void }) {
   const [mode, setMode] = useState<ForgeLayoutMode>("agent");
   const [activePath, setActivePath] = useState<string | null>(null);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
@@ -113,6 +113,7 @@ export default function Forge() {
         onModeChange={onModeChange}
         activePath={activePath}
         onNewSession={onNewSession}
+        onExit={onExit}
       />
 
       {mode === "agent" ? (

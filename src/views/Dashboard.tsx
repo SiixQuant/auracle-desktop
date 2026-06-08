@@ -32,19 +32,40 @@ import {
   openInBrowser,
 } from "@/lib/tauri";
 
-export default function Dashboard() {
+export default function Dashboard({
+  onOpenForge,
+}: {
+  onOpenForge?: () => void;
+}) {
   return (
     <>
       <h1>Auracle</h1>
       <LicenseSection />
-      <BrokerSection />
-      <h2>Quick Actions</h2>
-      <div className="card">
-        <div className="row">
-          <div>Open the Auracle dashboard in your browser</div>
-          <OpenAuracleButton />
-        </div>
+
+      {/* Two destinations, no repetition: the single door into the
+          web product (Open Auracle) + the native Forge authoring
+          workspace. Everything else the platform owns lives one click
+          inside it, so the launcher doesn't re-list it. */}
+      <h2>Workspaces</h2>
+      <div className="launch-grid">
+        <LaunchCard
+          primary
+          title="Open Auracle"
+          description="The full platform — Home, Build, Research, Trade, Seer."
+          onClick={() => {
+            void openAuracle();
+          }}
+        />
+        {onOpenForge && (
+          <LaunchCard
+            title="Forge"
+            description="Build & iterate on strategies with Claude, locally."
+            onClick={onOpenForge}
+          />
+        )}
       </div>
+
+      <BrokerSection />
       <ContainersSection />
     </>
   );
@@ -424,47 +445,69 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
   );
 }
 
-// ── Open Auracle ────────────────────────────────────────────────
+// ── Workspaces (entry cards) ────────────────────────────────────
 
-function OpenAuracleButton() {
-  const onClick = async () => {
-    // Two-mode open: embedded WebviewWindow (native feel) or
-    // external browser. Preference lives in view-mode.json; default
-    // is 'browser' for fresh installs (matches pre-v0.2.0 behavior).
-    let mode: "browser" | "embedded" = "browser";
+/** The single canonical door into the web product. Two-mode open:
+ *  embedded WebviewWindow (native feel) or external browser.
+ *  Preference lives in view-mode.json; default is 'browser' for fresh
+ *  installs (matches pre-v0.2.0 behavior). */
+async function openAuracle(): Promise<void> {
+  let mode: "browser" | "embedded" = "browser";
+  try {
+    mode = await cmd.getViewMode();
+  } catch {
+    // Backend unavailable — fall through to the browser path.
+  }
+
+  if (mode === "embedded") {
     try {
-      mode = await cmd.getViewMode();
-    } catch {
-      // Backend unavailable — fall through to the browser path.
+      await cmd.openEmbeddedAuracle();
+      return;
+    } catch (err) {
+      // Embedded window failed to spawn — fall through to browser
+      // so the customer still gets where they were going.
+      console.warn("embedded open failed, falling back to browser:", err);
     }
+  }
 
-    if (mode === "embedded") {
-      try {
-        await cmd.openEmbeddedAuracle();
-        return;
-      } catch (err) {
-        // Embedded window failed to spawn — fall through to browser
-        // so the customer still gets where they were going.
-        console.warn("embedded open failed, falling back to browser:", err);
-      }
-    }
+  // Browser path: prefer the dashboard URL if the stack is healthy,
+  // otherwise drop the user on /ui/setup so they can diagnose the
+  // failed startup.
+  let url = "http://localhost:1969/ui/setup";
+  try {
+    const h = await cmd.currentHealth();
+    if (h?.state === "healthy") url = "http://localhost:1969/ui/dashboard";
+  } catch {
+    // ignore
+  }
+  await openInBrowser(url);
+}
 
-    // Browser path: prefer the dashboard URL if the stack is
-    // healthy, otherwise drop the user on /ui/setup so they can
-    // diagnose the failed startup.
-    let url = "http://localhost:1969/ui/setup";
-    try {
-      const h = await cmd.currentHealth();
-      if (h?.state === "healthy") url = "http://localhost:1969/ui/dashboard";
-    } catch {
-      // ignore
-    }
-    await openInBrowser(url);
-  };
-
+/** A large, calm, clickable entry card. The whole card is the button
+ *  — the arrow + hover accent signal that. `primary` gives the one
+ *  platform door a stronger emerald treatment. */
+function LaunchCard({
+  title,
+  description,
+  primary,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  primary?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <button type="button" className="primary" onClick={onClick}>
-      Open Auracle
+    <button
+      type="button"
+      className={`launch-card${primary ? " launch-card--primary" : ""}`}
+      onClick={onClick}
+    >
+      <span className="launch-card__arrow" aria-hidden="true">
+        →
+      </span>
+      <span className="launch-card__title">{title}</span>
+      <span className="launch-card__desc">{description}</span>
     </button>
   );
 }
