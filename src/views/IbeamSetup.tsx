@@ -111,7 +111,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
       >
         <StatePill state={status.state} />
         {status.state.state !== "not_installed" && (
-          <span className="muted" style={{ fontSize: 11 }}>
+          <span className="muted fs-xs">
             auto-managed via Docker · re-auths on every daily session reset
           </span>
         )}
@@ -153,28 +153,26 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
       )}
 
       {status.state.state === "stopped" && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div className="wrap-row">
           <button
             type="button"
-            className="primary"
+            className="primary fs-xs"
             disabled={busy !== null}
             onClick={() => runBusy("start", cmd.ibeamStart)}
-            style={{ fontSize: 12 }}
           >
             {busy === "start" ? "Starting…" : "Start"}
           </button>
           <button
             type="button"
-            className="ghost"
+            className="ghost fs-xs"
             disabled={busy !== null}
             onClick={loadLogs}
-            style={{ fontSize: 12 }}
           >
             View logs
           </button>
           <button
             type="button"
-            className="ghost danger"
+            className="ghost danger fs-xs"
             disabled={busy !== null}
             onClick={() => {
               if (
@@ -185,7 +183,6 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
                 return;
               runBusy("uninstall", cmd.ibeamUninstall);
             }}
-            style={{ fontSize: 12 }}
           >
             Uninstall
           </button>
@@ -199,7 +196,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
       )}
 
       {status.state.state === "running" && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div className="wrap-row">
           {!status.state.auth_ok && (
             <div
               className="muted"
@@ -222,34 +219,31 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
           )}
           <button
             type="button"
-            className="ghost"
+            className="ghost fs-xs"
             disabled={busy !== null}
             onClick={() => runBusy("restart", cmd.ibeamRestart)}
-            style={{ fontSize: 12 }}
           >
             {busy === "restart" ? "Restarting…" : "Restart"}
           </button>
           <button
             type="button"
-            className="ghost"
+            className="ghost fs-xs"
             disabled={busy !== null}
             onClick={() => runBusy("stop", cmd.ibeamStop)}
-            style={{ fontSize: 12 }}
           >
             {busy === "stop" ? "Stopping…" : "Stop"}
           </button>
           <button
             type="button"
-            className="ghost"
+            className="ghost fs-xs"
             disabled={busy !== null}
             onClick={loadLogs}
-            style={{ fontSize: 12 }}
           >
             View logs
           </button>
           <button
             type="button"
-            className="ghost danger"
+            className="ghost danger fs-xs"
             disabled={busy !== null}
             onClick={() => {
               if (
@@ -260,7 +254,6 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
                 return;
               runBusy("uninstall", cmd.ibeamUninstall);
             }}
-            style={{ fontSize: 12 }}
           >
             Uninstall
           </button>
@@ -268,7 +261,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
       )}
 
       {status.state.state === "docker_unavailable" && (
-        <div className="muted mono" style={{ fontSize: 11 }}>
+        <div className="muted mono fs-xs">
           Docker isn&apos;t reachable: {status.state.detail}. Start Docker
           Desktop and refresh.
         </div>
@@ -417,7 +410,7 @@ function CredentialsForm({
         value={username}
         onChange={(e) => setUsername(e.target.value)}
         disabled={busy}
-        style={{ fontSize: 13 }}
+        className="fs-sm"
       />
       <input
         name="password"
@@ -427,7 +420,7 @@ function CredentialsForm({
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         disabled={busy}
-        style={{ fontSize: 13 }}
+        className="fs-sm"
       />
       <button
         type="submit"

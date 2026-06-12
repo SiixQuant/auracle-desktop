@@ -159,7 +159,7 @@ function Step1({ onNext }: { onNext: () => void }) {
         canNext={!!docker?.installed && !!docker?.running}
         onNext={onNext}
       >
-        <h2 style={{ marginTop: 0 }}>Let&apos;s get you set up</h2>
+        <h2 className="mt-0">Let&apos;s get you set up</h2>
         <p>
           Auracle Desktop manages a self-hosted algorithmic-trading platform
           that runs locally on your machine. The first thing it needs is a
@@ -224,7 +224,7 @@ function DockerCheck({
         {" ("}
         <a
           href="#"
-          style={{ fontSize: 11 }}
+          className="fs-xs"
           onClick={async (e) => {
             e.preventDefault();
             try {
@@ -297,7 +297,7 @@ function Step2({
       nextLabel="Next →"
       skipLabel="Skip for Community tier"
     >
-      <h2 style={{ marginTop: 0 }}>License key</h2>
+      <h2 className="mt-0">License key</h2>
       <p className="muted">
         Paste your license key from your Auracle purchase email — accepts{" "}
         <code>akey_…</code> (Stripe), <code>polar_…</code> (legacy Polar), or a
@@ -435,7 +435,7 @@ function Step3({
 
   return (
     <Actions canNext={false} hideSkip>
-      <h2 style={{ marginTop: 0 }}>Pre-flight check</h2>
+      <h2 className="mt-0">Pre-flight check</h2>
       <p className="muted">
         Verifying your machine is ready before we pull anything. This takes a
         few seconds.
@@ -465,8 +465,7 @@ function Step3({
           </button>
           <button
             type="button"
-            className="ghost"
-            style={{ marginLeft: 8 }}
+            className="ghost ml-2"
             onClick={onBack}
           >
             ← Back
@@ -483,8 +482,7 @@ function Step3({
           </p>
           <div style={{ margin: "24px 0" }}>
             <div
-              className="muted mono"
-              style={{ fontSize: 11, marginBottom: 8 }}
+              className="muted mono fs-xs mb-2"
             >
               {progress.phase ? progress.phase.replace(/_/g, " ") : "starting…"}
             </div>
@@ -525,8 +523,7 @@ function Step3({
                 </button>
                 <button
                   type="button"
-                  className="ghost"
-                  style={{ marginLeft: 8 }}
+                  className="ghost ml-2"
                   onClick={onBack}
                 >
                   Back
@@ -536,7 +533,7 @@ function Step3({
               progress.message || ""
             )}
           </div>
-          <details style={{ marginTop: 16 }}>
+          <details className="mt-4">
             <summary
               className="muted"
               style={{ cursor: "pointer", fontSize: 12 }}

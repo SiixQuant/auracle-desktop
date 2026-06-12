@@ -114,7 +114,7 @@ function BrokerSection() {
   if (!summary && error) {
     return (
       <>
-        <h2 style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <h2 className="hstack">
           <span>Broker</span>
           <button
             type="button"
@@ -153,7 +153,7 @@ function BrokerSection() {
 
   return (
     <>
-      <h2 style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <h2 className="hstack">
         <span>Broker</span>
         {/* Quick-glance only — full portfolio + order management lives in
             the web Trade view (R-4: keep the glance, link out for depth). */}
@@ -168,7 +168,7 @@ function BrokerSection() {
         </button>
         {marketData && <DataQualityBadge quality={marketData.us_equity} />}
         {loading && (
-          <span className="muted mono" style={{ fontSize: 11 }}>
+          <span className="muted mono fs-xs">
             refreshing…
           </span>
         )}
@@ -302,7 +302,7 @@ function BrokerKpiRow({ summary }: { summary: BrokerAccountSummary }) {
 
   return (
     <div>
-      <div className="muted mono" style={{ fontSize: 11, marginBottom: 8 }}>
+      <div className="muted mono fs-xs mb-2">
         account · {summary.account_id} · {summary.currency}
       </div>
       <div
@@ -360,7 +360,7 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
     .slice(0, 6);
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="mt-4">
       <div
         className="muted"
         style={{
@@ -382,10 +382,10 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
       >
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--fg-dim)" }}>
-            <th style={{ padding: "4px 8px", textAlign: "left", fontWeight: 400 }}>Symbol</th>
-            <th style={{ padding: "4px 8px", textAlign: "right", fontWeight: 400 }}>Qty</th>
-            <th style={{ padding: "4px 8px", textAlign: "right", fontWeight: 400 }}>Mkt Val</th>
-            <th style={{ padding: "4px 8px", textAlign: "right", fontWeight: 400 }}>P&L</th>
+            <th className="cell">Symbol</th>
+            <th className="cell-num">Qty</th>
+            <th className="cell-num">Mkt Val</th>
+            <th className="cell-num">P&L</th>
           </tr>
         </thead>
         <tbody>
@@ -403,10 +403,10 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
                 style={{ borderBottom: "1px solid var(--border)" }}
               >
                 <td style={{ padding: "6px 8px" }}>{p.symbol}</td>
-                <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                <td className="cell-num">
                   {p.quantity?.toLocaleString("en-US") ?? "—"}
                 </td>
-                <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                <td className="cell-num">
                   {p.market_value !== null
                     ? p.market_value.toLocaleString("en-US", {
                         style: "currency",
@@ -559,7 +559,7 @@ function LicenseSection() {
       >
         <div>
           <strong>License active</strong>
-          <div className="muted mono" style={{ marginTop: 2 }}>
+          <div className="muted mono mt-1">
             {stored.slice(0, 16)}…
           </div>
         </div>
@@ -628,7 +628,7 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div className="card">
-      <h2 style={{ marginTop: 0 }}>Activate Auracle</h2>
+      <h2 className="mt-0">Activate Auracle</h2>
       <p className="muted" style={{ margin: "0 0 12px" }}>
         Paste the license key from your purchase email.
       </p>
@@ -700,7 +700,7 @@ function ContainersSection() {
           <div className="row" key={c.name}>
             <div>
               <strong>{c.name}</strong>
-              <div className="muted mono" style={{ marginTop: 2 }}>
+              <div className="muted mono mt-1">
                 state: {c.state}
                 {c.health ? ` · health: ${c.health}` : ""}
               </div>

@@ -58,7 +58,7 @@ function WorkspaceCard() {
         <div className="row" style={{ alignItems: "center" }}>
           <div>
             <div>Where Open Auracle opens</div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+            <div className="muted fs-sm mt-1">
               {mode === "embedded"
                 ? "In its own window. Feels native, uses a bit more memory."
                 : "In your default browser. Uses less memory."}
@@ -213,7 +213,7 @@ function SystemCard() {
             <div>Auracle Desktop launcher version</div>
             <div className="muted mono">v{version}</div>
             {resultText && (
-              <div className="muted mono" style={{ marginTop: 6 }}>
+              <div className="muted mono mt-2">
                 {resultText}
               </div>
             )}

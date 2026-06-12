@@ -81,7 +81,7 @@ export default function BrokerConnectionsCard() {
 
   return (
     <>
-      <h2 style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <h2 className="hstack">
         <span>Broker Connections</span>
         <button
           type="button"
@@ -228,10 +228,9 @@ function HoustonConflictBanner({
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button
           type="button"
-          className="primary"
+          className="primary fs-xs"
           onClick={takeOver}
           disabled={busy}
-          style={{ fontSize: 12 }}
         >
           {busy ? "Stopping…" : "Free the port"}
         </button>
@@ -280,7 +279,7 @@ function BrokerRow({
             <strong>{broker.label}</strong>
             <StatePill state={broker.state} />
           </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+          <div className="muted fs-xs mt-1">
             {broker.description}
           </div>
           {!isIbkr && <BrokerDetail broker={broker} />}
@@ -369,7 +368,7 @@ function BrokerDetail({ broker }: { broker: BrokerStatus }) {
   }
   if (s.state === "unauthenticated") {
     return (
-      <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+      <div className="muted fs-xs mt-2">
         Gateway is running — log in to start pulling data.
       </div>
     );
@@ -420,7 +419,7 @@ function BrokerActions({
 
   if (s.state === "not_implemented") {
     return (
-      <span className="muted mono" style={{ fontSize: 11 }}>
+      <span className="muted mono fs-xs">
         roadmap
       </span>
     );
@@ -430,9 +429,8 @@ function BrokerActions({
     return (
       <button
         type="button"
-        className="ghost"
+        className="ghost fs-xs"
         onClick={() => openInBrowser("https://www.interactivebrokers.com/en/trading/ib-api.php#client-portal-api")}
-        style={{ fontSize: 12 }}
       >
         Get gateway
       </button>
@@ -444,7 +442,7 @@ function BrokerActions({
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <button
           type="button"
-          className="primary"
+          className="primary fs-xs"
           onClick={async () => {
             try {
               await cmd.openIbkrLogin(s.login_url);
@@ -458,15 +456,13 @@ function BrokerActions({
             // handles the steady state.
             setTimeout(onRefresh, 4000);
           }}
-          style={{ fontSize: 12 }}
         >
           Connect
         </button>
         <button
           type="button"
-          className="ghost"
+          className="ghost fs-xs"
           onClick={() => openInBrowser(s.login_url)}
-          style={{ fontSize: 11 }}
         >
           Open in browser
         </button>
@@ -479,10 +475,9 @@ function BrokerActions({
       <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
         <button
           type="button"
-          className="ghost"
+          className="ghost fs-xs"
           onClick={runTest}
           disabled={testing}
-          style={{ fontSize: 12 }}
         >
           {testing ? "Testing…" : "Test pull"}
         </button>
@@ -509,9 +504,8 @@ function BrokerActions({
     return (
       <button
         type="button"
-        className="ghost"
+        className="ghost fs-xs"
         onClick={onRefresh}
-        style={{ fontSize: 12 }}
       >
         Retry
       </button>
