@@ -150,18 +150,7 @@ function BrokerList({
  *  other surfaces read from it. */
 function CanonicalSourceBanner() {
   return (
-    <div
-      style={{
-        padding: 10,
-        marginBottom: 12,
-        background: "rgba(96,165,250,0.08)",
-        border: "1px solid rgba(96,165,250,0.25)",
-        borderRadius: 4,
-        fontSize: 12,
-        lineHeight: 1.6,
-        color: "var(--fg-dim)",
-      }}
-    >
+    <div className="banner info">
       <strong style={{ color: "var(--fg)" }}>One connection, everywhere.</strong>
       {" "}
       Set up your broker once here — the launcher, Forge, and the web UI all use it.
@@ -203,17 +192,7 @@ function HoustonConflictBanner({
   };
 
   return (
-    <div
-      style={{
-        padding: 10,
-        marginBottom: 12,
-        background: "rgba(251,191,36,0.08)",
-        border: "1px solid rgba(251,191,36,0.35)",
-        borderRadius: 4,
-        fontSize: 12,
-        lineHeight: 1.6,
-      }}
-    >
+    <div className="banner warn">
       <div style={{ color: "var(--fg)", marginBottom: 6 }}>
         <strong>Port already in use</strong> — the Auracle stack is currently
         running its own IBKR gateway container (<code>{containerName}</code>)
@@ -292,38 +271,15 @@ function BrokerRow({
 }
 
 function StatePill({ state }: { state: BrokerState }) {
-  const styles: Record<BrokerState["state"], { bg: string; fg: string; label: string }> = {
-    offline: { bg: "rgba(248,113,113,0.15)", fg: "#fca5a5", label: "offline" },
-    unauthenticated: {
-      bg: "rgba(251,191,36,0.15)",
-      fg: "#fcd34d",
-      label: "log in needed",
-    },
-    connected: { bg: "rgba(74,222,128,0.15)", fg: "#86efac", label: "connected" },
-    error: { bg: "rgba(248,113,113,0.15)", fg: "#fca5a5", label: "error" },
-    not_implemented: {
-      bg: "rgba(148,163,184,0.15)",
-      fg: "#cbd5e1",
-      label: "coming soon",
-    },
+  const cfg: Record<BrokerState["state"], { variant: string; label: string }> = {
+    offline: { variant: "err", label: "offline" },
+    unauthenticated: { variant: "warn", label: "log in needed" },
+    connected: { variant: "ok", label: "connected" },
+    error: { variant: "err", label: "error" },
+    not_implemented: { variant: "neutral", label: "coming soon" },
   };
-  const s = styles[state.state];
-  return (
-    <span
-      className="mono"
-      style={{
-        fontSize: 10,
-        padding: "2px 8px",
-        background: s.bg,
-        color: s.fg,
-        borderRadius: 999,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-      }}
-    >
-      {s.label}
-    </span>
-  );
+  const s = cfg[state.state];
+  return <span className={`chip ${s.variant}`}>{s.label}</span>;
 }
 
 function BrokerDetail({ broker }: { broker: BrokerStatus }) {
@@ -486,7 +442,7 @@ function BrokerActions({
             className="muted mono"
             style={{
               fontSize: 10,
-              color: testResult.ok ? "var(--ok, #4ade80)" : "var(--err)",
+              color: testResult.ok ? "var(--ok)" : "var(--err)",
               maxWidth: 200,
               textAlign: "right",
               whiteSpace: "pre-wrap",

@@ -202,64 +202,43 @@ function BrokerSection() {
  *  always knows whether prices on this page are real-time or
  *  trailing the tape. */
 function DataQualityBadge({ quality }: { quality: BrokerDataQuality }) {
-  const cfg: Record<
-    BrokerDataQuality,
-    { label: string; bg: string; fg: string; title: string }
-  > = {
+  const cfg: Record<BrokerDataQuality, { variant: string; label: string; title: string }> = {
     realtime: {
+      variant: "ok",
       label: "real-time",
-      bg: "rgba(74,222,128,0.15)",
-      fg: "#86efac",
       title: "Live US equity data — your IBKR subscription includes real-time quotes.",
     },
     delayed: {
+      variant: "warn",
       label: "15-min delayed",
-      bg: "rgba(251,191,36,0.15)",
-      fg: "#fcd34d",
       title:
         "Delayed US equity data. Upgrade your IBKR market-data subscription for real-time quotes.",
     },
     frozen: {
+      variant: "neutral",
       label: "frozen",
-      bg: "rgba(148,163,184,0.15)",
-      fg: "#cbd5e1",
       title: "Last-known quote (market closed or feed paused).",
     },
     closed: {
+      variant: "neutral",
       label: "market closed",
-      bg: "rgba(148,163,184,0.15)",
-      fg: "#cbd5e1",
       title: "US equity market is closed; values are the closing prices.",
     },
     halted: {
+      variant: "err",
       label: "halted",
-      bg: "rgba(248,113,113,0.15)",
-      fg: "#fca5a5",
       title: "Trading is halted on at least one of the displayed symbols.",
     },
     unknown: {
+      variant: "neutral",
       label: "tier unknown",
-      bg: "rgba(148,163,184,0.15)",
-      fg: "#cbd5e1",
       title:
         "Couldn't determine your data tier — gateway response didn't carry the availability code.",
     },
   };
   const c = cfg[quality] ?? cfg.unknown;
   return (
-    <span
-      className="mono"
-      title={c.title}
-      style={{
-        fontSize: 10,
-        padding: "2px 8px",
-        background: c.bg,
-        color: c.fg,
-        borderRadius: 999,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-      }}
-    >
+    <span className={`chip ${c.variant}`} title={c.title}>
       {c.label}
     </span>
   );
@@ -293,9 +272,9 @@ function BrokerKpiRow({ summary }: { summary: BrokerAccountSummary }) {
       value: fmtSigned(summary.unrealized_pnl),
       color:
         (summary.unrealized_pnl ?? 0) > 0
-          ? "var(--ok, #4ade80)"
+          ? "var(--ok)"
           : (summary.unrealized_pnl ?? 0) < 0
-            ? "var(--err, #f87171)"
+            ? "var(--err)"
             : undefined,
     },
   ];
@@ -393,9 +372,9 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
             const pnl = p.unrealized_pnl ?? 0;
             const pnlColor =
               pnl > 0
-                ? "var(--ok, #4ade80)"
+                ? "var(--ok)"
                 : pnl < 0
-                  ? "var(--err, #f87171)"
+                  ? "var(--err)"
                   : "var(--fg)";
             return (
               <tr
