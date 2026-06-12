@@ -167,16 +167,19 @@ function SystemCard() {
 
   const installUpdate = async () => {
     setUpdating(true);
-    setResultText("Downloading…");
+    setResultText("");
     try {
       await cmd.installUpdate();
-      setResultText(
-        "Installed but restart did not fire — quit + relaunch manually.",
-      );
+      // install_update restarts the process before replying, so a
+      // resolved promise means the reply raced the exit — it is the
+      // same restart, not a separate outcome.
+      setResultText("Restarting on the new version.");
     } catch (err) {
       const msg = String(err);
-      if (/closed|connection/i.test(msg)) {
-        setResultText("Restarting on the new version…");
+      // The backend dying mid-invoke IS the success signal; match the
+      // strings each webview emits when the process goes away.
+      if (/closed|connection|communicating|reset/i.test(msg)) {
+        setResultText("Restarting on the new version.");
       } else {
         setResultText("Install failed: " + msg);
         setUpdating(false);
@@ -208,36 +211,64 @@ function SystemCard() {
           <div>Docker Desktop</div>
           <DockerStatusBadge status={docker} error={dockerError} />
         </div>
-        <div className="row">
-          <div>
-            <div>Auracle Desktop launcher version</div>
-            <div className="muted mono">v{version}</div>
-            {resultText && (
-              <div className="muted mono mt-2">
-                {resultText}
-              </div>
+        <div className="pane-head mt-4">
+          <span className="pane-head__label">Launcher version</span>
+          <div className="pane-head__actions">
+            {updateAvailable ? (
+              <button
+                type="button"
+                className="primary btn-sm"
+                disabled={updating}
+                onClick={installUpdate}
+              >
+                {updating ? "Installing…" : `Install v${info!.version}`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="ghost btn-sm"
+                disabled={checking}
+                onClick={check}
+              >
+                {checking ? "Checking…" : "Check for Update"}
+              </button>
             )}
           </div>
-          {updateAvailable ? (
-            <button
-              type="button"
-              className="primary"
-              disabled={updating}
-              onClick={installUpdate}
-            >
-              {updating ? "Installing…" : `Download + Install v${info!.version}`}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ghost"
-              disabled={checking}
-              onClick={check}
-            >
-              {checking ? "Checking…" : "Check for Update"}
-            </button>
+        </div>
+        <div className="hstack">
+          <span className="muted mono">v{version}</span>
+          {updateAvailable && (
+            <span className="chip warn">v{info!.version} available</span>
           )}
         </div>
+        {updateAvailable && info?.notes && (
+          <div className="mt-2">
+            <div className="muted fs-2xs mb-2">Release notes</div>
+            <div
+              className="muted fs-xs lh-relaxed"
+              style={{ maxHeight: 66, overflow: "hidden", whiteSpace: "pre-line" }}
+            >
+              {info.notes}
+            </div>
+          </div>
+        )}
+        {updating && !resultText && (
+          <div className="banner info mt-2 m-0">
+            Downloading and installing — the launcher will restart
+            automatically.
+          </div>
+        )}
+        {resultText && (
+          <div
+            className={
+              /^(Install failed|Error)/.test(resultText)
+                ? "err-text fs-xs mt-2"
+                : "muted fs-xs mt-2"
+            }
+          >
+            {resultText}
+          </div>
+        )}
       </div>
     </>
   );

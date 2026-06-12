@@ -70,6 +70,11 @@ export interface UpdateInfo {
   available: boolean;
   current: string;
   version?: string;
+  /** Release notes from the update manifest (raw text — render as
+   *  plain text only, never as HTML). The Rust struct has always
+   *  carried this; the interface omitted it, which is why no view
+   *  ever rendered it. */
+  notes?: string | null;
 }
 
 export interface PreflightCheck {

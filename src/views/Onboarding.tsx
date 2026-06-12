@@ -535,11 +535,7 @@ function Step3({
             <summary className="muted fs-xs" style={{ cursor: "pointer" }}>
               Show installer log
             </summary>
-            <pre
-              ref={logRef}
-              className="logs mt-2 fs-2xs"
-              style={{ maxHeight: 200 }}
-            >
+            <pre ref={logRef} className="logs logs-compact mt-2 fs-2xs">
               {logLines.join("\n")}
             </pre>
           </details>
