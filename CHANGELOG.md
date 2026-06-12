@@ -4,6 +4,36 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.7.0]
+
+The design system reaches every surface, and updates explain
+themselves before they happen.
+
+### Added
+- **Release notes in the updater.** Settings now shows what an update
+  contains before you install it, a clear in-progress notice names the
+  automatic restart, and the outcome is reported in plain words.
+- **In-surface confirmations.** Destructive actions (uninstalling the
+  gateway connection, clearing a license key) confirm with an inline
+  row that states the consequences — reliable inside the desktop
+  webview where native dialogs are not.
+
+### Changed
+- **Dashboard.** Account numbers live in titled metric tiles, open
+  positions in a quieter table, and every section header carries its
+  actions on the same line.
+- **IBKR gateway card.** Labeled credential fields with a note on
+  where the secret is stored, a named log pane, and status notices
+  that span the card instead of crowding the buttons.
+- **Broker Connections.** The last surface to adopt the shared
+  vocabulary — headers, stacks, tone colors, and row separators now
+  match the rest of the app.
+
+### Fixed
+- Several panels referenced styling values that did not exist, which
+  left their frames and separators invisible; all surfaces now draw
+  as designed.
+
 ## [0.6.0]
 
 Enterprise shell + design system — four passes in one release: the
