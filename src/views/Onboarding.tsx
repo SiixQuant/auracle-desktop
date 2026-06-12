@@ -537,8 +537,8 @@ function Step3({
             </summary>
             <pre
               ref={logRef}
-              className="logs mt-2"
-              style={{ fontSize: 10, maxHeight: 200 }}
+              className="logs mt-2 fs-2xs"
+              style={{ maxHeight: 200 }}
             >
               {logLines.join("\n")}
             </pre>

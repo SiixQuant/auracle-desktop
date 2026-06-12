@@ -85,7 +85,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
 
   if (!status) {
     return (
-      <div className="muted mono" style={{ fontSize: 11, padding: 10 }}>
+      <div className="muted mono fs-xs" style={{ padding: 10 }}>
         probing ibeam…
       </div>
     );
@@ -117,7 +117,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
         )}
       </div>
       {status.state.state === "not_installed" && (
-        <div className="muted" style={{ fontSize: 11, marginBottom: 8, lineHeight: 1.5 }}>
+        <div className="muted fs-xs mb-2" style={{ lineHeight: 1.5 }}>
           Stays connected continuously — no daily re-login. Requires Docker
           (running) and IBKR Mobile 2FA push notifications enabled on your phone.
         </div>
@@ -331,7 +331,7 @@ function CredentialsForm({
       }}
       style={{ display: "flex", flexDirection: "column", gap: 8 }}
     >
-      <div className="muted" style={{ fontSize: 11, marginBottom: 2, lineHeight: 1.5 }}>
+      <div className="muted fs-xs" style={{ marginBottom: 2, lineHeight: 1.5 }}>
         Stored encrypted in the launcher&apos;s vault, injected into the
         container only at start time. Account ID and paper / live mode
         are detected automatically after the first login — you don&apos;t
