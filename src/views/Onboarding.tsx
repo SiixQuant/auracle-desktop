@@ -1,7 +1,11 @@
-// Onboarding — first-run wizard. Three screens (per launcher plan §4.1):
-//   1. Welcome + Docker check
-//   2. License key entry (optional — skip lands you on Community)
-//   3. Pre-flight + run installer with live progress
+// Onboarding — first-run wizard. Three named steps:
+//   1. Environment — Docker runtime check (auto-detects once a
+//      download link is clicked; no relaunch needed)
+//   2. License — key entry (skip lands on Community)
+//   3. Install — pre-flight, then an EXPLICIT install start with
+//      live progress. The installer never starts itself: pulling
+//      gigabytes is a consented action, and an explicit gate is
+//      also what keeps a failed install from auto-retrying forever.
 //
 // Auto-shown by App.tsx when cmd.isInstalled() returns false.
 // Subscribes to the 'installer-progress' Tauri event for live
@@ -24,6 +28,8 @@ interface OnboardingProps {
   onDone: () => void;
 }
 
+const STEPS = ["Environment", "License", "Install"] as const;
+
 export default function Onboarding({ onDone }: OnboardingProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [licenseKey, setLicenseKey] = useState("");
@@ -42,19 +48,12 @@ export default function Onboarding({ onDone }: OnboardingProps) {
       className="card"
       style={{ maxWidth: 640, margin: "48px auto", padding: 32 }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
+      <div className="hstack" style={{ marginBottom: 24 }}>
         <span
           className="logo-dot"
           style={{ background: "var(--accent)", width: 14, height: 14 }}
         />
-        <h1 style={{ margin: 0 }}>Welcome to Auracle Desktop</h1>
+        <h1 className="m-0">Welcome to Auracle Desktop</h1>
       </div>
 
       <Stepper current={step} />
@@ -93,24 +92,13 @@ export default function Onboarding({ onDone }: OnboardingProps) {
 
 function Stepper({ current }: { current: 1 | 2 | 3 }) {
   return (
-    <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
-      {[1, 2, 3].map((n) => {
-        const active = n <= current;
+    <div className="stepper">
+      {STEPS.map((name, i) => {
+        const n = i + 1;
+        const state = n < current ? "done" : n === current ? "current" : "";
         return (
-          <div
-            key={n}
-            style={{
-              flex: 1,
-              padding: "8px 0",
-              borderTop: `3px solid ${
-                active ? "var(--accent)" : "var(--line)"
-              }`,
-              textAlign: "center",
-              fontSize: 11,
-              color: active ? "var(--fg-dim)" : "var(--fg-muted)",
-            }}
-          >
-            Step {n}
+          <div key={name} className={`step ${state}`}>
+            {name}
           </div>
         );
       })}
@@ -118,7 +106,7 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
   );
 }
 
-// ── Step 1: Welcome + Docker check ─────────────────────────────
+// ── Step 1: Environment (Docker check) ─────────────────────────
 
 function Step1({ onNext }: { onNext: () => void }) {
   const [docker, setDocker] = useState<DockerStatus | null>(null);
@@ -145,52 +133,54 @@ function Step1({ onNext }: { onNext: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // T-83: when the user clicks the direct-download link, kick off a
-  // 5s poll so the badge auto-flips to "running" without them
-  // having to come back and click anything.
+  // T-83: once the user heads off to install Docker, poll every 5s so
+  // the status flips on its own — no relaunch, no re-check button.
   const startPoll = () => {
     if (pollRef.current !== null) return;
     pollRef.current = window.setInterval(probe, 5_000);
   };
 
+  const ready = !!docker?.installed && !!docker?.running;
+
   return (
-    <>
-      <Actions
-        canNext={!!docker?.installed && !!docker?.running}
-        onNext={onNext}
-      >
-        <h2 className="mt-0">Let&apos;s get you set up</h2>
-        <p>
-          Auracle Desktop manages a self-hosted algorithmic-trading platform
-          that runs locally on your machine. The first thing it needs is a
-          working Docker runtime.
-        </p>
+    <Actions
+      canNext={ready}
+      onNext={onNext}
+      nextDisabledReason={
+        docker === null
+          ? "Checking Docker…"
+          : !docker.installed
+            ? "Waiting for Docker Desktop to be installed — auto-detects every few seconds."
+            : !docker.running
+              ? `Waiting for ${runtimeName(docker.runtime)} to start.`
+              : undefined
+      }
+    >
+      <div className="step-head">Let&apos;s get you set up</div>
+      <p>
+        Auracle Desktop manages a self-hosted algorithmic-trading platform
+        that runs locally on your machine. The first thing it needs is a
+        working Docker runtime.
+      </p>
 
-        <h2>Docker check</h2>
-        <DockerCheck docker={docker} onTriggerPoll={startPoll} />
+      <h2>Docker runtime</h2>
+      <DockerCheck docker={docker} onTriggerPoll={startPoll} />
 
-        <h2>What you&apos;ll get after install</h2>
-        <ul
-          style={{
-            paddingLeft: 20,
-            color: "var(--fg-dim)",
-            fontSize: 13,
-            lineHeight: 1.6,
-          }}
-        >
-          <li>
-            Web dashboard at <code>localhost:1969</code> for backtests + live
-            strategy management
-          </li>
-          <li>
-            JupyterLab at <code>localhost:1969/jupyter</code> for research
-            notebooks
-          </li>
-          <li>MCP server so Claude / Cursor can drive Auracle as an agent</li>
-          <li>TimescaleDB for tick-level price storage</li>
-        </ul>
-      </Actions>
-    </>
+      <h2>What you&apos;ll get after install</h2>
+      <ul className="muted fs-sm" style={{ paddingLeft: 20, lineHeight: 1.6 }}>
+        <li>
+          The Auracle platform at <code>localhost:1969</code> — Home, Build,
+          Research, and Trade in one place: backtests, schedules, brokers,
+          live runs
+        </li>
+        <li>
+          The Seer IDE — an AI engineer inside Build that drafts, edits, and
+          backtests strategies with you
+        </li>
+        <li>MCP server so Claude / Cursor can drive Auracle as an agent</li>
+        <li>TimescaleDB for tick-level price storage</li>
+      </ul>
+    </Actions>
   );
 }
 
@@ -201,62 +191,78 @@ function DockerCheck({
   docker: DockerStatus | null;
   onTriggerPoll: () => void;
 }) {
-  if (!docker) return <div className="muted mono">checking…</div>;
+  if (!docker) {
+    return (
+      <div className="hstack">
+        <span className="chip neutral">checking</span>
+      </div>
+    );
+  }
 
   if (!docker.installed) {
     return (
-      <div className="muted mono">
-        <span className="badge err">not installed</span>
-        {" — "}
-        <a
-          href="#"
-          onClick={async (e) => {
-            e.preventDefault();
-            await openInBrowser(
-              docker.install_url ||
-                "https://www.docker.com/products/docker-desktop/",
-            );
-            onTriggerPoll();
-          }}
-        >
-          download Docker Desktop directly
-        </a>
-        {" ("}
-        <a
-          href="#"
-          className="fs-xs"
-          onClick={async (e) => {
-            e.preventDefault();
-            try {
-              const landing = await cmd.dockerInstallLandingUrl();
-              await openInBrowser(landing);
-            } catch {
+      <>
+        <div className="hstack">
+          <span className="chip err">not installed</span>
+          <span className="muted fs-sm">
+            Install Docker Desktop, leave this window open — the status
+            flips on its own once it&apos;s running.
+          </span>
+        </div>
+        <div className="wrap-row mt-2">
+          <button
+            type="button"
+            className="ghost fs-xs"
+            onClick={async () => {
               await openInBrowser(
-                "https://www.docker.com/products/docker-desktop/",
+                docker.install_url ||
+                  "https://www.docker.com/products/docker-desktop/",
               );
-            }
-          }}
-        >
-          verify the source
-        </a>
-        {"), then re-launch to continue. We'll auto-detect when it's installed."}
-      </div>
+              onTriggerPoll();
+            }}
+          >
+            Download Docker Desktop
+          </button>
+          <button
+            type="button"
+            className="ghost fs-xs"
+            onClick={async () => {
+              try {
+                const landing = await cmd.dockerInstallLandingUrl();
+                await openInBrowser(landing);
+              } catch {
+                await openInBrowser(
+                  "https://www.docker.com/products/docker-desktop/",
+                );
+              }
+              onTriggerPoll();
+            }}
+          >
+            Verify the source ↗
+          </button>
+        </div>
+      </>
     );
   }
 
   if (!docker.running) {
     return (
-      <div className="muted mono">
-        <span className="badge warn">installed but not running</span> — start{" "}
-        <strong>{runtimeName(docker.runtime)}</strong> first, then come back.
+      <div className="hstack">
+        <span className="chip warn">installed · not running</span>
+        <span className="muted fs-sm">
+          Start <strong>{runtimeName(docker.runtime)}</strong> — this updates
+          on its own once the daemon is up.
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="muted mono">
-      <span className="badge ok">running</span>{" "}
-      {docker.version || "docker"} (<strong>{runtimeName(docker.runtime)}</strong>)
+    <div className="hstack">
+      <span className="chip ok">running</span>
+      <span className="muted mono fs-xs">
+        {docker.version || "docker"} · {runtimeName(docker.runtime)}
+      </span>
     </div>
   );
 }
@@ -297,7 +303,7 @@ function Step2({
       nextLabel="Next →"
       skipLabel="Skip for Community tier"
     >
-      <h2 className="mt-0">License key</h2>
+      <div className="step-head">License key</div>
       <p className="muted">
         Paste your license key from your Auracle purchase email — accepts{" "}
         <code>akey_…</code> (Stripe), <code>polar_…</code> (legacy Polar), or a
@@ -312,19 +318,13 @@ function Step2({
         onChange={(e) => setLicenseKey(e.target.value)}
       />
       {licenseKey ? (
-        <div
-          className="muted mono"
-          style={{ fontSize: 11, marginTop: 8 }}
-        >
+        <div className="muted mono fs-xs mt-2">
           {licenseKey.length >= 16
             ? "Will be saved when you click Next."
             : "Looks short — check the key for typos."}
         </div>
       ) : null}
-      <p
-        className="muted"
-        style={{ fontSize: 12, marginTop: 24 }}
-      >
+      <p className="muted fs-xs mt-4">
         Don&apos;t have a key yet? Click <strong>Skip for Community tier</strong>
         {" "}below — you can add one anytime from Settings → License Key.
         Community gives you 1 strategy + 3 schedules + IBKR data.
@@ -347,6 +347,7 @@ function Step3({
   const [preflight, setPreflight] = useState<PreflightReport | null>(null);
   const [preflightError, setPreflightError] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [finished, setFinished] = useState(false);
   const [progress, setProgress] = useState<InstallerProgress>({});
   const [logLines, setLogLines] = useState<string[]>([]);
   const [installError, setInstallError] = useState<string | null>(null);
@@ -357,17 +358,6 @@ function Step3({
     runPreflight();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Auto-advance when pre-flight passes — short pause so the user
-  // can read the green checkmarks before the screen swaps.
-  useEffect(() => {
-    if (preflight?.can_install && !installing) {
-      const t = window.setTimeout(beginInstall, 1_200);
-      return () => window.clearTimeout(t);
-    }
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preflight, installing]);
 
   // Auto-scroll log pane on new lines.
   useEffect(() => {
@@ -413,9 +403,11 @@ function Step3({
 
     try {
       await cmd.runFirstInstall();
+      setFinished(true);
       setProgress((prev) => ({
         ...prev,
-        message: "Auracle is running. Opening dashboard…",
+        percent: 100,
+        message: "",
       }));
       window.setTimeout(async () => {
         try {
@@ -425,7 +417,7 @@ function Step3({
         }
         unlisten();
         onDone();
-      }, 1_500);
+      }, 1_800);
     } catch (err) {
       setInstallError(String(err));
       setInstalling(false);
@@ -433,121 +425,120 @@ function Step3({
     }
   };
 
+  const canInstall = !!preflight?.can_install && !installing && !finished;
+
   return (
     <Actions canNext={false} hideSkip>
-      <h2 className="mt-0">Pre-flight check</h2>
+      <div className="step-head">Pre-flight check</div>
       <p className="muted">
-        Verifying your machine is ready before we pull anything. This takes a
-        few seconds.
+        Verifying your machine is ready. Nothing is downloaded until you
+        start the install.
       </p>
 
       <div style={{ margin: "16px 0" }}>
         {preflightError ? (
-          <div className="muted mono">
-            <span className="badge err">Pre-flight check failed</span>{" "}
-            {preflightError}
+          <div className="banner err mono">
+            <strong>Pre-flight check failed.</strong> {preflightError}
           </div>
         ) : preflight ? (
           <PreflightResults report={preflight} />
         ) : (
-          <div className="muted mono">running checks…</div>
+          <div className="hstack">
+            <span className="chip neutral">running checks</span>
+          </div>
         )}
       </div>
 
       {preflight && !preflight.can_install && (
-        <div style={{ marginTop: 12 }}>
-          <p className="muted" style={{ fontSize: 12, margin: "12px 0" }}>
+        <div className="mt-2">
+          <p className="muted fs-xs" style={{ margin: "12px 0" }}>
             Fix the items above and re-check. The install can&apos;t run while
             critical checks are failing.
           </p>
           <button type="button" className="primary" onClick={runPreflight}>
             Re-check
           </button>
-          <button
-            type="button"
-            className="ghost ml-2"
-            onClick={onBack}
-          >
+          <button type="button" className="ghost ml-2" onClick={onBack}>
             ← Back
           </button>
         </div>
       )}
 
-      {installing && (
-        <>
-          <h2 style={{ marginTop: 24 }}>Setting up Auracle</h2>
-          <p className="muted">
-            Pulling Docker images and starting services. This typically takes
-            3–8 minutes on a fresh machine.
+      {canInstall && (
+        <div className="mt-2">
+          <p className="muted fs-xs" style={{ margin: "12px 0" }}>
+            Ready. The install pulls the platform&apos;s Docker images and
+            starts the stack — typically 3–8 minutes on a fresh machine.
           </p>
+          <button type="button" className="primary" onClick={beginInstall}>
+            Install Auracle
+          </button>
+          <button type="button" className="ghost ml-2" onClick={onBack}>
+            ← Back
+          </button>
+        </div>
+      )}
+
+      {/* Failure is its own state — visible regardless of the
+          installing flag, with explicit Retry. (Previously the error
+          UI lived inside the installing block, which the failure
+          handler unmounted — an invisible error.) */}
+      {installError && !installing && (
+        <div className="mt-4">
+          <div className="banner err mono">
+            <strong>Install failed.</strong> {installError}
+          </div>
+          <button type="button" className="primary" onClick={beginInstall}>
+            Retry install
+          </button>
+          <button type="button" className="ghost ml-2" onClick={onBack}>
+            ← Back
+          </button>
+        </div>
+      )}
+
+      {(installing || finished) && (
+        <>
+          <h2 style={{ marginTop: 24 }}>
+            {finished ? "Install complete" : "Setting up Auracle"}
+          </h2>
+          {!finished && (
+            <p className="muted">
+              Pulling Docker images and starting services. Safe to leave this
+              window in the background — progress continues either way.
+            </p>
+          )}
           <div style={{ margin: "24px 0" }}>
-            <div
-              className="muted mono fs-xs mb-2"
-            >
-              {progress.phase ? progress.phase.replace(/_/g, " ") : "starting…"}
+            <div className="muted mono fs-xs mb-2">
+              {finished
+                ? "done"
+                : progress.phase
+                  ? progress.phase.replace(/_/g, " ")
+                  : "starting…"}
             </div>
-            <div
-              style={{
-                height: 6,
-                background: "var(--bg)",
-                borderRadius: 3,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: `${progress.percent ?? 0}%`,
-                  background: "var(--accent)",
-                  transition: "width 0.4s ease",
-                }}
-              />
+            <div className="progress">
+              <div style={{ width: `${progress.percent ?? 0}%` }} />
             </div>
           </div>
-          <div
-            className="muted"
-            style={{ fontSize: 13, minHeight: 40 }}
-          >
-            {installError ? (
-              <>
-                <span className="badge err">Install failed</span>{" "}
-                {installError}
-                <br />
-                <br />
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={beginInstall}
-                >
-                  Retry
-                </button>
-                <button
-                  type="button"
-                  className="ghost ml-2"
-                  onClick={onBack}
-                >
-                  Back
-                </button>
-              </>
-            ) : (
-              progress.message || ""
-            )}
-          </div>
+          {finished ? (
+            <div className="banner info">
+              <strong>The stack is up.</strong> Finishing first-run setup in
+              your browser at <code>localhost:1969</code> — the launcher stays
+              here for status, brokers, and updates.
+            </div>
+          ) : (
+            <div className="muted fs-sm" style={{ minHeight: 20 }}>
+              {progress.message || ""}
+            </div>
+          )}
           <details className="mt-4">
-            <summary
-              className="muted"
-              style={{ cursor: "pointer", fontSize: 12 }}
-            >
+            <summary className="muted fs-xs" style={{ cursor: "pointer" }}>
               Show installer log
             </summary>
             <pre
               ref={logRef}
-              className="logs"
-              style={{
-                marginTop: 8,
-                fontSize: 10,
-                maxHeight: 200,
-              }}
+              className="logs mt-2"
+              style={{ fontSize: 10, maxHeight: 200 }}
             >
               {logLines.join("\n")}
             </pre>
@@ -562,43 +553,20 @@ function PreflightResults({ report }: { report: PreflightReport }) {
   return (
     <>
       {report.checks.map((c, i) => {
-        const icon = c.passed ? "✓" : c.level === "warning" ? "!" : "✗";
-        const badgeClass = c.passed
-          ? "ok"
-          : c.level === "warning"
-            ? "warn"
-            : "err";
+        const variant = c.passed ? "ok" : c.level === "warning" ? "warn" : "err";
+        const label = c.passed ? "pass" : c.level === "warning" ? "warn" : "fail";
         return (
-          <div key={i} style={{ margin: "8px 0" }}>
-            <span
-              className={`badge ${badgeClass}`}
-              style={{
-                display: "inline-block",
-                minWidth: 18,
-                textAlign: "center",
-              }}
-            >
-              {icon}
-            </span>
-            <strong style={{ marginLeft: 6 }}>{c.name}</strong>
-            <div
-              className="muted"
-              style={{ fontSize: 12, marginLeft: 24 }}
-            >
-              {c.message}
-            </div>
-            {c.remediation && (
-              <div
-                className="muted"
-                style={{
-                  fontSize: 11,
-                  marginLeft: 24,
-                  marginTop: 4,
-                }}
-              >
-                {c.remediation}
+          <div key={i} className="row">
+            <div>
+              <div className="hstack" style={{ gap: 8 }}>
+                <span className={`chip ${variant}`}>{label}</span>
+                <strong className="fs-sm">{c.name}</strong>
               </div>
-            )}
+              <div className="muted fs-xs mt-1">{c.message}</div>
+              {c.remediation && (
+                <div className="muted fs-xs mt-1">{c.remediation}</div>
+              )}
+            </div>
           </div>
         );
       })}
@@ -617,6 +585,7 @@ function Actions({
   nextLabel,
   skipLabel,
   hideSkip,
+  nextDisabledReason,
 }: {
   children: React.ReactNode;
   canNext: boolean;
@@ -626,6 +595,7 @@ function Actions({
   nextLabel?: string;
   skipLabel?: string;
   hideSkip?: boolean;
+  nextDisabledReason?: string;
 }) {
   return (
     <>
@@ -634,41 +604,40 @@ function Actions({
         style={{
           display: "flex",
           justifyContent: "space-between",
+          alignItems: "center",
           marginTop: 32,
           paddingTop: 24,
           borderTop: "1px solid var(--line)",
         }}
       >
         {onBack ? (
-          <button
-            type="button"
-            className="ghost"
-            onClick={onBack}
-          >
+          <button type="button" className="ghost" onClick={onBack}>
             ← Back
           </button>
         ) : (
           <div />
         )}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="hstack" style={{ gap: 8 }}>
           {!hideSkip && onSkip && (
-            <button
-              type="button"
-              className="ghost"
-              onClick={onSkip}
-            >
+            <button type="button" className="ghost" onClick={onSkip}>
               {skipLabel || "Skip"}
             </button>
           )}
-          {canNext && onNext && (
-            <button
-              type="button"
-              className="primary"
-              onClick={onNext}
-            >
-              {nextLabel || "Next →"}
-            </button>
-          )}
+          {onNext &&
+            (canNext ? (
+              <button type="button" className="primary" onClick={onNext}>
+                {nextLabel || "Next →"}
+              </button>
+            ) : (
+              <div className="hstack" style={{ gap: 8 }}>
+                {nextDisabledReason && (
+                  <span className="muted fs-xs">{nextDisabledReason}</span>
+                )}
+                <button type="button" className="primary" disabled>
+                  {nextLabel || "Next →"}
+                </button>
+              </div>
+            ))}
         </div>
       </div>
     </>
