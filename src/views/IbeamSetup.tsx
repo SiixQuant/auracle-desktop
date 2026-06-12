@@ -15,6 +15,10 @@
 //     → user taps Approve on phone; poll auth state
 //   running, auth_ok=true
 //     → green "auto-managed" pill; only show Stop / View logs
+//
+// Destructive confirm is an in-surface row, not a native browser
+// dialog — Tauri's WKWebView can suppress those entirely, which
+// would turn the guard into a silent no-op.
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -83,32 +87,15 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
     }
   };
 
+  const uninstall = () => runBusy("uninstall", cmd.ibeamUninstall);
+
   if (!status) {
-    return (
-      <div className="muted mono fs-xs" style={{ padding: 10 }}>
-        probing ibeam…
-      </div>
-    );
+    return <div className="subcard muted mono">probing ibeam…</div>;
   }
 
   return (
-    <div
-      style={{
-        marginTop: 8,
-        padding: 10,
-        background: "var(--bg-alt)",
-        border: "1px solid var(--border)",
-        borderRadius: 4,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: status.state.state === "not_installed" ? 8 : 6,
-        }}
-      >
+    <div className="subcard">
+      <div className="hstack mb-2">
         <StatePill state={status.state} />
         {status.state.state !== "not_installed" && (
           <span className="muted fs-xs">
@@ -117,7 +104,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
         )}
       </div>
       {status.state.state === "not_installed" && (
-        <div className="muted fs-xs mb-2" style={{ lineHeight: 1.5 }}>
+        <div className="muted fs-xs mb-2 lh-relaxed">
           Stays connected continuously — no daily re-login. Requires Docker
           (running) and IBKR Mobile 2FA push notifications enabled on your phone.
         </div>
@@ -159,33 +146,13 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
           >
             View logs
           </button>
-          <button
-            type="button"
-            className="ghost danger fs-xs"
-            disabled={busy !== null}
-            onClick={() => {
-              if (
-                !confirm(
-                  "Uninstall ibeam? This stops the container, deletes its compose project, and removes stored IBKR credentials.",
-                )
-              )
-                return;
-              runBusy("uninstall", cmd.ibeamUninstall);
-            }}
-          >
-            Uninstall
-          </button>
-          <div
-            className="muted mono"
-            style={{ fontSize: 11, alignSelf: "center" }}
-          >
-            last state: {status.state.reason}
-          </div>
+          <UninstallConfirm busy={busy !== null} onConfirm={uninstall} />
+          <div className="muted mono">last state: {status.state.reason}</div>
         </div>
       )}
 
       {status.state.state === "running" && (
-        <div className="wrap-row">
+        <>
           {!status.state.auth_ok && (
             <div className="banner warn">
               <strong>Awaiting 2FA approval.</strong> Check your phone for
@@ -194,101 +161,62 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
               is authenticated.
             </div>
           )}
-          <button
-            type="button"
-            className="ghost fs-xs"
-            disabled={busy !== null}
-            onClick={() => runBusy("restart", cmd.ibeamRestart)}
-          >
-            {busy === "restart" ? "Restarting…" : "Restart"}
-          </button>
-          <button
-            type="button"
-            className="ghost fs-xs"
-            disabled={busy !== null}
-            onClick={() => runBusy("stop", cmd.ibeamStop)}
-          >
-            {busy === "stop" ? "Stopping…" : "Stop"}
-          </button>
-          <button
-            type="button"
-            className="ghost fs-xs"
-            disabled={busy !== null}
-            onClick={loadLogs}
-          >
-            View logs
-          </button>
-          <button
-            type="button"
-            className="ghost danger fs-xs"
-            disabled={busy !== null}
-            onClick={() => {
-              if (
-                !confirm(
-                  "Uninstall ibeam? This stops the container, deletes its compose project, and removes stored IBKR credentials.",
-                )
-              )
-                return;
-              runBusy("uninstall", cmd.ibeamUninstall);
-            }}
-          >
-            Uninstall
-          </button>
-        </div>
+          <div className="wrap-row">
+            <button
+              type="button"
+              className="ghost fs-xs"
+              disabled={busy !== null}
+              onClick={() => runBusy("restart", cmd.ibeamRestart)}
+            >
+              {busy === "restart" ? "Restarting…" : "Restart"}
+            </button>
+            <button
+              type="button"
+              className="ghost fs-xs"
+              disabled={busy !== null}
+              onClick={() => runBusy("stop", cmd.ibeamStop)}
+            >
+              {busy === "stop" ? "Stopping…" : "Stop"}
+            </button>
+            <button
+              type="button"
+              className="ghost fs-xs"
+              disabled={busy !== null}
+              onClick={loadLogs}
+            >
+              View logs
+            </button>
+            <UninstallConfirm busy={busy !== null} onConfirm={uninstall} />
+          </div>
+        </>
       )}
 
       {status.state.state === "docker_unavailable" && (
-        <div className="muted mono fs-xs">
+        <div className="muted mono">
           Docker isn&apos;t reachable: {status.state.detail}. Start Docker
           Desktop and refresh.
         </div>
       )}
 
+      {status.state.state === "other" && (
+        <div className="muted mono">{status.state.detail}</div>
+      )}
+
       {showLogs && (
-        <div style={{ marginTop: 10 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 4,
-            }}
-          >
-            <span
-              className="muted"
-              style={{
-                fontSize: 10,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              ibeam logs (last 300 lines)
-            </span>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => setShowLogs(false)}
-              style={{ fontSize: 11, padding: "2px 6px" }}
-            >
-              hide
-            </button>
+        <div className="mt-2">
+          <div className="pane-head">
+            <span className="pane-head__label">ibeam logs (last 300 lines)</span>
+            <div className="pane-head__actions">
+              <button
+                type="button"
+                className="ghost btn-sm"
+                onClick={() => setShowLogs(false)}
+              >
+                hide
+              </button>
+            </div>
           </div>
-          <pre
-            className="mono"
-            style={{
-              maxHeight: 200,
-              overflow: "auto",
-              padding: 8,
-              background: "var(--bg)",
-              border: "1px solid var(--border)",
-              borderRadius: 3,
-              fontSize: 10,
-              lineHeight: 1.4,
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {logs || "no output"}
-          </pre>
+          <pre className="logs logs-compact">{logs || "no output"}</pre>
         </div>
       )}
     </div>
@@ -310,6 +238,59 @@ function StatePill({ state }: { state: IbeamStatus["state"] }) {
   return <span className={`chip ${c.variant}`}>{c.label}</span>;
 }
 
+/** In-surface destructive confirm: quiet trigger, then a full-width
+ *  banner row that names the consequences. One implementation for
+ *  every state branch; the armed flag survives the 10s status poll
+ *  because it is component state. */
+function UninstallConfirm({
+  busy,
+  onConfirm,
+}: {
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  if (!armed) {
+    return (
+      <button
+        type="button"
+        className="ghost danger fs-xs"
+        disabled={busy}
+        onClick={() => setArmed(true)}
+      >
+        Uninstall
+      </button>
+    );
+  }
+  return (
+    <div className="banner err hstack m-0" style={{ flexBasis: "100%" }}>
+      <span style={{ flex: 1 }}>
+        <strong>Uninstall ibeam?</strong> Stops the container, deletes its
+        compose project, and removes stored IBKR credentials from the vault.
+      </span>
+      <button
+        type="button"
+        className="ghost danger btn-sm"
+        disabled={busy}
+        onClick={() => {
+          setArmed(false);
+          onConfirm();
+        }}
+      >
+        Confirm
+      </button>
+      <button
+        type="button"
+        className="ghost btn-sm"
+        onClick={() => setArmed(false)}
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 function CredentialsForm({
   busy,
   onSubmit,
@@ -324,44 +305,56 @@ function CredentialsForm({
 
   return (
     <form
+      className="vstack"
       onSubmit={(e) => {
         e.preventDefault();
         if (!ready) return;
         onSubmit({ username, password });
       }}
-      style={{ display: "flex", flexDirection: "column", gap: 8 }}
     >
-      <div className="muted fs-xs" style={{ marginBottom: 2, lineHeight: 1.5 }}>
+      <p className="muted fs-xs m-0 lh-relaxed">
         Stored encrypted in the launcher&apos;s vault, injected into the
         container only at start time. Account ID and paper / live mode
         are detected automatically after the first login — you don&apos;t
         need to type them.
+      </p>
+      <div>
+        <label htmlFor="ibeam-username" className="fs-xs muted">
+          IBKR username
+        </label>
+        <input
+          id="ibeam-username"
+          name="username"
+          type="text"
+          placeholder="e.g. U1234567"
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          disabled={busy}
+          className="mt-1"
+        />
       </div>
-      <input
-        name="username"
-        type="text"
-        placeholder="IBKR username"
-        autoComplete="username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        disabled={busy}
-        className="fs-sm"
-      />
-      <input
-        name="password"
-        type="password"
-        placeholder="IBKR password"
-        autoComplete="current-password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        disabled={busy}
-        className="fs-sm"
-      />
+      <div>
+        <label htmlFor="ibeam-password" className="fs-xs muted">
+          IBKR password
+        </label>
+        <input
+          id="ibeam-password"
+          name="password"
+          type="password"
+          placeholder="your IBKR login password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={busy}
+          className="mt-1"
+        />
+      </div>
       <button
         type="submit"
         className="primary"
         disabled={!ready}
-        style={{ alignSelf: "flex-start", fontSize: 12 }}
+        style={{ alignSelf: "flex-start" }}
       >
         {busy ? "Installing…" : "Connect"}
       </button>
