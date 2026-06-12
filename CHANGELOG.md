@@ -4,6 +4,35 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.6.0]
+
+Enterprise shell + design system — four passes in one release: the
+stylesheet tells the truth, density is a system property, status has
+one language, and the install wizard earns trust.
+
+### Changed
+- **Shell uniformity.** Tokens aligned to the platform design law
+  (status amber, radii, brand-first font stacks, a defined hover
+  tier); 991 lines of dead stylesheet from the retired native
+  workspace deleted; a small density utility kit replaces the views'
+  hand-rolled font sizes and margins.
+- **One status language.** New `chip` (machine states) and `banner`
+  (notices) components replace three private pill implementations and
+  four bespoke banners — views map states to variants, never to
+  colors; zero raw color literals remain in any view. Settings and
+  Onboarding now describe Docker states identically.
+- **First-run install flow.** Named steps (Environment → License →
+  Install) with done/current states; install is an explicitly
+  consented action; failures render as a first-class state with
+  Retry (previously the error UI unmounted itself and the install
+  silently re-fired); the value list describes the platform that
+  actually ships; success explains the browser handoff.
+
+### Docs
+- `LAUNCHER_SHELL_REPORT.md`, `LAUNCHER_DESIGN_SYSTEM.md`,
+  `LAUNCHER_WORKFLOW_REPORT.md`, `LAUNCHER_UI_QA.md` — the standards,
+  anti-patterns, and remaining-gap ledgers behind this release.
+
 ## [0.5.1]
 
 Settings polish — same layout, tighter copy.
