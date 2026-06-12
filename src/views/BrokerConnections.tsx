@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import IncidentCard from "@/components/IncidentCard";
 import IbeamSetup from "@/views/IbeamSetup";
 import {
   cmd,
@@ -159,11 +160,13 @@ function CanonicalSourceBanner() {
   );
 }
 
-/** Conflict banner — shown when Houston's bundled IBKR gateway
- *  container is currently running. It and the launcher-managed
- *  ibeam container both bind localhost:5000, so one of them has to
- *  yield. Default recommendation is to let the launcher take over
- *  (auto-reauth is the whole point) but provide both paths. */
+/** Port conflict — Houston's bundled IBKR gateway and the launcher's
+ *  ibeam container both bind localhost:5000, so one has to yield.
+ *  Default recommendation: let the launcher take over (auto-reauth is
+ *  the whole point). Renders through the shared incident contract;
+ *  the action operates directly on the detected container name — no
+ *  compose intermediary, so it works even when the stack's .env is
+ *  missing optional vars that would fail compose before the rm. */
 function HoustonConflictBanner({
   containerName,
   onResolved,
@@ -172,58 +175,32 @@ function HoustonConflictBanner({
   onResolved: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const takeOver = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      // Operate directly on the container name we detected — no
-      // compose intermediary, so the action works even when the
-      // stack's .env is missing optional vars (POSTGRES_PASSWORD,
-      // IBKR_USER, etc.) that would otherwise cause compose to
-      // fail before it reaches the rm.
-      await cmd.dockerRemoveContainer(containerName);
-      onResolved();
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
-    <div className="banner warn">
-      <div className="mb-2">
-        <strong>Port already in use</strong> — the Auracle stack is currently
-        running its own IBKR gateway container (<code>{containerName}</code>)
-        on the port the launcher&apos;s auto-managed connection wants
-        (<code>localhost:5000</code>).
-      </div>
-      <div className="mb-2">
-        Free it and the launcher hosts the connection for every surface —
-        and re-logs in for you on IBKR&apos;s daily reset, so no more 24-hour
-        re-login.
-      </div>
-      <div className="wrap-row">
-        <button
-          type="button"
-          className="primary fs-xs"
-          onClick={takeOver}
-          disabled={busy}
-        >
-          {busy ? "Stopping…" : "Free the port"}
-        </button>
-        <span className="muted mono fs-2xs">
-          stops <code>{containerName}</code>
-        </span>
-      </div>
-      {error && (
-        <div className="mono err-text mt-2">
-          {error}
-        </div>
-      )}
-    </div>
+    <IncidentCard
+      severity="warn"
+      cause="Port already in use — the stack's IBKR gateway holds localhost:5000."
+      detail={`container: ${containerName}`}
+      action={{
+        label: busy ? "Stopping…" : "Free the port",
+        primary: true,
+        busy,
+        onClick: async () => {
+          setBusy(true);
+          try {
+            await cmd.dockerRemoveContainer(containerName);
+            onResolved();
+          } finally {
+            setBusy(false);
+          }
+        },
+      }}
+    >
+      <p className="muted fs-2xs m-0 lh-relaxed mt-2">
+        Freeing it lets the launcher host the connection for every surface
+        and re-log in on IBKR&apos;s daily session reset.
+      </p>
+    </IncidentCard>
   );
 }
 

@@ -18,9 +18,10 @@
 // spawning a docker-compose-ps subprocess every 5s after the user
 // switches tabs.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import ConfirmRow from "@/components/ConfirmRow";
+import IncidentCard from "@/components/IncidentCard";
 import {
   cmd,
   type BrokerAccountSummary,
@@ -40,8 +41,9 @@ export default function Dashboard() {
 
       {/* The launcher is the parent shell; the web product is the child
           surface it opens. ONE door — "Open Auracle" — into the platform
-          (Home, Build incl. Compose, Research, Trade, Seer). */}
-      <h2>Workspaces</h2>
+          (Home, Build incl. Compose, Research, Trade, Seer). A single
+          door needs no section label: the card's primary treatment
+          anchors it. */}
       <div className="mb-3" style={{ maxWidth: 440 }}>
         <LaunchCard
           primary
@@ -535,41 +537,91 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
 
 function ContainersSection() {
   const [status, setStatus] = useState<StackStatus | null | undefined>(undefined);
+  const [probeError, setProbeError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const alive = useRef(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    let handle: number | undefined;
-
-    const tick = async () => {
-      try {
-        const s = await cmd.stackStatus();
-        if (!cancelled) setStatus(s);
-      } catch {
-        // Transient docker-compose error — leave the previous paint
-        // up rather than blanking the section.
-        if (!cancelled && status === undefined) setStatus(null);
+  const probe = useCallback(async () => {
+    try {
+      const s = await cmd.stackStatus();
+      if (alive.current) {
+        setStatus(s);
+        setProbeError(null);
       }
-    };
-
-    tick().then(() => {
-      if (!cancelled) handle = window.setInterval(tick, 5_000);
-    });
-
-    return () => {
-      cancelled = true;
-      if (handle !== undefined) window.clearInterval(handle);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch (err) {
+      // Transient docker-compose error — keep the previous paint up
+      // rather than blanking the rows, but SAY that the check failed:
+      // a section that silently vanishes on probe failure is
+      // indistinguishable from "no install".
+      if (alive.current) {
+        setStatus((prev) => (prev === undefined ? null : prev));
+        setProbeError(String(err));
+      }
+    }
   }, []);
 
+  useEffect(() => {
+    alive.current = true;
+    let handle: number | undefined;
+    probe().then(() => {
+      if (alive.current) handle = window.setInterval(() => void probe(), 5_000);
+    });
+    return () => {
+      alive.current = false;
+      if (handle !== undefined) window.clearInterval(handle);
+    };
+  }, [probe]);
+
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      await probe();
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   if (status === undefined) return null;             // initial probe in flight
-  if (!status || status.containers.length === 0) {
+
+  // Probe failed with nothing ever painted: Docker isn't answering at
+  // all. This is an incident, not an empty state.
+  if (status === null) {
+    if (!probeError) return null;
+    return (
+      <>
+        <h2>Containers</h2>
+        <IncidentCard
+          severity="warn"
+          cause="Container status unavailable — last check failed."
+          action={{
+            label: retrying ? "Retrying…" : "Retry",
+            onClick: retry,
+            busy: retrying,
+          }}
+        />
+      </>
+    );
+  }
+
+  if (status.containers.length === 0) {
     return null;                                     // no install — silent
   }
 
   return (
     <>
       <h2>Containers</h2>
+      {probeError && (
+        <IncidentCard
+          severity="warn"
+          cause="Container status unavailable — last check failed."
+          detail="Showing the last successful check."
+          action={{
+            label: retrying ? "Retrying…" : "Retry",
+            onClick: retry,
+            busy: retrying,
+          }}
+        />
+      )}
       <div className="card">
         {status.containers.map((c) => (
           <div className="row" key={c.name}>

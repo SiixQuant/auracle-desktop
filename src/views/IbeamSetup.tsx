@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import ConfirmRow from "@/components/ConfirmRow";
+import IncidentCard from "@/components/IncidentCard";
 import {
   cmd,
   type IbeamCredentials,
@@ -207,14 +208,15 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
       )}
 
       {status.state.state === "docker_unavailable" && (
-        <div className="muted mono">
-          Docker isn&apos;t reachable: {status.state.detail}. Start Docker
-          Desktop and refresh.
-        </div>
+        <IncidentCard
+          severity="err"
+          cause={`Docker isn't reachable: ${status.state.detail}.`}
+          detail="Start Docker Desktop and return to this screen."
+        />
       )}
 
       {status.state.state === "other" && (
-        <div className="muted mono">{status.state.detail}</div>
+        <IncidentCard severity="err" cause={status.state.detail} />
       )}
 
       {showLogs && (
