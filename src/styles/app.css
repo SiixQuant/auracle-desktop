@@ -379,6 +379,41 @@ input[type="text"]:focus, input[type="password"]:focus {
 .badge.warn { background: rgba(245, 158, 11, 0.12);      color: var(--warn); }
 .badge.err  { background: rgba(239, 68, 68, 0.12);       color: var(--err); }
 
+/* ── Chips — mono data-state pills (broker state, data tier, ibeam) ──
+ * The compact cousin of .badge: same tint vocabulary, mono/uppercase
+ * for machine-state words. Views map their states to a variant —
+ * never to colors. */
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.chip.ok      { background: var(--accent-soft);          color: var(--ok); }
+.chip.warn    { background: rgba(245, 166, 35, 0.12);    color: var(--warn); }
+.chip.err     { background: rgba(239, 68, 68, 0.12);     color: var(--err); }
+.chip.neutral { background: var(--surface-3);            color: var(--fg-dim); }
+
+/* ── Banners — inline notices inside cards/views ──────────────────
+ * info = accent-tinted guidance; warn = needs attention; err = failed.
+ * One shape, token tints only. */
+.banner {
+  padding: var(--s-3);
+  margin-bottom: var(--s-3);
+  border-radius: var(--r-md);
+  font-size: var(--t-xs);
+  line-height: 1.6;
+  color: var(--fg-dim);
+}
+.banner strong { color: var(--fg); }
+.banner.info { background: var(--accent-soft);        border: 1px solid var(--accent-dim); }
+.banner.warn { background: rgba(245, 166, 35, 0.08);  border: 1px solid rgba(245, 166, 35, 0.35); }
+.banner.err  { background: rgba(239, 68, 68, 0.08);   border: 1px solid rgba(239, 68, 68, 0.30); color: var(--err); }
+.banner.err strong { color: var(--err); }
+
 /* ── Logs / code blocks ─────────────────────────────────────────── */
 
 pre.logs {

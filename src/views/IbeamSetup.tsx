@@ -124,18 +124,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
       )}
 
       {error && (
-        <div
-          className="muted mono"
-          style={{
-            color: "var(--err)",
-            fontSize: 11,
-            marginBottom: 8,
-            padding: 6,
-            background: "rgba(248,113,113,0.08)",
-            border: "1px solid rgba(248,113,113,0.3)",
-            borderRadius: 3,
-          }}
-        >
+        <div className="banner err mono">
           {error}
         </div>
       )}
@@ -198,19 +187,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
       {status.state.state === "running" && (
         <div className="wrap-row">
           {!status.state.auth_ok && (
-            <div
-              className="muted"
-              style={{
-                fontSize: 11,
-                padding: 6,
-                background: "rgba(251,191,36,0.1)",
-                border: "1px solid rgba(251,191,36,0.3)",
-                borderRadius: 3,
-                width: "100%",
-                marginBottom: 6,
-                lineHeight: 1.5,
-              }}
-            >
+            <div className="banner warn">
               <strong>Awaiting 2FA approval.</strong> Check your phone for
               an IBKR Mobile push notification and tap Approve. This
               card will flip to green automatically once the session
@@ -319,60 +296,18 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
 }
 
 function StatePill({ state }: { state: IbeamStatus["state"] }) {
-  const cfg: Record<
-    IbeamStatus["state"]["state"],
-    { label: string; bg: string; fg: string }
-  > = {
-    not_installed: {
-      label: "not installed",
-      bg: "rgba(148,163,184,0.15)",
-      fg: "#cbd5e1",
-    },
-    stopped: {
-      label: "stopped",
-      bg: "rgba(148,163,184,0.15)",
-      fg: "#cbd5e1",
-    },
+  const cfg: Record<IbeamStatus["state"]["state"], { variant: string; label: string }> = {
+    not_installed: { variant: "neutral", label: "not installed" },
+    stopped: { variant: "neutral", label: "stopped" },
     running:
       state.state === "running" && state.auth_ok
-        ? {
-            label: "auto-managed",
-            bg: "rgba(74,222,128,0.15)",
-            fg: "#86efac",
-          }
-        : {
-            label: "starting · 2fa",
-            bg: "rgba(251,191,36,0.15)",
-            fg: "#fcd34d",
-          },
-    docker_unavailable: {
-      label: "docker offline",
-      bg: "rgba(248,113,113,0.15)",
-      fg: "#fca5a5",
-    },
-    other: {
-      label: "issue",
-      bg: "rgba(248,113,113,0.15)",
-      fg: "#fca5a5",
-    },
+        ? { variant: "ok", label: "auto-managed" }
+        : { variant: "warn", label: "starting · 2fa" },
+    docker_unavailable: { variant: "err", label: "docker offline" },
+    other: { variant: "err", label: "issue" },
   };
   const c = cfg[state.state];
-  return (
-    <span
-      className="mono"
-      style={{
-        fontSize: 10,
-        padding: "2px 8px",
-        background: c.bg,
-        color: c.fg,
-        borderRadius: 999,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-      }}
-    >
-      {c.label}
-    </span>
-  );
+  return <span className={`chip ${c.variant}`}>{c.label}</span>;
 }
 
 function CredentialsForm({
