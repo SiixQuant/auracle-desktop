@@ -245,7 +245,9 @@ function BrokerRow({
     <div
       style={{
         padding: "10px 0",
-        borderBottom: "1px solid var(--border)",
+        // --line is the real token; the old --border never existed and
+        // the separator silently rendered as nothing (M4 bug class).
+        borderBottom: "1px solid var(--line)",
       }}
     >
       <div className="row" style={{ alignItems: "flex-start" }}>
@@ -282,22 +284,7 @@ function BrokerDetail({ broker }: { broker: BrokerStatus }) {
   const s = broker.state;
   if (s.state === "offline") {
     return (
-      <pre
-        className="mono"
-        style={{
-          fontSize: 11,
-          marginTop: 8,
-          padding: 10,
-          background: "var(--bg-alt)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          overflow: "auto",
-          color: "var(--fg-dim)",
-          whiteSpace: "pre-wrap",
-        }}
-      >
-        {s.hint}
-      </pre>
+      <pre className="logs logs-compact mt-2">{s.hint}</pre>
     );
   }
   if (s.state === "error") {

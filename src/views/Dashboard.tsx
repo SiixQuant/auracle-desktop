@@ -2,17 +2,16 @@
 //
 // Three sections render conditionally:
 //
-//   1. License activation card — only when no license key is stored
-//      in the OS keychain. First thing a customer sees on first
-//      launch so they can't miss it.
+//   1. License card — section appears with an activation form when no
+//      key is stored in the OS keychain, or a quiet active card when
+//      one is. First thing a customer sees on first launch.
 //
-//   2. Quick Actions — "Open Auracle" always; other actions only
-//      when there's something to act on.
+//   2. Workspaces — the one door into the web product.
 //
-//   3. Containers — only when the launcher detects an installed
-//      stack. When no install is present (AURACLE_INSTALL_DIR
-//      missing/empty), the section is silently omitted rather than
-//      showing a "backend unavailable" error.
+//   3. Broker glance + Containers — only when there's something to
+//      show. When no install is present the containers section is
+//      silently omitted rather than showing a "backend unavailable"
+//      error.
 //
 // Stack status polls every 5s while this view is mounted. The
 // effect cleanup tears the interval down on unmount so we're not
@@ -21,6 +20,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import ConfirmRow from "@/components/ConfirmRow";
 import {
   cmd,
   type BrokerAccountSummary,
@@ -40,11 +40,9 @@ export default function Dashboard() {
 
       {/* The launcher is the parent shell; the web product is the child
           surface it opens. ONE door — "Open Auracle" — into the platform
-          (Home, Build incl. Compose, Research, Trade, Seer). Strategy
-          authoring (Compose) lives inside the web product, so the launcher
-          no longer carries a duplicate native Forge. */}
+          (Home, Build incl. Compose, Research, Trade, Seer). */}
       <h2>Workspaces</h2>
-      <div className="launch-grid">
+      <div className="mb-3" style={{ maxWidth: 440 }}>
         <LaunchCard
           primary
           title="Open Auracle"
@@ -114,37 +112,21 @@ function BrokerSection() {
   if (!summary && error) {
     return (
       <>
-        <h2 className="hstack">
-          <span>Broker</span>
-          <button
-            type="button"
-            className="ghost btn-sm"
-            onClick={refresh}
-          >
-            Retry
-          </button>
-        </h2>
+        <div className="section-head">
+          <h2>Broker</h2>
+          <div className="section-head__actions">
+            <button type="button" className="ghost btn-sm" onClick={refresh}>
+              Retry
+            </button>
+          </div>
+        </div>
         <div className="card">
           <p className="muted m-0 fs-sm">
             No broker connected. Open <strong>Settings → Broker Connections</strong> to
             link IBKR, then your account summary and open positions will
             stream into this card.
           </p>
-          <pre
-            className="muted mono"
-            style={{
-              marginTop: 8,
-              padding: 8,
-              background: "var(--bg-alt)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              fontSize: 11,
-              overflow: "auto",
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {error}
-          </pre>
+          <pre className="logs logs-compact mt-2">{error}</pre>
         </div>
       </>
     );
@@ -152,33 +134,26 @@ function BrokerSection() {
 
   return (
     <>
-      <h2 className="hstack">
-        <span>Broker</span>
+      <div className="section-head">
+        <h2>Broker</h2>
+        {marketData && <DataQualityBadge quality={marketData.us_equity} />}
+        {loading && <span className="muted mono fs-xs">refreshing…</span>}
         {/* Quick-glance only — full portfolio + order management lives in
             the web Trade view (R-4: keep the glance, link out for depth). */}
-        <button
-          type="button"
-          className="ghost btn-sm"
-          onClick={() => { void openAuracle("/blotter"); }}
-          title="Open the full Trade view in Auracle"
-        >
-          Open Trade →
-        </button>
-        {marketData && <DataQualityBadge quality={marketData.us_equity} />}
-        {loading && (
-          <span className="muted mono fs-xs">
-            refreshing…
-          </span>
-        )}
-        <button
-          type="button"
-          className="ghost btn-sm"
-          onClick={refresh}
-          style={{ marginLeft: "auto" }}
-        >
-          Refresh
-        </button>
-      </h2>
+        <div className="section-head__actions">
+          <button
+            type="button"
+            className="ghost btn-sm"
+            onClick={() => { void openAuracle("/blotter"); }}
+            title="Open the full Trade view in Auracle"
+          >
+            Open Trade →
+          </button>
+          <button type="button" className="ghost btn-sm" onClick={refresh}>
+            Refresh
+          </button>
+        </div>
+      </div>
       <div className="card">
         {summary && <BrokerKpiRow summary={summary} />}
         {positions !== null && positions.length > 0 && (
@@ -261,62 +236,34 @@ function BrokerKpiRow({ summary }: { summary: BrokerAccountSummary }) {
           maximumFractionDigits: 2,
         })}`;
 
-  const cards: { label: string; value: string; color?: string }[] = [
+  const pnl = summary.unrealized_pnl ?? 0;
+  const cards: { label: string; value: string; tone?: "ok" | "err" }[] = [
     { label: "Net liq", value: fmt(summary.net_liquidation) },
     { label: "Buying power", value: fmt(summary.buying_power) },
     { label: "Available", value: fmt(summary.available_funds) },
     {
       label: "Unrealized P&L",
       value: fmtSigned(summary.unrealized_pnl),
-      color:
-        (summary.unrealized_pnl ?? 0) > 0
-          ? "var(--ok)"
-          : (summary.unrealized_pnl ?? 0) < 0
-            ? "var(--err)"
-            : undefined,
+      tone: pnl > 0 ? "ok" : pnl < 0 ? "err" : undefined,
     },
   ];
 
   return (
     <div>
-      <div className="muted mono fs-xs mb-2">
+      <div className="micro-label mb-2">
         account · {summary.account_id} · {summary.currency}
       </div>
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${cards.length}, 1fr)`,
-          gap: 8,
-        }}
+        className="kpi-grid"
+        style={{ gridTemplateColumns: `repeat(${cards.length}, 1fr)` }}
       >
         {cards.map((c) => (
-          <div
-            key={c.label}
-            style={{
-              padding: "10px 12px",
-              background: "var(--bg-alt)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-            }}
-          >
+          <div className="kpi" key={c.label}>
+            <div className="micro-label mb-1">{c.label}</div>
             <div
-              className="muted"
-              style={{
-                fontSize: 10,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-                marginBottom: 4,
-              }}
-            >
-              {c.label}
-            </div>
-            <div
-              className="mono"
-              style={{
-                fontSize: 16,
-                fontWeight: 500,
-                color: c.color ?? "var(--fg)",
-              }}
+              className={`kpi__value${
+                c.tone === "ok" ? " ok-text" : c.tone === "err" ? " err-text" : ""
+              }`}
             >
               {c.value}
             </div>
@@ -338,27 +285,10 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
 
   return (
     <div className="mt-4">
-      <div
-        className="muted"
-        style={{
-          fontSize: 11,
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-          marginBottom: 6,
-        }}
-      >
-        Top positions
-      </div>
-      <table
-        className="mono"
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: 12,
-        }}
-      >
+      <div className="micro-label mb-2">Top positions</div>
+      <table className="data-table">
         <thead>
-          <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--fg-dim)" }}>
+          <tr>
             <th className="cell">Symbol</th>
             <th className="cell-num">Qty</th>
             <th className="cell-num">Mkt Val</th>
@@ -368,18 +298,11 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
         <tbody>
           {sorted.map((p) => {
             const pnl = p.unrealized_pnl ?? 0;
-            const pnlColor =
-              pnl > 0
-                ? "var(--ok)"
-                : pnl < 0
-                  ? "var(--err)"
-                  : "var(--fg)";
+            const pnlClass =
+              pnl > 0 ? " ok-text" : pnl < 0 ? " err-text" : "";
             return (
-              <tr
-                key={p.symbol}
-                style={{ borderBottom: "1px solid var(--border)" }}
-              >
-                <td style={{ padding: "6px 8px" }}>{p.symbol}</td>
+              <tr key={p.symbol}>
+                <td className="cell">{p.symbol}</td>
                 <td className="cell-num">
                   {p.quantity?.toLocaleString("en-US") ?? "—"}
                 </td>
@@ -392,13 +315,7 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
                       })
                     : "—"}
                 </td>
-                <td
-                  style={{
-                    padding: "6px 8px",
-                    textAlign: "right",
-                    color: pnlColor,
-                  }}
-                >
+                <td className={`cell-num${pnlClass}`}>
                   {pnl >= 0 ? "+" : ""}
                   {pnl.toLocaleString("en-US", {
                     style: "currency",
@@ -412,9 +329,7 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
         </tbody>
       </table>
       {positions.length > sorted.length && (
-        <div
-          className="muted mono fs-xs mt-1"
-        >
+        <div className="muted mono fs-xs mt-1">
           showing top {sorted.length} of {positions.length}
         </div>
       )}
@@ -496,11 +411,12 @@ function LaunchCard({
   );
 }
 
-// ── License activation ──────────────────────────────────────────
+// ── License ─────────────────────────────────────────────────────
 
 function LicenseSection() {
   const [stored, setStored] = useState<string | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
 
   const refresh = async () => {
     try {
@@ -522,64 +438,47 @@ function LicenseSection() {
     return null; // initial fetch in flight
   }
 
-  if (stored && !editing) {
-    return (
-      <div
-        className="card"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <div>
-          <strong>License active</strong>
-          <div className="muted mono mt-1">
-            {stored.slice(0, 16)}…
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span className="badge ok">activated</span>
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => setEditing(true)}
-          >
-            Change
-          </button>
-          <button
-            type="button"
-            className="ghost danger"
-            onClick={async () => {
-              if (
-                !confirm(
-                  "Remove the stored license key? You can paste it again from your email anytime.",
-                )
-              )
-                return;
-              try {
-                await cmd.licenseClear();
-                refresh();
-              } catch (err) {
-                alert("Could not clear: " + err);
-              }
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <ActivationCard
-      onSaved={() => {
-        setEditing(false);
-        refresh();
-      }}
-    />
+    <>
+      <h2>License</h2>
+      {stored && !editing ? (
+        <div className="card">
+          <div className="wrap-row">
+            <div style={{ flex: 1 }}>
+              <strong>License active</strong>
+              <div className="muted mono mt-1">{stored.slice(0, 16)}…</div>
+            </div>
+            <span className="badge ok">activated</span>
+            <button type="button" className="ghost" onClick={() => setEditing(true)}>
+              Change
+            </button>
+            <ConfirmRow
+              trigger="Clear"
+              title="Remove the stored license key?"
+              body="You can paste it again from your purchase email anytime."
+              confirmLabel="Remove"
+              onConfirm={async () => {
+                setClearError(null);
+                try {
+                  await cmd.licenseClear();
+                  refresh();
+                } catch (err) {
+                  setClearError("Could not clear: " + err);
+                }
+              }}
+            />
+          </div>
+          {clearError && <div className="err-text fs-xs mt-2">{clearError}</div>}
+        </div>
+      ) : (
+        <ActivationCard
+          onSaved={() => {
+            setEditing(false);
+            refresh();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -604,9 +503,8 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div className="card">
-      <h2 className="mt-0">Activate Auracle</h2>
-      <p className="muted mt-0 mb-3">
-        Paste the license key from your purchase email.
+      <p className="muted m-0 mb-3">
+        Paste the license key from your purchase email to activate Auracle.
       </p>
       <input
         type="password"
@@ -615,18 +513,19 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
-      <div
-        style={{
-          marginTop: 12,
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-        }}
-      >
+      <div className="hstack mt-4">
         <button type="button" className="primary" onClick={save}>
           Save
         </button>
-        <span className="muted mono">{status}</span>
+        <span
+          className={
+            /^(Could not|Paste)/.test(status)
+              ? "err-text fs-xs"
+              : "muted mono fs-xs"
+          }
+        >
+          {status}
+        </span>
       </div>
     </div>
   );

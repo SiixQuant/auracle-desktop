@@ -192,21 +192,9 @@ h2 {
 
 .row + .row { border-top: 1px solid var(--line); }
 
-/* ── Launch cards (Home → Workspaces) ────────────────────────────
- * Two-up entry grid: the one platform door (primary) + native Forge.
- * The whole card is a button — the arrow + hover accent signal it,
- * so there's no nested-button or repeated CTA noise. */
-
-.launch-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--s-3);
-  margin-bottom: var(--s-3);
-}
-
-@media (max-width: 640px) {
-  .launch-grid { grid-template-columns: 1fr; }
-}
+/* ── Launch card (Home → Workspaces) ─────────────────────────────
+ * The one platform door. The whole card is a button — the arrow +
+ * hover accent signal it. */
 
 .launch-card {
   position: relative;
@@ -473,14 +461,57 @@ pre.logs.logs-compact { max-height: 200px; }
   align-items: center;
   margin-bottom: var(--s-1);
 }
-.pane-head__label {
+.pane-head__label,
+.micro-label {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
 }
+.micro-label { display: block; }
 .pane-head__actions { display: flex; gap: var(--s-2); }
+
+/* ── Section head — h2 + right-aligned actions on one line ───────
+ * Buttons never live inside the h2 element; the wrapper carries the
+ * section margins and the h2 inside drops to zero. */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-5) 0 var(--s-2);
+}
+.section-head h2 { margin: 0; }
+.section-head__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+
+/* ── KPI tiles — the broker glance numbers ───────────────────────── */
+.kpi-grid { display: grid; gap: var(--s-2); }
+.kpi {
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.kpi__value {
+  font-family: var(--font-mono);
+  font-size: var(--t-md);
+  font-weight: 500;
+}
+
+/* ── Data table — quiet mono table for glance data ──────────────── */
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}
+.data-table thead tr { border-bottom: 1px solid var(--line); color: var(--fg-dim); }
+.data-table tbody tr { border-bottom: 1px solid var(--line); }
 
 /* ── Sub-card — nested panel inside a row (ibeam under IBKR) ─────
  * Quieter tier of .card: tighter radius, surface tint, line border. */
@@ -522,6 +553,8 @@ pre.logs.logs-compact { max-height: 200px; }
 
 .fs-2xs { font-size: 10px; }          /* chip/log tier for fine print */
 .err-text { color: var(--err); }
+.ok-text  { color: var(--ok); }
+.mb-1 { margin-bottom: var(--s-1); }
 .mb-3 { margin-bottom: var(--s-3); }
 
 /* Table cells (status/positions tables) — quiet, right-aligned numerics. */
