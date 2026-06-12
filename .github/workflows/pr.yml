@@ -45,7 +45,7 @@ jobs:
 
       - name: clippy
         working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
 
   rust-test:
     runs-on: ubuntu-22.04
@@ -71,7 +71,7 @@ jobs:
         run: npm run build
       - name: cargo test
         working-directory: src-tauri
-        run: cargo test --no-default-features
+        run: cargo test --locked --no-default-features
 
   # Audit P1-4: scan the Rust dependency tree for CVEs published to
   # the RustSec Advisory Database. cargo audit is the de-facto tool

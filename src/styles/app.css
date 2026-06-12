@@ -402,6 +402,16 @@ input[type="text"]:focus, input[type="password"]:focus {
 .progress       { height: 6px; background: var(--surface-2); border-radius: var(--r-pill); overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); transition: width 0.4s ease; }
 
+/* Wizard step footer — back/next rail under each step's content. */
+.step-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--s-6);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+}
+
 /* ── Chips — mono data-state pills (broker state, data tier, ibeam) ──
  * The compact cousin of .badge: same tint vocabulary, mono/uppercase
  * for machine-state words. Views map their states to a variant —

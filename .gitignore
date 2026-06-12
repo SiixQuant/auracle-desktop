@@ -1,6 +1,5 @@
 # Rust build artifacts
 src-tauri/target/
-src-tauri/Cargo.lock
 **/*.rs.bk
 
 # Tauri-generated context

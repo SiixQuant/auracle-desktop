@@ -49,10 +49,7 @@ export default function Onboarding({ onDone }: OnboardingProps) {
       style={{ maxWidth: 640, margin: "48px auto", padding: 32 }}
     >
       <div className="hstack" style={{ marginBottom: 24 }}>
-        <span
-          className="logo-dot"
-          style={{ background: "var(--accent)", width: 14, height: 14 }}
-        />
+        <span className="logo-dot healthy" style={{ width: 14, height: 14 }} />
         <h1 className="m-0">Welcome to Auracle Desktop</h1>
       </div>
 
@@ -596,16 +593,7 @@ function Actions({
   return (
     <>
       <div>{children}</div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: 32,
-          paddingTop: 24,
-          borderTop: "1px solid var(--line)",
-        }}
-      >
+      <div className="step-footer">
         {onBack ? (
           <button type="button" className="ghost" onClick={onBack}>
             ← Back

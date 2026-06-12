@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 
+import IncidentCard from "@/components/IncidentCard";
 import BrokerConnectionsCard from "@/views/BrokerConnections";
 import {
   cmd,
@@ -123,19 +124,26 @@ function SystemCard() {
       setInstallLabel(v ? "Already installed" : "Run First-Time Install");
     });
 
-    cmd.dockerStatus()
-      .then((s) => setDocker(s))
-      .catch((err) => {
-        // Defense-in-depth: backend used to swallow spawn errors and
-        // never resolve, leaving the UI stuck on "checking..." forever.
-        // It's fixed in 0.2.2+ but a stuck label is worse than a wrong
-        // one, so render a fallback if the promise still rejects.
-        setDocker("error");
-        setDockerError(String(err));
-      });
+    void loadDocker();
 
     cmd.currentVersion().then(setVersion).catch(() => setVersion("?"));
   }, []);
+
+  // Defense-in-depth: the backend used to swallow spawn errors and
+  // never resolve, leaving the UI stuck on "checking..." forever.
+  // Fixed in 0.2.2+, but a stuck label is worse than a wrong one, so
+  // a rejection still lands as an explicit error state — and the
+  // incident card can retry it.
+  const loadDocker = async () => {
+    try {
+      const s = await cmd.dockerStatus();
+      setDocker(s);
+      setDockerError(null);
+    } catch (err) {
+      setDocker("error");
+      setDockerError(String(err));
+    }
+  };
 
   const runInstall = async () => {
     setInstalling(true);
@@ -209,8 +217,13 @@ function SystemCard() {
         </div>
         <div className="row">
           <div>Docker Desktop</div>
-          <DockerStatusBadge status={docker} error={dockerError} />
+          <DockerChip status={docker} />
         </div>
+        <DockerIncident
+          status={docker}
+          error={dockerError}
+          onRetry={loadDocker}
+        />
         <div className="pane-head mt-4">
           <span className="pane-head__label">Launcher version</span>
           <div className="pane-head__actions">
@@ -274,59 +287,72 @@ function SystemCard() {
   );
 }
 
-function DockerStatusBadge({
+/** Glance tier: the chip that lives in the Docker row's right cell.
+ *  Incident states escalate to a full-width IncidentCard BELOW the
+ *  row (banners are never row children) — see DockerIncident. */
+function DockerChip({ status }: { status: DockerStatus | null | "error" }) {
+  if (status === null) return <span className="chip neutral">checking</span>;
+  if (status === "error") return <span className="chip err">check failed</span>;
+  if (!status.installed) return <span className="chip err">not installed</span>;
+  if (!status.running) return <span className="chip warn">not running</span>;
+  return (
+    <div className="hstack">
+      <span className="chip ok">running</span>
+      <span className="muted mono fs-xs">{status.version || "docker"}</span>
+    </div>
+  );
+}
+
+/** Act tier: the shared incident contract for the three Docker
+ *  failure states. Healthy and checking render nothing here. */
+function DockerIncident({
   status,
   error,
+  onRetry,
 }: {
   status: DockerStatus | null | "error";
   error: string | null;
+  onRetry: () => Promise<void>;
 }) {
-  if (status === null) return <span className="chip neutral">checking</span>;
+  if (status === null) return null;
 
   if (status === "error") {
     return (
-      <div className="hstack" style={{ gap: 8 }}>
-        <span className="chip err">check failed</span>
-        {error ? <span className="muted fs-xs">{error}</span> : null}
-      </div>
+      <IncidentCard
+        severity="err"
+        cause="Docker status check failed."
+        detail={error ?? undefined}
+        action={{ label: "Retry", onClick: onRetry }}
+      />
     );
   }
-
   if (!status.installed) {
     return (
-      <div className="hstack" style={{ gap: 8 }}>
-        <span className="chip err">not installed</span>
-        <button
-          type="button"
-          className="ghost btn-sm"
-          onClick={async () => {
+      <IncidentCard
+        severity="err"
+        cause="Docker Desktop is not installed."
+        action={{
+          label: "Download Docker Desktop",
+          onClick: async () => {
             try {
               const url = await cmd.dockerInstallUrl();
               await openInBrowser(url);
             } catch (err) {
               console.warn("docker install url fetch failed:", err);
             }
-          }}
-        >
-          Download Docker Desktop
-        </button>
-      </div>
+          },
+        }}
+      />
     );
   }
-
   if (!status.running) {
     return (
-      <div className="hstack" style={{ gap: 8 }}>
-        <span className="chip warn">installed · not running</span>
-        <span className="muted fs-xs">start Docker Desktop</span>
-      </div>
+      <IncidentCard
+        severity="warn"
+        cause="Docker is installed but not running."
+        detail="Open Docker Desktop to start it, then return here."
+      />
     );
   }
-
-  return (
-    <div className="hstack" style={{ gap: 8 }}>
-      <span className="chip ok">running</span>
-      <span className="muted mono fs-xs">{status.version || "docker"}</span>
-    </div>
-  );
+  return null;
 }
