@@ -461,6 +461,37 @@ pre.logs {
   color: var(--fg-dim);
 }
 
+/* Compact variant — inline tails where logs are secondary to the
+ * action on screen (ibeam sub-card, installer details). */
+pre.logs.logs-compact { max-height: 200px; }
+
+/* ── Pane head — quiet header for collapsible sub-panes ──────────
+ * Uppercase label left, small actions right. Not a card title bar. */
+.pane-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--s-1);
+}
+.pane-head__label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.pane-head__actions { display: flex; gap: var(--s-2); }
+
+/* ── Sub-card — nested panel inside a row (ibeam under IBKR) ─────
+ * Quieter tier of .card: tighter radius, surface tint, line border. */
+.subcard {
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
 /* ── Density utilities ───────────────────────────────────────────
  * The only sanctioned way to do micro-typography and small gaps in
  * views. Inline style={{}} is reserved for genuine one-off LAYOUT;
@@ -479,7 +510,11 @@ pre.logs {
 .ml-2 { margin-left: var(--s-2); }
 
 .hstack      { display: flex; align-items: center; gap: var(--s-3); }
+.vstack      { display: flex; flex-direction: column; gap: var(--s-2); }
 .wrap-row    { display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center; }
+
+/* Relaxed line-height for help/description text under controls. */
+.lh-relaxed { line-height: 1.5; }
 
 /* Compact control size — the codified 12px tier small buttons share
  * with seg-tabs. The ONLY place this size is defined. */
