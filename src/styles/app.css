@@ -192,6 +192,11 @@ h2 {
 
 .row + .row { border-top: 1px solid var(--line); }
 
+/* Block-flow list row — .row's sibling-border idiom for column
+ * content (a control row stacked over a sub-card). */
+.list-row { padding: var(--s-3) 0; }
+.list-row + .list-row { border-top: 1px solid var(--line); }
+
 /* ── Launch card (Home → Workspaces) ─────────────────────────────
  * The one platform door. The whole card is a button — the arrow +
  * hover accent signal it. */

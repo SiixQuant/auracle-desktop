@@ -81,17 +81,19 @@ export default function BrokerConnectionsCard() {
 
   return (
     <>
-      <h2 className="hstack">
-        <span>Broker Connections</span>
-        <button
-          type="button"
-          className="ghost btn-sm"
-          onClick={refresh}
-          disabled={refreshing}
-        >
-          {refreshing ? "Checking…" : "Refresh"}
-        </button>
-      </h2>
+      <div className="section-head">
+        <h2>Broker Connections</h2>
+        <div className="section-head__actions">
+          <button
+            type="button"
+            className="ghost btn-sm"
+            onClick={refresh}
+            disabled={refreshing}
+          >
+            {refreshing ? "Checking…" : "Refresh"}
+          </button>
+        </div>
+      </div>
       <div className="card">
         <CanonicalSourceBanner />
         {houstonConflict && (
@@ -101,7 +103,7 @@ export default function BrokerConnectionsCard() {
           />
         )}
         {error && (
-          <div className="muted mono err-text mb-3">
+          <div className="mono err-text mb-3">
             {error}
           </div>
         )}
@@ -150,7 +152,7 @@ function BrokerList({
 function CanonicalSourceBanner() {
   return (
     <div className="banner info">
-      <strong style={{ color: "var(--fg)" }}>One connection, everywhere.</strong>
+      <strong>One connection, everywhere.</strong>
       {" "}
       Set up your broker once here — the launcher, Forge, and the web UI all use it.
     </div>
@@ -192,7 +194,7 @@ function HoustonConflictBanner({
 
   return (
     <div className="banner warn">
-      <div className="mb-2" style={{ color: "var(--fg)" }}>
+      <div className="mb-2">
         <strong>Port already in use</strong> — the Auracle stack is currently
         running its own IBKR gateway container (<code>{containerName}</code>)
         on the port the launcher&apos;s auto-managed connection wants
@@ -217,7 +219,7 @@ function HoustonConflictBanner({
         </span>
       </div>
       {error && (
-        <div className="muted mono err-text fs-xs mt-2">
+        <div className="mono err-text mt-2">
           {error}
         </div>
       )}
@@ -242,17 +244,10 @@ function BrokerRow({
   const isIbkr = broker.id === "ibkr";
 
   return (
-    <div
-      style={{
-        padding: "10px 0",
-        // --line is the real token; the old --border never existed and
-        // the separator silently rendered as nothing (M4 bug class).
-        borderBottom: "1px solid var(--line)",
-      }}
-    >
+    <div className="list-row">
       <div className="row" style={{ alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="hstack">
             <strong>{broker.label}</strong>
             <StatePill state={broker.state} />
           </div>
@@ -289,7 +284,7 @@ function BrokerDetail({ broker }: { broker: BrokerStatus }) {
   }
   if (s.state === "error") {
     return (
-      <div className="muted mono err-text fs-xs mt-2">
+      <div className="mono err-text mt-2">
         {s.detail}
       </div>
     );
@@ -375,7 +370,7 @@ function BrokerActions({
 
   if (s.state === "unauthenticated") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div className="vstack">
         <button
           type="button"
           className="primary fs-xs"
@@ -408,7 +403,7 @@ function BrokerActions({
 
   if (s.state === "connected") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+      <div className="vstack" style={{ alignItems: "flex-end" }}>
         <button
           type="button"
           className="ghost fs-xs"
@@ -419,14 +414,8 @@ function BrokerActions({
         </button>
         {testResult && (
           <div
-            className="muted mono"
-            style={{
-              fontSize: 10,
-              color: testResult.ok ? "var(--ok)" : "var(--err)",
-              maxWidth: 200,
-              textAlign: "right",
-              whiteSpace: "pre-wrap",
-            }}
+            className={`mono fs-2xs ${testResult.ok ? "ok-text" : "err-text"}`}
+            style={{ maxWidth: 200, textAlign: "right", whiteSpace: "pre-wrap" }}
           >
             {testResult.ok ? "✓ " : "✗ "}
             {testResult.msg}
