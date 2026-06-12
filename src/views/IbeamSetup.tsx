@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import ConfirmRow from "@/components/ConfirmRow";
 import {
   cmd,
   type IbeamCredentials,
@@ -146,7 +147,14 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
           >
             View logs
           </button>
-          <UninstallConfirm busy={busy !== null} onConfirm={uninstall} />
+          <ConfirmRow
+            compact
+            trigger="Uninstall"
+            title="Uninstall ibeam?"
+            body="Stops the container, deletes its compose project, and removes stored IBKR credentials from the vault."
+            busy={busy !== null}
+            onConfirm={uninstall}
+          />
           <div className="muted mono">last state: {status.state.reason}</div>
         </div>
       )}
@@ -186,7 +194,14 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
             >
               View logs
             </button>
-            <UninstallConfirm busy={busy !== null} onConfirm={uninstall} />
+            <ConfirmRow
+              compact
+              trigger="Uninstall"
+              title="Uninstall ibeam?"
+              body="Stops the container, deletes its compose project, and removes stored IBKR credentials from the vault."
+              busy={busy !== null}
+              onConfirm={uninstall}
+            />
           </div>
         </>
       )}
@@ -236,59 +251,6 @@ function StatePill({ state }: { state: IbeamStatus["state"] }) {
   };
   const c = cfg[state.state];
   return <span className={`chip ${c.variant}`}>{c.label}</span>;
-}
-
-/** In-surface destructive confirm: quiet trigger, then a full-width
- *  banner row that names the consequences. One implementation for
- *  every state branch; the armed flag survives the 10s status poll
- *  because it is component state. */
-function UninstallConfirm({
-  busy,
-  onConfirm,
-}: {
-  busy: boolean;
-  onConfirm: () => void;
-}) {
-  const [armed, setArmed] = useState(false);
-
-  if (!armed) {
-    return (
-      <button
-        type="button"
-        className="ghost danger fs-xs"
-        disabled={busy}
-        onClick={() => setArmed(true)}
-      >
-        Uninstall
-      </button>
-    );
-  }
-  return (
-    <div className="banner err hstack m-0" style={{ flexBasis: "100%" }}>
-      <span style={{ flex: 1 }}>
-        <strong>Uninstall ibeam?</strong> Stops the container, deletes its
-        compose project, and removes stored IBKR credentials from the vault.
-      </span>
-      <button
-        type="button"
-        className="ghost danger btn-sm"
-        disabled={busy}
-        onClick={() => {
-          setArmed(false);
-          onConfirm();
-        }}
-      >
-        Confirm
-      </button>
-      <button
-        type="button"
-        className="ghost btn-sm"
-        onClick={() => setArmed(false)}
-      >
-        Cancel
-      </button>
-    </div>
-  );
 }
 
 function CredentialsForm({
