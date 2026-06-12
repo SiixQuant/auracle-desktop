@@ -250,26 +250,25 @@ function DockerStatusBadge({
   status: DockerStatus | null | "error";
   error: string | null;
 }) {
-  if (status === null) return <div className="muted mono">checking…</div>;
+  if (status === null) return <span className="chip neutral">checking</span>;
 
   if (status === "error") {
     return (
-      <div className="muted mono">
-        <span className="badge err">check failed</span>
-        {error ? ` — ${error}` : null}
+      <div className="hstack" style={{ gap: 8 }}>
+        <span className="chip err">check failed</span>
+        {error ? <span className="muted fs-xs">{error}</span> : null}
       </div>
     );
   }
 
   if (!status.installed) {
     return (
-      <div className="muted mono">
-        <span className="badge err">not installed</span>
-        {" — "}
-        <a
-          href="#"
-          onClick={async (e) => {
-            e.preventDefault();
+      <div className="hstack" style={{ gap: 8 }}>
+        <span className="chip err">not installed</span>
+        <button
+          type="button"
+          className="ghost btn-sm"
+          onClick={async () => {
             try {
               const url = await cmd.dockerInstallUrl();
               await openInBrowser(url);
@@ -278,27 +277,25 @@ function DockerStatusBadge({
             }
           }}
         >
-          install Docker Desktop
-        </a>
+          Download Docker Desktop
+        </button>
       </div>
     );
   }
 
   if (!status.running) {
     return (
-      <div className="muted mono">
-        <span className="badge warn">installed but not running</span> — start
-        Docker Desktop
+      <div className="hstack" style={{ gap: 8 }}>
+        <span className="chip warn">installed · not running</span>
+        <span className="muted fs-xs">start Docker Desktop</span>
       </div>
     );
   }
 
   return (
-    <div className="muted mono">
-      <span className="badge ok">running</span>
-      {" "}
-      {status.version || "docker"}
+    <div className="hstack" style={{ gap: 8 }}>
+      <span className="chip ok">running</span>
+      <span className="muted mono fs-xs">{status.version || "docker"}</span>
     </div>
   );
 }
-

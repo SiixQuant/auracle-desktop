@@ -118,15 +118,14 @@ function BrokerSection() {
           <span>Broker</span>
           <button
             type="button"
-            className="ghost"
+            className="ghost btn-sm"
             onClick={refresh}
-            style={{ fontSize: 12, padding: "4px 10px" }}
           >
             Retry
           </button>
         </h2>
         <div className="card">
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          <p className="muted m-0 fs-sm">
             No broker connected. Open <strong>Settings → Broker Connections</strong> to
             link IBKR, then your account summary and open positions will
             stream into this card.
@@ -159,9 +158,8 @@ function BrokerSection() {
             the web Trade view (R-4: keep the glance, link out for depth). */}
         <button
           type="button"
-          className="ghost"
+          className="ghost btn-sm"
           onClick={() => { void openAuracle("/blotter"); }}
-          style={{ fontSize: 12, padding: "4px 10px" }}
           title="Open the full Trade view in Auracle"
         >
           Open Trade →
@@ -174,9 +172,9 @@ function BrokerSection() {
         )}
         <button
           type="button"
-          className="ghost"
+          className="ghost btn-sm"
           onClick={refresh}
-          style={{ fontSize: 12, padding: "4px 10px", marginLeft: "auto" }}
+          style={{ marginLeft: "auto" }}
         >
           Refresh
         </button>
@@ -187,7 +185,7 @@ function BrokerSection() {
           <BrokerPositionsList positions={positions} />
         )}
         {positions !== null && positions.length === 0 && summary && (
-          <div className="muted mono" style={{ fontSize: 12, marginTop: 8 }}>
+          <div className="muted mono fs-xs mt-2">
             No open positions.
           </div>
         )}
@@ -415,8 +413,7 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
       </table>
       {positions.length > sorted.length && (
         <div
-          className="muted mono"
-          style={{ fontSize: 11, marginTop: 4 }}
+          className="muted mono fs-xs mt-1"
         >
           showing top {sorted.length} of {positions.length}
         </div>
@@ -608,7 +605,7 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
   return (
     <div className="card">
       <h2 className="mt-0">Activate Auracle</h2>
-      <p className="muted" style={{ margin: "0 0 12px" }}>
+      <p className="muted mt-0 mb-3">
         Paste the license key from your purchase email.
       </p>
       <input

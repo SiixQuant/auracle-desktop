@@ -479,7 +479,15 @@ pre.logs {
 .ml-2 { margin-left: var(--s-2); }
 
 .hstack      { display: flex; align-items: center; gap: var(--s-3); }
-.wrap-row    { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.wrap-row    { display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center; }
+
+/* Compact control size — the codified 12px tier small buttons share
+ * with seg-tabs. The ONLY place this size is defined. */
+.btn-sm { font-size: 12px; padding: 4px 10px; }
+
+.fs-2xs { font-size: 10px; }          /* chip/log tier for fine print */
+.err-text { color: var(--err); }
+.mb-3 { margin-bottom: var(--s-3); }
 
 /* Table cells (status/positions tables) — quiet, right-aligned numerics. */
 .cell     { padding: var(--s-1) var(--s-2); text-align: left;  font-weight: 400; }

@@ -85,10 +85,9 @@ export default function BrokerConnectionsCard() {
         <span>Broker Connections</span>
         <button
           type="button"
-          className="ghost"
+          className="ghost btn-sm"
           onClick={refresh}
           disabled={refreshing}
-          style={{ fontSize: 12, padding: "4px 10px" }}
         >
           {refreshing ? "Checking…" : "Refresh"}
         </button>
@@ -102,12 +101,12 @@ export default function BrokerConnectionsCard() {
           />
         )}
         {error && (
-          <div className="muted mono" style={{ color: "var(--err)", marginBottom: 12 }}>
+          <div className="muted mono err-text mb-3">
             {error}
           </div>
         )}
         {!statuses && !error && (
-          <div className="muted mono" style={{ padding: 8 }}>
+          <div className="muted mono fs-xs mt-1">
             probing brokers…
           </div>
         )}
@@ -193,18 +192,18 @@ function HoustonConflictBanner({
 
   return (
     <div className="banner warn">
-      <div style={{ color: "var(--fg)", marginBottom: 6 }}>
+      <div className="mb-2" style={{ color: "var(--fg)" }}>
         <strong>Port already in use</strong> — the Auracle stack is currently
         running its own IBKR gateway container (<code>{containerName}</code>)
         on the port the launcher&apos;s auto-managed connection wants
         (<code>localhost:5000</code>).
       </div>
-      <div style={{ color: "var(--fg-dim)", marginBottom: 8 }}>
+      <div className="mb-2">
         Free it and the launcher hosts the connection for every surface —
         and re-logs in for you on IBKR&apos;s daily reset, so no more 24-hour
         re-login.
       </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="wrap-row">
         <button
           type="button"
           className="primary fs-xs"
@@ -213,15 +212,12 @@ function HoustonConflictBanner({
         >
           {busy ? "Stopping…" : "Free the port"}
         </button>
-        <span className="muted mono" style={{ fontSize: 10 }}>
+        <span className="muted mono fs-2xs">
           stops <code>{containerName}</code>
         </span>
       </div>
       {error && (
-        <div
-          className="muted mono"
-          style={{ color: "var(--err)", fontSize: 11, marginTop: 6 }}
-        >
+        <div className="muted mono err-text fs-xs mt-2">
           {error}
         </div>
       )}
@@ -306,17 +302,14 @@ function BrokerDetail({ broker }: { broker: BrokerStatus }) {
   }
   if (s.state === "error") {
     return (
-      <div
-        className="muted mono"
-        style={{ fontSize: 11, marginTop: 6, color: "var(--err)" }}
-      >
+      <div className="muted mono err-text fs-xs mt-2">
         {s.detail}
       </div>
     );
   }
   if (s.state === "connected") {
     return (
-      <div className="muted mono" style={{ fontSize: 11, marginTop: 6 }}>
+      <div className="muted mono fs-xs mt-2">
         account · {s.account_id}
         {s.account_label ? ` · ${s.account_label}` : null}
       </div>
