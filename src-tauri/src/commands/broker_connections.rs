@@ -88,7 +88,32 @@ pub struct BrokerStatus {
     /// True when a real execution adapter exists for this source
     /// (auracle/brokers/*). Drives the "Trade" capability badge.
     pub provides_execution: bool,
+    /// How the user actually connects this source from the launcher:
+    ///   "gateway"  — an in-launcher portal/gateway connect flow exists
+    ///                (opens the broker's secure login from here). TODAY
+    ///                only IBKR (Client Portal Gateway via the ibeam
+    ///                supervisor) qualifies.
+    ///   "api_key"  — connects by API key/secret; no in-launcher portal.
+    ///   "wallet"   — wallet-signed (no API key, no portal).
+    ///   "none"     — data-only provider, not a broker login.
+    /// HONESTY: only sources with a REAL in-launcher portal flow are
+    /// "gateway" — never imply a portal a broker doesn't have.
+    pub connect_method: &'static str,
     pub state: BrokerState,
+}
+
+/// The connection method each source genuinely supports from the
+/// launcher today. Single source of truth so the catalog + the live
+/// IBKR probe agree. See `connect_method` on BrokerStatus.
+fn connect_method_for(id: &str) -> &'static str {
+    match id {
+        "ibkr" => "gateway",
+        "hyperliquid" => "wallet",
+        "polygon" | "databento" | "finnhub" | "tiingo" | "twelvedata" => "none",
+        // Brokers/exchanges that connect by API key/secret — no
+        // in-launcher portal flow yet (so they stay "coming soon").
+        _ => "api_key",
+    }
 }
 
 /// Build a catalog entry for a source that has no launcher connect flow
@@ -114,6 +139,7 @@ fn catalog_entry(
         assets,
         provides_data,
         provides_execution,
+        connect_method: connect_method_for(id),
         state: BrokerState::NotImplemented,
     }
 }
@@ -290,6 +316,7 @@ async fn probe_ibkr() -> BrokerStatus {
         assets: vec!["equities", "options", "futures", "forex"],
         provides_data: true,
         provides_execution: true,
+        connect_method: "gateway",
         state: BrokerState::Offline {
             hint: "default".to_string(),
         },

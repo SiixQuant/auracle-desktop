@@ -446,6 +446,23 @@ h2 {
 }
 .cap-badge svg { color: var(--fg-muted); }
 
+/* Connect-method tag — how you link the broker. "Portal" (an in-launcher
+ * gateway login flow) is accented because it's connectable now; API key /
+ * Wallet are neutral (honest: no portal yet). */
+.method-tag {
+  font-size: 10px;
+  color: var(--fg-muted);
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+.method-tag--portal {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+}
+
 .dir-pill {
   justify-self: end;
   font-family: var(--font-mono);
