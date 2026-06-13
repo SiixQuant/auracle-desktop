@@ -306,6 +306,167 @@ h2 {
   color: var(--fg-muted);
 }
 
+/* ── Connections directory (Settings → Connections) ─────────────────
+ * Compact enterprise integration catalog: search + category filter,
+ * status-first sections, fixed 4-zone rows. Capability badges are
+ * deliberately hairline/neutral; only the status pill carries color
+ * (honesty: a badge must never read as "connected"). */
+.dir-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s-3);
+}
+.dir-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+.dir-search svg { position: absolute; left: 10px; color: var(--fg-faint); pointer-events: none; }
+.dir-search input {
+  width: 100%;
+  padding: 7px 10px 7px 30px;
+  font-size: var(--t-sm, 13px);
+}
+.dir-filters { display: flex; gap: 4px; }
+.dir-filter {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--t-xs);
+  cursor: pointer;
+}
+.dir-filter:hover { color: var(--fg); border-color: var(--line-strong); }
+.dir-filter.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-dim); }
+
+.dir-empty { padding: var(--s-4) 0; }
+.linklike {
+  background: none; border: none; padding: 0;
+  color: var(--accent); cursor: pointer; font: inherit;
+}
+.linklike:hover { text-decoration: underline; }
+
+.dir-section { margin-top: var(--s-3); }
+.dir-section__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  border-bottom: 1px solid var(--line);
+}
+.dir-section__count {
+  font-family: var(--font-mono);
+  color: var(--fg-muted);
+}
+
+.dir-row { border-bottom: 1px solid var(--line); }
+.dir-row:last-child { border-bottom: none; }
+.dir-row__top {
+  display: grid;
+  /* Fixed trailing columns keep every status pill on the same x and
+   * the action column stable whether or not a row has a button. */
+  grid-template-columns: 32px 1fr auto 72px;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px 0;
+}
+.dir-row.is-soon { opacity: 0.55; }
+.dir-row.is-soon .dir-logo { filter: saturate(0.5); }
+
+.dir-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.dir-row__meta { min-width: 0; }
+.dir-name { font-size: 14px; font-weight: 500; color: var(--fg); }
+.dir-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+.achip {
+  font-size: 10px;
+  color: var(--fg-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.achip--more { color: var(--fg-faint); border-style: dashed; }
+.cap-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--fg-dim);
+  padding: 1px 5px 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.cap-badge svg { color: var(--fg-muted); }
+
+.dir-pill {
+  justify-self: end;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+/* The connected pill is the most assertive element on screen — it's the
+ * one real "you're live" claim, so it gets a stronger fill + border than
+ * the (intentionally quiet) capability badges and filter chips. */
+.dir-pill.ok   { background: rgba(16, 185, 129, 0.16); color: var(--ok);   border: 1px solid var(--accent-dim); }
+.dir-pill.warn { background: rgba(245, 166, 35, 0.12); color: var(--warn); }
+.dir-pill.err  { background: rgba(239, 68, 68, 0.12);  color: var(--err); }
+/* Coming-soon pill must stay legible even on the dimmed (55%) row —
+ * use the mid foreground, not the faintest. */
+.dir-pill.soon { background: transparent;              color: var(--fg-muted); border: 1px solid var(--line); }
+
+.dir-row__action { justify-self: end; min-width: 0; }
+.dir-row__expand { padding: 0 0 10px; }
+
+.dir-legend {
+  margin: var(--s-4) 0 0;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--fg-muted);
+}
+.dir-legend .cap-badge { margin: 0 1px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
 /* ── Buttons ────────────────────────────────────────────────────── */
 
 button.primary {

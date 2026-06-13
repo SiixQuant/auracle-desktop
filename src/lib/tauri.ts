@@ -436,6 +436,14 @@ export interface BrokerStatus {
   label: string;
   description: string;
   capabilities: string[];
+  /** Directory grouping: "broker" | "data" | "crypto". */
+  category: "broker" | "data" | "crypto";
+  /** Asset classes covered, rendered as chips. */
+  assets: string[];
+  /** Engine can ingest market data from this source today. */
+  provides_data: boolean;
+  /** A real execution adapter exists for this source. */
+  provides_execution: boolean;
   state: BrokerState;
 }
 

@@ -73,7 +73,49 @@ pub struct BrokerStatus {
     /// agent's tool advertising in a future phase — e.g. don't
     /// offer get_options_chain when only Alpaca is connected).
     pub capabilities: Vec<&'static str>,
+    /// Directory grouping for the compact connections UI:
+    /// "broker" | "data" | "crypto".
+    pub category: &'static str,
+    /// Asset classes this source covers, rendered as chips. Use the
+    /// short canonical set: equities, options, futures, forex, crypto,
+    /// indices, metals.
+    pub assets: Vec<&'static str>,
+    /// True when Auracle's ENGINE can pull market data from this source
+    /// today (a real ingestor exists: see auracle/ingest/*). Drives the
+    /// "Data" capability badge — must reflect shipped reality, not
+    /// roadmap.
+    pub provides_data: bool,
+    /// True when a real execution adapter exists for this source
+    /// (auracle/brokers/*). Drives the "Trade" capability badge.
+    pub provides_execution: bool,
     pub state: BrokerState,
+}
+
+/// Build a catalog entry for a source that has no launcher connect flow
+/// yet (state = NotImplemented). Capability flags still reflect real
+/// engine/adapter support so the badges stay honest — a "coming soon"
+/// connection can still truthfully advertise that the engine ingests
+/// its data.
+fn catalog_entry(
+    id: &str,
+    label: &str,
+    description: &str,
+    category: &'static str,
+    assets: Vec<&'static str>,
+    provides_data: bool,
+    provides_execution: bool,
+) -> BrokerStatus {
+    BrokerStatus {
+        id: id.to_string(),
+        label: label.to_string(),
+        description: description.to_string(),
+        capabilities: vec![],
+        category,
+        assets,
+        provides_data,
+        provides_execution,
+        state: BrokerState::NotImplemented,
+    }
 }
 
 #[tauri::command]
@@ -81,33 +123,108 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
     // Run all broker probes concurrently — settings page load shouldn't
     // serialize on the slowest one. tokio::join! returns once all are done.
     let (ibkr,) = tokio::join!(probe_ibkr(),);
+    // The catalog below is the enterprise connections directory. IBKR
+    // is the one source with a one-click launcher connect flow today
+    // (probed live above); the rest are catalog entries whose Data /
+    // Trade badges reflect REAL engine + adapter support (auracle/ingest
+    // and auracle/brokers), with a "coming soon" launcher-connect state.
+    // Honesty rule: provides_data / provides_execution must track what
+    // actually ships, never the roadmap.
     Ok(vec![
         ibkr,
-        // Placeholders for brokers that will land later. Surfacing
-        // them in "coming soon" state is intentional UX — it tells
-        // the user what's on the roadmap without requiring them to
-        // hunt through docs.
-        BrokerStatus {
-            id: "alpaca".to_string(),
-            label: "Alpaca".to_string(),
-            description: "API-key stocks + options + crypto. Free paper trading.".to_string(),
-            capabilities: vec!["positions", "account", "quotes", "bars"],
-            state: BrokerState::NotImplemented,
-        },
-        BrokerStatus {
-            id: "tradier".to_string(),
-            label: "Tradier".to_string(),
-            description: "API-key equities + options. Sandbox + live tiers.".to_string(),
-            capabilities: vec!["positions", "account", "quotes", "options_chain"],
-            state: BrokerState::NotImplemented,
-        },
-        BrokerStatus {
-            id: "hyperliquid".to_string(),
-            label: "Hyperliquid".to_string(),
-            description: "Wallet-signed perps + spot. No API key.".to_string(),
-            capabilities: vec!["positions", "account", "quotes"],
-            state: BrokerState::NotImplemented,
-        },
+        // ── Brokers (data + execution) ──────────────────────────────
+        catalog_entry(
+            "alpaca", "Alpaca",
+            "Commission-free US stocks, options & crypto. Free real-time data.",
+            "broker", vec!["equities", "options", "crypto"],
+            true, true,
+        ),
+        catalog_entry(
+            "tradier", "Tradier",
+            "Equities & options with a clean options chain.",
+            "broker", vec!["equities", "options"],
+            false, true,
+        ),
+        catalog_entry(
+            "oanda", "OANDA",
+            "Dedicated forex & metals with streaming prices.",
+            "broker", vec!["forex", "metals"],
+            false, false,
+        ),
+        catalog_entry(
+            "tradovate", "Tradovate",
+            "Flat-fee futures and futures options.",
+            "broker", vec!["futures"],
+            false, true,
+        ),
+        // ── Crypto exchanges (data via ccxt; execution on the roadmap) ─
+        catalog_entry(
+            "coinbase", "Coinbase",
+            "US-regulated crypto spot. Data via ccxt.",
+            "crypto", vec!["crypto"],
+            true, false,
+        ),
+        catalog_entry(
+            "kraken", "Kraken",
+            "Crypto spot & futures. Data via ccxt.",
+            "crypto", vec!["crypto", "futures"],
+            true, false,
+        ),
+        catalog_entry(
+            "binance", "Binance",
+            "Largest crypto venue — spot, futures, options. Data via ccxt.",
+            "crypto", vec!["crypto", "futures", "options"],
+            true, false,
+        ),
+        catalog_entry(
+            "bybit", "Bybit",
+            "Crypto perpetuals, futures & options. Data via ccxt.",
+            "crypto", vec!["crypto", "futures", "options"],
+            true, false,
+        ),
+        catalog_entry(
+            "okx", "OKX",
+            "Full-spectrum crypto — spot, perps, options. Data via ccxt.",
+            "crypto", vec!["crypto", "futures", "options"],
+            true, false,
+        ),
+        catalog_entry(
+            "hyperliquid", "Hyperliquid",
+            "On-chain perps DEX. Wallet-signed, no API key.",
+            "crypto", vec!["crypto", "futures"],
+            false, true,
+        ),
+        // ── Market-data providers (data only) ───────────────────────
+        catalog_entry(
+            "polygon", "Polygon.io",
+            "Normalized US equities, options, forex & crypto data.",
+            "data", vec!["equities", "options", "forex", "crypto", "indices"],
+            true, false,
+        ),
+        catalog_entry(
+            "databento", "Databento",
+            "Institutional L2/L3 depth for equities, futures & options.",
+            "data", vec!["equities", "futures", "options"],
+            false, false,
+        ),
+        catalog_entry(
+            "finnhub", "Finnhub",
+            "Equities, forex & crypto quotes with a free tier.",
+            "data", vec!["equities", "forex", "crypto"],
+            false, false,
+        ),
+        catalog_entry(
+            "tiingo", "Tiingo",
+            "Low-cost real-time US equities & crypto (IEX feed).",
+            "data", vec!["equities", "crypto", "forex"],
+            false, false,
+        ),
+        catalog_entry(
+            "twelvedata", "Twelve Data",
+            "Multi-asset quotes — equities, forex, crypto, indices.",
+            "data", vec!["equities", "forex", "crypto", "indices"],
+            false, false,
+        ),
     ])
 }
 
@@ -124,6 +241,10 @@ async fn probe_ibkr() -> BrokerStatus {
         label: "Interactive Brokers".to_string(),
         description: "Your market data and trading account.".to_string(),
         capabilities: vec!["positions", "account", "quotes", "bars", "options_chain"],
+        category: "broker",
+        assets: vec!["equities", "options", "futures", "forex"],
+        provides_data: true,
+        provides_execution: true,
         state: BrokerState::Offline {
             hint: "default".to_string(),
         },
