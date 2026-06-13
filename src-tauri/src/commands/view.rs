@@ -194,13 +194,21 @@ pub async fn open_auracle_ide() -> Result<(), String> {
     Err("Auracle IDE isn't installed yet on this machine.".to_string())
 }
 
-/// Spawn a binary (or `open` a .app bundle) detached from the launcher.
+/// Spawn the IDE detached from the launcher.
+///
+/// A packaged `.app` is opened through LaunchServices, which focuses
+/// an already-running instance instead of starting a duplicate. A
+/// bare development binary is spawned directly with `ZED_STATELESS=1`,
+/// because the dev build's single-instance handshake can hand off to a
+/// stale lock and exit without showing a window — stateless bypasses
+/// that so a window reliably appears every time. (A packaged build
+/// won't need this; its single-instance handling is sound.)
 fn launch_path(path: &str) -> Result<(), String> {
     use std::process::Command;
     if path.ends_with(".app") {
         Command::new("open").arg(path).spawn()
     } else {
-        Command::new(path).spawn()
+        Command::new(path).env("ZED_STATELESS", "1").spawn()
     }
     .map(|_| ())
     .map_err(to_error_string)
