@@ -250,8 +250,13 @@ function BrokerDirectory({
       <p className="dir-legend">
         <span className="cap-badge"><DataIcon />Data</span> = engine can pull
         market data ·{" "}
-        <span className="cap-badge"><TradeIcon />Trade</span> = can place orders.
-        More one-click connections coming.
+        <span className="cap-badge"><TradeIcon />Trade</span> = can place orders ·{" "}
+        <span className="method-tag method-tag--portal">Portal</span> = sign in
+        through the broker&apos;s own secure login, opened right here —
+        Interactive Brokers is the only broker you can connect today.{" "}
+        <span className="method-tag">API key</span> and{" "}
+        <span className="method-tag">Wallet</span> connections aren&apos;t
+        available yet.
       </p>
     </>
   );
@@ -287,6 +292,7 @@ function DirectoryRow({
               data={broker.provides_data}
               trade={broker.provides_execution}
             />
+            <ConnectMethodTag method={broker.connect_method} />
           </div>
         </div>
         <StatePill state={broker.state} />
@@ -331,10 +337,11 @@ function StatePill({ state }: { state: BrokerState }) {
     BrokerState["state"],
     { variant: string; label: string }
   > = {
-    offline: { variant: "warn", label: "set up" },
-    unauthenticated: { variant: "warn", label: "log in" },
+    // Novice-readable connection states (word, not just color).
+    offline: { variant: "warn", label: "not connected" },
+    unauthenticated: { variant: "warn", label: "waiting for sign-in" },
     connected: { variant: "ok", label: "connected" },
-    error: { variant: "err", label: "error" },
+    error: { variant: "err", label: "failed" },
     not_implemented: { variant: "soon", label: "coming soon" },
   };
   const s = cfg[state.state];
@@ -391,6 +398,35 @@ function CapabilityBadges({
       )}
     </>
   );
+}
+
+/** How you connect this broker from the launcher. "Portal" = an
+ *  in-launcher gateway login flow exists today (accent); the others are
+ *  honest about the real method so a non-portal broker is never mistaken
+ *  for one. Data-only providers ("none") show nothing — they aren't a
+ *  broker login. */
+function ConnectMethodTag({ method }: { method: BrokerStatus["connect_method"] }) {
+  if (method === "none") return null;
+  const cfg: Record<string, { label: string; cls: string; title: string }> = {
+    gateway: {
+      label: "Portal",
+      cls: "method-tag method-tag--portal",
+      title: "Connect through the broker's secure login, opened from here",
+    },
+    api_key: {
+      label: "API key",
+      cls: "method-tag",
+      title: "Connects with an API key (no in-launcher portal yet)",
+    },
+    wallet: {
+      label: "Wallet",
+      cls: "method-tag",
+      title: "Connects with a signing wallet (no in-launcher portal)",
+    },
+  };
+  const c = cfg[method];
+  if (!c) return null;
+  return <span className={c.cls} title={c.title}>{c.label}</span>;
 }
 
 /** The connector's official mark where a verified, license-permitted

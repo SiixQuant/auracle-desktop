@@ -444,6 +444,11 @@ export interface BrokerStatus {
   provides_data: boolean;
   /** A real execution adapter exists for this source. */
   provides_execution: boolean;
+  /** How you connect from the launcher:
+   *  "gateway" = in-launcher portal/gateway login flow exists (IBKR);
+   *  "api_key" = connects by API key/secret; "wallet" = wallet-signed;
+   *  "none" = data-only provider. Only "gateway" implies a portal. */
+  connect_method: "gateway" | "api_key" | "wallet" | "none";
   state: BrokerState;
 }
 
