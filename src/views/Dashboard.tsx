@@ -39,21 +39,11 @@ export default function Dashboard() {
       <h1>Auracle</h1>
       <LicenseSection />
 
-      {/* The launcher is the parent shell; the web product is the child
-          surface it opens. ONE door — "Open Auracle" — into the platform
-          (Home, Build incl. Compose, Research, Trade, Seer). A single
-          door needs no section label: the card's primary treatment
-          anchors it. */}
-      <div className="mb-3" style={{ maxWidth: 440 }}>
-        <LaunchCard
-          primary
-          title="Open Auracle"
-          description="The full platform — Home, Build, Research, Trade, Seer."
-          onClick={() => {
-            void openAuracle();
-          }}
-        />
-      </div>
+      {/* The launcher boots the engine, then hands the user into the
+          Auracle IDE — the native workspace app and the primary door.
+          The web console stays one click away (capability retention),
+          and an honest line appears if the IDE isn't installed. */}
+      <WorkspaceDoor />
 
       <BrokerSection />
       <ContainersSection />
@@ -340,6 +330,42 @@ function BrokerPositionsList({ positions }: { positions: BrokerPosition[] }) {
 }
 
 // ── Workspaces (entry cards) ────────────────────────────────────
+
+/** The launcher's primary door. "Open Auracle IDE" launches the
+ *  native workspace app; the web console stays available as a
+ *  secondary action. If the IDE isn't installed, an honest line says
+ *  so and offers the web console — never a silent failure. */
+function WorkspaceDoor() {
+  const [ideError, setIdeError] = useState<string | null>(null);
+
+  return (
+    <div className="mb-3" style={{ maxWidth: 440 }}>
+      <LaunchCard
+        primary
+        title="Open Auracle IDE"
+        description="Your workspace — research, build, validate, paper-trade, go live."
+        onClick={() => {
+          setIdeError(null);
+          void cmd.openAuracleIDE().catch((err) => setIdeError(String(err)));
+        }}
+      />
+      {ideError && (
+        <p style={{ marginTop: 8, fontSize: 12, color: "var(--fg-muted)" }}>
+          {ideError}
+        </p>
+      )}
+      <div style={{ marginTop: 10 }}>
+        <LaunchCard
+          title="Open the web console"
+          description="The browser version — Home, Build, Research, Trade, Seer."
+          onClick={() => {
+            void openAuracle();
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 /** The single canonical door into the web product. Two-mode open:
  *  embedded WebviewWindow (native feel) or external browser.

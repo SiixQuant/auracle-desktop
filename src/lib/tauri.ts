@@ -148,6 +148,10 @@ export const cmd = {
   getViewMode: () => invoke<ViewMode>("get_view_mode"),
   setViewMode: (mode: ViewMode) => invoke<void>("set_view_mode", { mode }),
   openEmbeddedAuracle: () => invoke<void>("open_embedded_auracle"),
+  // Launch the native Auracle IDE — the primary workspace app the
+  // launcher now hands the user into. Rejects with a plain message
+  // when the IDE isn't installed on this machine.
+  openAuracleIDE: () => invoke<void>("open_auracle_ide"),
   // Open JupyterLab in its own top-level window (the inline iframe panel
   // doesn't render in WKWebView; a top-level window does).
   openJupyter: () => invoke<void>("open_jupyter"),

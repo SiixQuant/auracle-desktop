@@ -143,6 +143,69 @@ pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> 
     Ok(())
 }
 
+/// Launch the Auracle IDE — the native workspace app — and bring it
+/// to the front. This is now the launcher's primary door: the
+/// launcher boots the engine and then hands the user into the IDE.
+///
+/// Resolution order (first hit wins):
+///   1. `AURACLE_IDE_PATH` env override (a binary or a .app bundle).
+///   2. The installed app bundle: `/Applications/Auracle IDE.app`.
+///   3. A local development build under the user's home.
+///
+/// Honest failure: if no IDE is found, returns a plain message the
+/// UI shows as-is — never a silent no-op, never a fake success.
+#[tauri::command]
+pub async fn open_auracle_ide() -> Result<(), String> {
+    use std::path::Path;
+    use std::process::Command;
+
+    // 1. Explicit override.
+    if let Ok(custom) = std::env::var("AURACLE_IDE_PATH") {
+        let custom = custom.trim().to_string();
+        if !custom.is_empty() && Path::new(&custom).exists() {
+            return launch_path(&custom);
+        }
+    }
+
+    // 2. Installed bundle.
+    let bundle = "/Applications/Auracle IDE.app";
+    if Path::new(bundle).exists() {
+        return Command::new("open")
+            .arg(bundle)
+            .spawn()
+            .map(|_| ())
+            .map_err(to_error_string);
+    }
+
+    // 3. Local development build.
+    if let Some(home) = std::env::var_os("HOME") {
+        let home = Path::new(&home);
+        for rel in [
+            "Downloads/auracle-ide/target/release/zed",
+            "Downloads/auracle-ide/target/debug/zed",
+        ] {
+            let candidate = home.join(rel);
+            if candidate.exists() {
+                return launch_path(&candidate.to_string_lossy());
+            }
+        }
+    }
+
+    Err("Auracle IDE isn't installed yet on this machine.".to_string())
+}
+
+/// Spawn a binary (or `open` a .app bundle) detached from the launcher.
+fn launch_path(path: &str) -> Result<(), String> {
+    use std::process::Command;
+    if path.ends_with(".app") {
+        Command::new("open").arg(path).spawn()
+    } else {
+        Command::new(path).spawn()
+    }
+    .map(|_| ())
+    .map_err(to_error_string)
+}
+
 /// Open JupyterLab in its own top-level window. The inline iframe panel in
 /// the workspace's Research view doesn't render in WKWebView (heavy nested
 /// SPA), but a top-level window does. Same Caddy origin so the Auracle
