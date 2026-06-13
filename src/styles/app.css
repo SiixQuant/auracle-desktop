@@ -386,6 +386,7 @@ h2 {
 .dir-logo {
   width: 32px;
   height: 32px;
+  flex: none;
   border-radius: var(--r-md);
   display: flex;
   align-items: center;
@@ -394,6 +395,25 @@ h2 {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
+  overflow: hidden;
+}
+/* Neutral, brand-agnostic placeholder — no per-broker color (a colored
+ * mark would be a homemade logo approximation). The text label beside
+ * it identifies the broker. */
+.dir-logo--placeholder {
+  background: var(--surface-2);
+  color: var(--fg-muted);
+  border: 1px solid var(--line);
+}
+/* Official mark sits on a light tile so dark logos (e.g. Alpaca's
+ * black roundel) stay visible on the dark UI — a container background,
+ * never a recolor of the mark itself. */
+.dir-logo--official { background: #f3f4f6; }
+.dir-logo--official img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
 }
 .dir-row__meta { min-width: 0; }
 .dir-name { font-size: 14px; font-weight: 500; color: var(--fg); }

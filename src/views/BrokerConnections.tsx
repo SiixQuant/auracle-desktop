@@ -26,6 +26,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import IncidentCard from "@/components/IncidentCard";
 import IbeamSetup from "@/views/IbeamSetup";
+// Official broker marks — used under nominative fair use to identify the
+// connection (full provenance in each SVG's header). ONLY verified,
+// in-repo official assets belong here; brokers without one fall back to
+// a neutral text placeholder rather than an invented logo.
+import alpacaLogo from "@/assets/brokers/alpaca.svg";
+import ibkrLogo from "@/assets/brokers/ibkr.svg";
 import {
   cmd,
   type BrokerState,
@@ -269,7 +275,7 @@ function DirectoryRow({
       aria-disabled={soon || undefined}
     >
       <div className="dir-row__top">
-        <Monogram id={broker.id} label={broker.label} />
+        <BrokerIcon id={broker.id} label={broker.label} />
         <div className="dir-row__meta">
           <div className="dir-name">
             {broker.label}
@@ -387,9 +393,25 @@ function CapabilityBadges({
   );
 }
 
-/** Deterministic 2-letter monogram on a brand-tinted square — keeps the
- *  left edge a clean scan line even with no logo asset. */
-function Monogram({ id, label }: { id: string; label: string }) {
+/** The connector's official mark where a verified, license-permitted
+ *  in-repo asset exists; otherwise a NEUTRAL, brand-agnostic initials
+ *  placeholder. A per-broker COLOR would be a homemade logo
+ *  approximation, so the placeholder is deliberately monochrome — the
+ *  always-visible text label (not the icon) identifies the broker. */
+const OFFICIAL_LOGOS: Record<string, string> = {
+  ibkr: ibkrLogo,
+  alpaca: alpacaLogo,
+};
+
+function BrokerIcon({ id, label }: { id: string; label: string }) {
+  const logo = OFFICIAL_LOGOS[id];
+  if (logo) {
+    return (
+      <div className="dir-logo dir-logo--official" aria-hidden="true">
+        <img src={logo} alt="" />
+      </div>
+    );
+  }
   const initials = label
     .replace(/[^A-Za-z0-9 ]/g, "")
     .split(/\s+/)
@@ -397,17 +419,8 @@ function Monogram({ id, label }: { id: string; label: string }) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const hue =
-    [...id].reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
   return (
-    <div
-      className="dir-logo"
-      aria-hidden="true"
-      style={{
-        background: `hsl(${hue} 38% 22%)`,
-        color: `hsl(${hue} 70% 78%)`,
-      }}
-    >
+    <div className="dir-logo dir-logo--placeholder" aria-hidden="true">
       {initials}
     </div>
   );
