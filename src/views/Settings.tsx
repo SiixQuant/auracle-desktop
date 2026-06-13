@@ -122,7 +122,7 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
   return (
     <>
       <p className="muted fs-sm m-0 mb-3 lh-relaxed">
-        Paste the key from your purchase email — or stay on Community.
+        You&apos;re on the free plan. Paste a key to upgrade.
       </p>
       <form
         className="hstack"
@@ -133,7 +133,7 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
       >
         <input
           type="password"
-          placeholder="akey_…"
+          placeholder="Paste license key (akey_…)"
           autoComplete="off"
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -225,7 +225,6 @@ function WorkspaceCard() {
 
 function SystemCard() {
   // Install + Docker
-  const [installPath, setInstallPath] = useState("checking…");
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installLabel, setInstallLabel] = useState("Run First-Time Install");
@@ -240,10 +239,6 @@ function SystemCard() {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    cmd.installPath()
-      .then((p) => setInstallPath(p))
-      .catch((err) => setInstallPath("unavailable: " + String(err)));
-
     cmd.isInstalled().then((v) => {
       setInstalled(v);
       setInstallLabel(v ? "Already installed" : "Run First-Time Install");
@@ -328,10 +323,7 @@ function SystemCard() {
         <span className="card-title">System</span>
       </div>
         <div className="row">
-          <div style={{ minWidth: 0 }}>
-            <div>Engine install</div>
-            <div className="muted mono fs-xs mt-1">{installPath}</div>
-          </div>
+          <div>Trading engine</div>
           {installed ? (
             <span className="chip ok">installed</span>
           ) : (
@@ -354,34 +346,32 @@ function SystemCard() {
           error={dockerError}
           onRetry={loadDocker}
         />
-        <div className="pane-head mt-4">
-          <span className="pane-head__label">Launcher version</span>
-          <div className="pane-head__actions">
-            {updateAvailable ? (
-              <button
-                type="button"
-                className="primary btn-sm"
-                disabled={updating}
-                onClick={installUpdate}
-              >
-                {updating ? "Installing…" : `Install v${info!.version}`}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="ghost btn-sm"
-                disabled={checking}
-                onClick={check}
-              >
-                {checking ? "Checking…" : "Check for Update"}
-              </button>
+        <div className="row">
+          <div className="hstack">
+            <span>Launcher</span>
+            <span className="muted mono fs-xs">v{version}</span>
+            {updateAvailable && (
+              <span className="chip warn">v{info!.version} available</span>
             )}
           </div>
-        </div>
-        <div className="hstack">
-          <span className="muted mono">v{version}</span>
-          {updateAvailable && (
-            <span className="chip warn">v{info!.version} available</span>
+          {updateAvailable ? (
+            <button
+              type="button"
+              className="primary btn-sm"
+              disabled={updating}
+              onClick={installUpdate}
+            >
+              {updating ? "Installing…" : `Install v${info!.version}`}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ghost btn-sm"
+              disabled={checking}
+              onClick={check}
+            >
+              {checking ? "Checking…" : "Check for update"}
+            </button>
           )}
         </div>
         {updateAvailable && info?.notes && (
@@ -424,12 +414,7 @@ function DockerChip({ status }: { status: DockerStatus | null | "error" }) {
   if (status === "error") return <span className="chip err">check failed</span>;
   if (!status.installed) return <span className="chip err">not installed</span>;
   if (!status.running) return <span className="chip warn">not running</span>;
-  return (
-    <div className="hstack">
-      <span className="chip ok">running</span>
-      <span className="muted mono fs-xs">{status.version || "docker"}</span>
-    </div>
-  );
+  return <span className="chip ok">running</span>;
 }
 
 /** Act tier: the shared incident contract for the three Docker
