@@ -799,15 +799,27 @@ table.data-table {
 .content { flex: 1; overflow: auto; }
 .view-narrow { max-width: 760px; margin: 0 auto; padding: 22px 24px 40px; }
 
-/* Settings — a responsive grid that fills the window at fullscreen and
- * collapses to a single column when minimized, so the page never sits
- * as a lone narrow column in a sea of empty space. */
-.settings { max-width: 1080px; margin: 0 auto; padding: 22px 28px 48px; }
+/* Settings — a fluid grid that scales with the window: it fills the
+ * width at fullscreen (up to a readable cap) with viewport-relative
+ * padding, packs the small setting cards into a top row, and lets the
+ * big Connections panel span full width below — so the page never sits
+ * as a lone narrow column in a sea of empty space, and never gets
+ * uncomfortably wide on an ultra-wide display either. */
+.settings {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px clamp(20px, 3vw, 56px) 56px;
+}
 .settings > h1 { margin: 0 0 var(--s-4); }
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 16px;
+  /* min(100%, 380px) keeps a single card from overflowing a narrow
+   * window while letting the track grow to fill wide ones. The 380px
+   * floor caps the small cards at 3-up on the widest layouts (4 would
+   * strand an empty track since there are only three of them). */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 18px;
   align-items: start;
 }
 .sgcell { min-width: 0; }
