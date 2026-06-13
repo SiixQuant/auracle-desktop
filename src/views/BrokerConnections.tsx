@@ -81,22 +81,19 @@ export default function BrokerConnectionsCard() {
   }, [statuses, refresh]);
 
   return (
-    <>
-      <div className="section-head">
-        <h2>Broker Connections</h2>
-        <div className="section-head__actions">
-          <button
-            type="button"
-            className="ghost btn-sm"
-            onClick={refresh}
-            disabled={refreshing}
-          >
-            {refreshing ? "Checking…" : "Refresh"}
-          </button>
-        </div>
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Broker connections</span>
+        <button
+          type="button"
+          className="ghost btn-sm"
+          onClick={refresh}
+          disabled={refreshing}
+        >
+          {refreshing ? "Checking…" : "Refresh"}
+        </button>
       </div>
-      <div className="card">
-        <CanonicalSourceBanner />
+      <CanonicalSourceBanner />
         {houstonConflict && (
           <HoustonConflictBanner
             containerName={houstonConflict}
@@ -114,8 +111,7 @@ export default function BrokerConnectionsCard() {
           </div>
         )}
         {statuses && <BrokerList statuses={statuses} onRefresh={refresh} />}
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -152,11 +148,10 @@ function BrokerList({
  *  other surfaces read from it. */
 function CanonicalSourceBanner() {
   return (
-    <div className="banner info">
-      <strong>One connection, everywhere.</strong>
-      {" "}
-      Set up your broker once here — the launcher, Forge, and the web UI all use it.
-    </div>
+    <p className="muted fs-sm m-0 mb-3 lh-relaxed">
+      One connection, everywhere — set it up once and the launcher, the IDE,
+      and the web console all use it.
+    </p>
   );
 }
 

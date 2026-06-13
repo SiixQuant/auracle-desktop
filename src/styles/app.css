@@ -636,11 +636,38 @@ table.data-table {
 .rail__foot .version { margin-left: 0; }
 
 .content { flex: 1; overflow: auto; }
-.view-narrow { max-width: 720px; margin: 0 auto; padding: 22px 24px 40px; }
+.view-narrow { max-width: 760px; margin: 0 auto; padding: 22px 24px 40px; }
+
+/* Settings — a responsive grid that fills the window at fullscreen and
+ * collapses to a single column when minimized, so the page never sits
+ * as a lone narrow column in a sea of empty space. */
+.settings { max-width: 1080px; margin: 0 auto; padding: 22px 28px 48px; }
+.settings > h1 { margin: 0 0 var(--s-4); }
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.sgcell { min-width: 0; }
+.sgcell.full { grid-column: 1 / -1; }
+.sgcell > .card { margin-bottom: 0; }
+
+/* In-card header — title (and optional action) live inside the card,
+ * so a setting is one self-contained box instead of a floating
+ * uppercase label stacked over a separate box (calmer / more minimal). */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+.card-title { font-size: var(--t-sm); font-weight: 600; letter-spacing: -0.01em; }
 
 /* ── Home hub ─────────────────────────────────────────────────────── */
 
-.hub { display: flex; min-height: 100%; }
+.hub { display: flex; min-height: 100%; max-width: 1280px; margin: 0 auto; }
 .hub__main {
   flex: 1;
   min-width: 0;
@@ -663,18 +690,31 @@ table.data-table {
 
 /* Hero */
 .hero {
+  position: relative;
   display: flex;
   align-items: center;
   overflow: hidden;
   background: var(--hero-bg);
   border: 1px solid var(--line);
   border-radius: 14px;
-  min-height: 150px;
+  min-height: 172px;
 }
-.hero__body { flex: 1; padding: 22px 24px; min-width: 0; }
+/* The flame is an immersive right-side backdrop (not a flex sibling),
+ * so the hero reads the same at any width — no far-right floating gap
+ * when the window is fullscreen. */
+.hero__bg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 42%;
+  min-width: 190px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.hero__body { position: relative; z-index: 1; padding: 24px 26px; max-width: 440px; min-width: 0; }
 .hero__title { font-size: 23px; font-weight: 700; letter-spacing: -0.3px; margin: 0; }
-.hero__sub { color: var(--fg-dim); font-size: 13px; margin: 7px 0 0; max-width: 320px; line-height: 1.5; }
-.hero__art { width: 168px; align-self: stretch; position: relative; background: #0d141a; flex: none; }
+.hero__sub { color: var(--fg-dim); font-size: 13px; margin: 7px 0 0; line-height: 1.5; }
 
 .btn-launch {
   display: inline-flex;

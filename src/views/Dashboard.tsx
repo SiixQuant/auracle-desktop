@@ -250,7 +250,7 @@ export default function Dashboard({
               </button>
             </div>
           </div>
-          <div className="hero__art">
+          <div className="hero__bg" aria-hidden="true">
             <Flame animated fill />
           </div>
         </div>
