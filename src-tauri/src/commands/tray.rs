@@ -71,8 +71,14 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
                             return;
                         }
                     };
+                    // `up -d` rather than `restart`: restart only touches
+                    // containers that still exist, so it can't recover a
+                    // stack that was brought down or had its containers
+                    // removed — exactly the "engine not running" case. `up
+                    // -d` recreates whatever is missing and is a no-op for
+                    // what's already healthy.
                     let _ = tokio::process::Command::new("docker")
-                        .args(["compose", "restart"])
+                        .args(["compose", "up", "-d"])
                         .current_dir(&dir)
                         .status()
                         .await;

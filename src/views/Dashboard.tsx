@@ -1,17 +1,20 @@
 // Dashboard — the launcher home, rebuilt as a hub (v7.1).
 //
-// Layout: a hero (animated Auracle flame + the one Launch action +
-// honest engine status), a row of live account tiles read straight
-// from the broker, and a right "Today" status column.
+// Layout: a hero (animated Auracle flame + the primary action + honest
+// engine status), a row of live account tiles read straight from the
+// broker, and a right "Today" status column.
 //
 // Honesty rules baked in:
+//   - The primary action follows engine truth: when the engine is down
+//     it becomes "Start engine" (compose up -d) — Launch never fires
+//     into a dead backend; "Starting…" shows while it comes up.
 //   - Mode (paper/live) is derived from IBKR's own account-id
 //     convention (DU* = paper) — never assumed.
-//   - Broker numbers carry an "as of HH:MM:SS" stamp. On a mid-session
-//     fetch failure the last values are KEPT but flipped to an amber
-//     "stale" state with the reason — never presented as live.
-//   - Nothing is shown that the launcher can't really fetch (no market
-//     clock, no run history — those live in the IDE / web console).
+//   - The broker glance is stamped "as of HH:MM:SS". If ANY of the
+//     three fetches (summary / positions / feed) fails after we had
+//     data, the whole glance flips to an amber "stale" state with the
+//     reason — never presenting last-good values as live.
+//   - Nothing is shown that the launcher can't really fetch.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -36,7 +39,10 @@ export default function Dashboard({
 }) {
   const [health, setHealth] = useState<HealthSnapshot | null>(null);
   const [ideError, setIdeError] = useState<string | null>(null);
+  const [engineErr, setEngineErr] = useState<string | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [launching, setLaunching] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   // Broker glance + staleness tracking.
   const [summary, setSummary] = useState<BrokerAccountSummary | null>(null);
@@ -47,16 +53,23 @@ export default function Dashboard({
   const [stale, setStale] = useState(false);
   const hadData = useRef(false);
 
+  const pollHealth = useCallback(async () => {
+    try {
+      const h = await cmd.currentHealth();
+      setHealth(h);
+      return h;
+    } catch {
+      setHealth(null);
+      return null;
+    }
+  }, []);
+
   // Engine health (hero status + Today). 30s, visible-only.
   useEffect(() => {
     let alive = true;
     const tick = async () => {
-      try {
-        const h = await cmd.currentHealth();
-        if (alive) setHealth(h);
-      } catch {
-        if (alive) setHealth(null);
-      }
+      if (!alive) return;
+      await pollHealth();
     };
     void tick();
     const id = window.setInterval(() => {
@@ -67,35 +80,43 @@ export default function Dashboard({
       alive = false;
       window.clearInterval(id);
     };
-  }, []);
+  }, [pollHealth]);
 
   // Launcher update check (best-effort, once).
   useEffect(() => {
     cmd.checkForUpdate().then(setUpdate).catch(() => setUpdate(null));
   }, []);
 
-  // Broker data with stale-as-live guard.
+  // Broker data with a stale-as-live guard covering ALL three fetches.
   const refreshBroker = useCallback(async () => {
     const [s, p, md] = await Promise.allSettled([
       cmd.brokerAccountSummary(),
       cmd.brokerOpenPositions(),
       cmd.brokerMarketDataStatus(),
     ]);
+    const allOk =
+      s.status === "fulfilled" && p.status === "fulfilled" && md.status === "fulfilled";
+
     if (s.status === "fulfilled") {
       setSummary(s.value);
-      setBrokerErr(null);
-      setLastOkAt(Date.now());
-      setStale(false);
       hadData.current = true;
+      setBrokerErr(null);
     } else {
       setBrokerErr(String(s.reason));
-      // Keep the last-good summary but mark it stale; only blank it if
-      // we never had data (cold start with no broker).
       if (!hadData.current) setSummary(null);
-      else setStale(true);
     }
     if (p.status === "fulfilled") setPositions(p.value.rows);
     if (md.status === "fulfilled") setMarketData(md.value);
+
+    if (allOk) {
+      setLastOkAt(Date.now());
+      setStale(false);
+    } else if (hadData.current) {
+      // Any of the three failing means the glance is no longer fully
+      // current — mark the whole block stale rather than letting a
+      // failed positions/feed fetch sit at full confidence.
+      setStale(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -107,27 +128,51 @@ export default function Dashboard({
     return () => window.clearInterval(id);
   }, [refreshBroker]);
 
-  const launch = () => {
+  const launch = async () => {
     setIdeError(null);
-    void cmd.openAuracleIDE().catch((err) => setIdeError(String(err)));
+    setLaunching(true);
+    try {
+      await cmd.openAuracleIDE();
+    } catch (err) {
+      setIdeError(String(err));
+    } finally {
+      window.setTimeout(() => setLaunching(false), 1200);
+    }
   };
 
-  const openWebConsole = async () => {
-    let url = "http://localhost:1969/ui/setup";
+  const startEngine = async () => {
+    setEngineErr(null);
+    setStarting(true);
     try {
-      const h = await cmd.currentHealth();
-      if (h?.state === "healthy") url = "http://localhost:1969/ui/dashboard";
-    } catch {
-      // ignore — fall through to /ui/setup
+      await cmd.stackStart();
+      // Poll until healthy (or ~60s), so the status reflects reality.
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => window.setTimeout(r, 2_000));
+        const h = await pollHealth();
+        if (h?.state === "healthy") break;
+      }
+    } catch (err) {
+      setEngineErr(String(err));
+    } finally {
+      setStarting(false);
     }
-    await openInBrowser(url);
+  };
+
+  const openWebConsole = () => {
+    // Houston routes to login/dashboard as appropriate; if the engine
+    // is down the page fails honestly rather than us guessing /setup.
+    void openInBrowser("http://localhost:1969/ui/dashboard");
   };
 
   const openTrade = () => {
     void openInBrowser("http://localhost:1969/ui/blotter");
   };
 
-  const eng = engineView(health);
+  const engineStarting = starting || health?.state === "starting";
+  const engineDown = !engineStarting && health?.state === "down";
+  const eng = engineStarting
+    ? { text: "Local engine — starting…", short: "starting", dot: "hollow" }
+    : engineView(health);
   const mode = accountMode(summary);
   const hasBroker = summary !== null;
   const ccy = summary?.currency || "USD";
@@ -146,23 +191,51 @@ export default function Dashboard({
           )}
         </div>
 
-        {/* Hero — the one Launch action + animated brand mark */}
+        {/* Hero — primary action follows engine truth + animated brand */}
         <div className="hero">
           <div className="hero__body">
             <div className="hero__title">Your workspace</div>
             <p className="hero__sub">
               Take an idea from research to live, in one place.
             </p>
-            <button type="button" className="btn-launch" onClick={launch}>
-              <PlayIcon />
-              Launch
-              {mode && <span className={`mode-badge ${mode}`}>{mode.toUpperCase()}</span>}
-            </button>
+
+            {engineStarting ? (
+              <button type="button" className="btn-launch" disabled>
+                Starting engine…
+              </button>
+            ) : engineDown ? (
+              <button type="button" className="btn-launch" onClick={startEngine}>
+                <PowerIcon />
+                Start engine
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-launch"
+                onClick={launch}
+                disabled={launching}
+              >
+                <PlayIcon />
+                {launching ? "Opening…" : "Launch"}
+                {mode && <span className={`mode-badge ${mode}`}>{mode.toUpperCase()}</span>}
+              </button>
+            )}
+
             <div className="statusline">
               <span className={`sdot ${eng.dot}`} />
               {eng.text}
             </div>
-            {ideError && <div className="err-text fs-xs mt-2">{ideError}</div>}
+
+            {engineErr && <div className="err-text fs-xs mt-2">{engineErr}</div>}
+            {ideError && (
+              <div className="mt-2">
+                <div className="err-text fs-xs">{ideError}</div>
+                <button type="button" className="hlink" onClick={openWebConsole}>
+                  Open the web console instead ↗
+                </button>
+              </div>
+            )}
+
             <div className="hero__links">
               <button type="button" className="hlink" onClick={openWebConsole}>
                 Open web console ↗
@@ -192,7 +265,7 @@ export default function Dashboard({
         </div>
 
         {hasBroker ? (
-          <div className="tiles">
+          <div className={`tiles${stale ? " is-stale" : ""}`}>
             <div className="tile">
               <div className="tile__label">Unrealized P&amp;L</div>
               <div
@@ -226,15 +299,12 @@ export default function Dashboard({
               <div>
                 <div>Connect your broker</div>
                 <div className="muted fs-sm mt-1">
-                  Link IBKR to see your account, P&amp;L, and feed here.
+                  Link IBKR to see your account, P&amp;L, and feed here. You'll enter
+                  your IBKR login and approve a sign-in on the IBKR Mobile app.
                 </div>
                 {brokerErr && <div className="muted mono fs-2xs mt-2">{brokerErr}</div>}
               </div>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => onGotoSettings?.()}
-              >
+              <button type="button" className="ghost" onClick={() => onGotoSettings?.()}>
                 Open Settings
               </button>
             </div>
@@ -251,7 +321,9 @@ export default function Dashboard({
           {mode ? (
             <span className={`mode-badge ${mode}`}>{mode.toUpperCase()}</span>
           ) : (
-            <span className="val">—</span>
+            <span className="val" title="Connect a broker to confirm paper vs live">
+              not connected
+            </span>
           )}
         </div>
         <div className="aside__row">
@@ -291,6 +363,24 @@ function PlayIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path d="M4 3 L13 8 L4 13 Z" />
+    </svg>
+  );
+}
+
+function PowerIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M8 2 V7" />
+      <path d="M4.8 4.2 a4.5 4.5 0 1 0 6.4 0" />
     </svg>
   );
 }

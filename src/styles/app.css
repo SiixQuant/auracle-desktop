@@ -709,7 +709,9 @@ table.data-table {
 /* Mode badge (paper / live) */
 .mode-badge { font-size: 10px; font-weight: 600; border-radius: var(--r-sm); padding: 2px 7px; letter-spacing: 0.3px; }
 .mode-badge.paper { background: #11314a; color: #7fc4ee; }
-.mode-badge.live  { background: rgba(245, 166, 35, 0.16); color: var(--warn); }
+/* LIVE = real money. Deliberately NOT the amber used for staleness /
+ * warnings, so it reads as its own high-salience mode, not an alert. */
+.mode-badge.live  { background: rgba(239, 68, 68, 0.18); color: #ff9a9a; box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.45); }
 
 /* Account tiles */
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
@@ -717,6 +719,9 @@ table.data-table {
 .tile__label { font-size: 10.5px; color: var(--fg-muted); }
 .tile__value { font-family: var(--font-mono); font-size: 18px; margin-top: 4px; }
 .tile__foot { font-size: 10px; color: var(--fg-muted); margin-top: 8px; }
+/* Whole glance dims when any of its three fetches is stale, so no tile
+ * reads as live while the header shows the amber "stale" stamp. */
+.tiles.is-stale { opacity: 0.6; }
 .asof { font-size: 11px; color: var(--fg-muted); }
 .asof.stale { color: var(--warn); }
 
@@ -731,10 +736,6 @@ table.data-table {
 .flame-aura { transform-box: fill-box; transform-origin: center; animation: flamePulse 5.5s ease-in-out infinite; }
 .flame-aura.b { animation-delay: 2s; }
 @keyframes flamePulse { 0%, 100% { transform: scale(1); opacity: 0.16; } 50% { transform: scale(1.1); opacity: 0.05; } }
-
-/* Sparkline draw-in */
-.spark-draw { stroke-dasharray: 260; stroke-dashoffset: 260; animation: sparkDraw 1.5s ease forwards; }
-@keyframes sparkDraw { to { stroke-dashoffset: 0; } }
 
 /* ── Tutorial overlay ─────────────────────────────────────────────── */
 .tut-overlay {

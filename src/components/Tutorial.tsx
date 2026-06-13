@@ -9,19 +9,19 @@ import { useState } from "react";
 const STEPS: { title: string; body: string }[] = [
   {
     title: "Welcome to Auracle",
-    body: "This launcher starts your local engine and opens the Auracle IDE — your quant workspace for taking an idea from research to live.",
+    body: "This launcher runs your local engine and opens the Auracle IDE — your quant workspace for taking an idea from research to live.",
   },
   {
-    title: "One button: Launch",
-    body: "Press Launch on the home screen. It opens the IDE already connected to your engine — no keys to copy, nothing to configure.",
+    title: "Start, then Launch",
+    body: "The home screen has one primary button. If your engine isn't running it reads Start engine; once it's up it becomes Launch and opens the IDE. The status line under it always tells you the engine's real state.",
   },
   {
     title: "Your account, at a glance",
-    body: "Home shows your unrealized P&L, exposure, and data feed read live from your broker. Each number is stamped with when it was last updated, and turns amber if it goes stale.",
+    body: "Home shows your unrealized P&L, exposure, and data feed from your broker, stamped with when it last updated. If a refresh fails the whole glance flips to amber 'stale' — so a number is never shown as live when it isn't.",
   },
   {
     title: "Settings & help",
-    body: "Connect your broker, manage your license, and control the engine in Settings. You can reopen this tour any time from Help.",
+    body: "Connect your broker, manage your license, and control the engine in Settings. Linking IBKR uses your IBKR login plus a one-time approval on the IBKR Mobile app. Reopen this tour any time from Help.",
   },
 ];
 
