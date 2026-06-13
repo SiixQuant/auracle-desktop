@@ -51,6 +51,7 @@ export default function Dashboard({
   const [brokerErr, setBrokerErr] = useState<string | null>(null);
   const [lastOkAt, setLastOkAt] = useState<number | null>(null);
   const [stale, setStale] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const hadData = useRef(false);
 
   const pollHealth = useCallback(async () => {
@@ -85,6 +86,13 @@ export default function Dashboard({
   // Launcher update check (best-effort, once).
   useEffect(() => {
     cmd.checkForUpdate().then(setUpdate).catch(() => setUpdate(null));
+  }, []);
+
+  // Tick a clock so the "as of" stamp shows a live relative age
+  // between the 30s broker polls.
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(id);
   }, []);
 
   // Broker data with a stale-as-live guard covering ALL three fetches.
@@ -251,11 +259,13 @@ export default function Dashboard({
         <div className="section-head">
           <h2>Account</h2>
           <span className={`asof${stale ? " stale" : ""}`}>
-            {stale
-              ? `stale · last ok ${lastOkAt ? clock(lastOkAt) : "—"}`
-              : lastOkAt
-                ? `as of ${clock(lastOkAt)}`
-                : ""}
+            {lastOkAt
+              ? stale
+                ? `stale · last ok ${clock(lastOkAt)} · ${relAge(lastOkAt, now)}`
+                : `as of ${clock(lastOkAt)}${
+                    now - lastOkAt >= 60_000 ? ` · ${relAge(lastOkAt, now)}` : ""
+                  }`
+              : ""}
           </span>
           <div className="section-head__actions">
             <button type="button" className="ghost btn-sm" onClick={openTrade}>
@@ -302,7 +312,14 @@ export default function Dashboard({
                   Link IBKR to see your account, P&amp;L, and feed here. You'll enter
                   your IBKR login and approve a sign-in on the IBKR Mobile app.
                 </div>
-                {brokerErr && <div className="muted mono fs-2xs mt-2">{brokerErr}</div>}
+                {brokerErr && (
+                  <details className="mt-2">
+                    <summary className="muted fs-xs" style={{ cursor: "pointer" }}>
+                      Couldn't reach your broker — details
+                    </summary>
+                    <div className="muted mono fs-2xs mt-1">{brokerErr}</div>
+                  </details>
+                )}
               </div>
               <button type="button" className="ghost" onClick={() => onGotoSettings?.()}>
                 Open Settings
@@ -481,4 +498,12 @@ function fmtSigned(v: number | null, ccy: string): string {
 
 function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString("en-US", { hour12: false });
+}
+
+function relAge(ms: number, now: number): string {
+  const s = Math.max(0, Math.floor((now - ms) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.floor(m / 60)}h ago`;
 }

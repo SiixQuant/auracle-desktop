@@ -125,8 +125,6 @@ export const cmd = {
    *  Houston's bundled gateway would conflict with ibeam. */
   dockerContainerRunning: (names: string[]) =>
     invoke<string | null>("docker_container_running", { names }),
-  containerLogs: (name: string, lines = 200) =>
-    invoke<string>("container_logs", { name, lines }),
 
   // Installer
   isInstalled: () => invoke<boolean>("is_installed"),
