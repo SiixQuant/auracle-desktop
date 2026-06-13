@@ -148,9 +148,8 @@ function BrokerList({
  *  other surfaces read from it. */
 function CanonicalSourceBanner() {
   return (
-    <p className="muted fs-sm m-0 mb-3 lh-relaxed">
-      One connection, everywhere — set it up once and the launcher, the IDE,
-      and the web console all use it.
+    <p className="muted fs-sm m-0 mb-3">
+      One connection for everything — set it up once.
     </p>
   );
 }

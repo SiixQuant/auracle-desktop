@@ -65,10 +65,7 @@ function LicenseCard() {
       {stored && !editing ? (
         <>
           <div className="wrap-row">
-            <div style={{ flex: 1 }}>
-              <strong>License active</strong>
-              <div className="muted mono mt-1">{stored.slice(0, 16)}…</div>
-            </div>
+            <span className="mono fs-sm" style={{ flex: 1 }}>{stored.slice(0, 16)}…</span>
             <button type="button" className="ghost btn-sm" onClick={() => setEditing(true)}>
               Change
             </button>
@@ -124,21 +121,28 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
 
   return (
     <>
-      <p className="muted m-0 mb-3">
-        Paste the license key from your purchase email to activate Auracle.
-        Leave it blank to stay on the Community tier.
+      <p className="muted fs-sm m-0 mb-3 lh-relaxed">
+        Paste the key from your purchase email — or stay on Community.
       </p>
-      <input
-        type="password"
-        placeholder="akey_…"
-        autoComplete="off"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-      />
-      <div className="hstack mt-4">
-        <button type="button" className="primary" onClick={save}>
+      <form
+        className="hstack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <input
+          type="password"
+          placeholder="akey_…"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <button type="submit" className="primary btn-sm">
           Save
         </button>
+      </form>
+      <div className="hstack mt-2">
         <span
           className={
             /^(Could not|Paste)/.test(status) ? "err-text fs-xs" : "muted mono fs-xs"
@@ -179,18 +183,15 @@ function WorkspaceCard() {
   return (
     <div className="card">
       <div className="card-head">
-        <span className="card-title">Workspace</span>
+        <span className="card-title">Web console</span>
       </div>
       <div className="row" style={{ alignItems: "center" }}>
-          <div>
-            <div>Where Open Auracle opens</div>
-            <div className="muted fs-sm mt-1">
-              {mode === "embedded"
-                ? "In its own window. Feels native, uses a bit more memory."
-                : "In your default browser. Uses less memory."}
-            </div>
+          <div className="muted fs-sm">
+            {mode === "embedded"
+              ? "Opens in its own app window."
+              : "Opens in your browser (lighter)."}
           </div>
-          <div className="seg-toggle" role="tablist" aria-label="Open Auracle in">
+          <div className="seg-toggle" role="tablist" aria-label="Where the web console opens">
             <button
               type="button"
               role="tab"
@@ -207,7 +208,7 @@ function WorkspaceCard() {
               className={`seg-tab ${mode === "embedded" ? "active" : ""}`}
               onClick={() => change("embedded")}
             >
-              Embedded
+              App window
             </button>
           </div>
         </div>
@@ -327,21 +328,25 @@ function SystemCard() {
         <span className="card-title">System</span>
       </div>
         <div className="row">
-          <div>
-            <div>Auracle install directory</div>
-            <div className="muted mono">{installPath}</div>
+          <div style={{ minWidth: 0 }}>
+            <div>Engine install</div>
+            <div className="muted mono fs-xs mt-1">{installPath}</div>
           </div>
-          <button
-            type="button"
-            className="ghost"
-            disabled={installed === null || installed || installing}
-            onClick={runInstall}
-          >
-            {installLabel}
-          </button>
+          {installed ? (
+            <span className="chip ok">installed</span>
+          ) : (
+            <button
+              type="button"
+              className="ghost btn-sm"
+              disabled={installed === null || installing}
+              onClick={runInstall}
+            >
+              {installLabel}
+            </button>
+          )}
         </div>
         <div className="row">
-          <div>Docker Desktop</div>
+          <div>Docker</div>
           <DockerChip status={docker} />
         </div>
         <DockerIncident
