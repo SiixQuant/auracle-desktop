@@ -19,12 +19,14 @@ import {
 
 export default function Settings() {
   return (
-    <div className="view-narrow">
+    <div className="settings">
       <h1>Settings</h1>
-      <LicenseCard />
-      <WorkspaceCard />
-      <BrokerConnectionsCard />
-      <SystemCard />
+      <div className="settings-grid">
+        <div className="sgcell"><LicenseCard /></div>
+        <div className="sgcell"><WorkspaceCard /></div>
+        <div className="sgcell"><SystemCard /></div>
+        <div className="sgcell"><BrokerConnectionsCard /></div>
+      </div>
     </div>
   );
 }
@@ -55,17 +57,19 @@ function LicenseCard() {
   if (stored === undefined) return null;
 
   return (
-    <>
-      <h2>License</h2>
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">License</span>
+        {stored && !editing && <span className="badge ok">activated</span>}
+      </div>
       {stored && !editing ? (
-        <div className="card">
+        <>
           <div className="wrap-row">
             <div style={{ flex: 1 }}>
               <strong>License active</strong>
               <div className="muted mono mt-1">{stored.slice(0, 16)}…</div>
             </div>
-            <span className="badge ok">activated</span>
-            <button type="button" className="ghost" onClick={() => setEditing(true)}>
+            <button type="button" className="ghost btn-sm" onClick={() => setEditing(true)}>
               Change
             </button>
             <ConfirmRow
@@ -73,6 +77,7 @@ function LicenseCard() {
               title="Remove the stored license key?"
               body="You can paste it again from your purchase email anytime."
               confirmLabel="Remove"
+              compact
               onConfirm={async () => {
                 setClearError(null);
                 try {
@@ -85,7 +90,7 @@ function LicenseCard() {
             />
           </div>
           {clearError && <div className="err-text fs-xs mt-2">{clearError}</div>}
-        </div>
+        </>
       ) : (
         <ActivationCard
           onSaved={() => {
@@ -94,7 +99,7 @@ function LicenseCard() {
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -118,7 +123,7 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
   };
 
   return (
-    <div className="card">
+    <>
       <p className="muted m-0 mb-3">
         Paste the license key from your purchase email to activate Auracle.
         Leave it blank to stay on the Community tier.
@@ -142,7 +147,7 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
           {status}
         </span>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -172,10 +177,11 @@ function WorkspaceCard() {
   };
 
   return (
-    <>
-      <h2>Workspace</h2>
-      <div className="card">
-        <div className="row" style={{ alignItems: "center" }}>
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Workspace</span>
+      </div>
+      <div className="row" style={{ alignItems: "center" }}>
           <div>
             <div>Where Open Auracle opens</div>
             <div className="muted fs-sm mt-1">
@@ -206,7 +212,6 @@ function WorkspaceCard() {
           </div>
         </div>
       </div>
-    </>
   );
 }
 
@@ -317,9 +322,10 @@ function SystemCard() {
   const updateAvailable = info?.available && !!info.version;
 
   return (
-    <>
-      <h2>System</h2>
-      <div className="card">
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">System</span>
+      </div>
         <div className="row">
           <div>
             <div>Auracle install directory</div>
@@ -402,7 +408,6 @@ function SystemCard() {
           </div>
         )}
       </div>
-    </>
   );
 }
 
