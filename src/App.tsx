@@ -1,26 +1,26 @@
-// Top-level app shell.
+// Top-level app shell (v7.1 hub).
 //
-// Three responsibilities:
-//   1. Run the first-launch gate — if the stack isn't installed
-//      yet, force the Onboarding wizard and hide the tab nav.
-//   2. Host the top bar (logo dot + version + tabs).
-//   3. Route between Home / Settings via a tiny in-memory router.
-//      The single platform door lives on Home as "Open Auracle";
-//      strategy authoring (Compose) lives in the web product, not the
-//      launcher. No URL routing needed — the window is a single-page app.
-//
-// The 5-second poll of /current_health that paints the top-bar
-// status dot lives here so the dot updates regardless of which
-// view is mounted.
+// Responsibilities:
+//   1. First-launch gate — if the stack isn't installed, the
+//      Onboarding wizard owns the whole window.
+//   2. Host the left nav rail (brand + Home/Settings/Help + health
+//      dot + version) and route the content area between views.
+//   3. Run the 5s health poll that paints the rail's status dot.
+//   4. Drive the first-run Tutorial (once, gated on localStorage),
+//      re-openable from Home and Help.
 
 import { useEffect, useState } from "react";
 
-import { cmd, type HealthSnapshot } from "@/lib/tauri";
+import Flame from "@/components/Flame";
+import Tutorial from "@/components/Tutorial";
+import { cmd, openInBrowser, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
 import Onboarding from "@/views/Onboarding";
 import Settings from "@/views/Settings";
 
-type View = "dashboard" | "settings" | "onboarding";
+type View = "dashboard" | "settings" | "help";
+
+const TUTORIAL_SEEN_KEY = "auracle_tutorial_seen";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -28,10 +28,10 @@ export default function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [version, setVersion] = useState<string>("?");
   const [health, setHealth] = useState<HealthSnapshot | null>(null);
+  const [licensed, setLicensed] = useState<boolean | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
-  // First-launch gate. If the stack isn't installed, the onboarding
-  // wizard owns the whole window — the tab nav stays hidden until
-  // install completes.
+  // First-launch gate.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -40,12 +40,10 @@ export default function App() {
         if (cancelled) return;
         if (!installed) {
           setNeedsOnboarding(true);
-          setView("onboarding");
         }
       } catch {
-        // Backend unavailable — fall through to dashboard so the
-        // user at least sees a (failing) status instead of a blank
-        // screen.
+        // Backend unavailable — fall through to the hub so the user
+        // sees a (failing) status rather than a blank screen.
       } finally {
         if (!cancelled) setBootstrapped(true);
       }
@@ -55,16 +53,15 @@ export default function App() {
     };
   }, []);
 
-  // Launcher version label in the top bar.
+  // Version label + license tier (rail).
   useEffect(() => {
-    cmd.currentVersion()
-      .then((v) => setVersion(v))
-      .catch(() => setVersion("?"));
+    cmd.currentVersion().then(setVersion).catch(() => setVersion("?"));
+    cmd.licenseGet()
+      .then((v) => setLicensed(!!v))
+      .catch(() => setLicensed(null));
   }, []);
 
-  // Top-bar health dot. Polls every 5s. The Rust core has its own
-  // 30s probe against Houston; this 5s tick just refreshes the
-  // cached snapshot in the UI without round-tripping to localhost.
+  // Rail health dot. Polls every 5s.
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
@@ -83,62 +80,182 @@ export default function App() {
     };
   }, []);
 
-  if (!bootstrapped) {
-    // Brief flash; the bootstrap check completes in well under a
-    // frame in practice. Render nothing rather than a spinner —
-    // the Tauri window's own splash handles the gap.
-    return null;
+  // First-run tutorial — once, after install completes.
+  useEffect(() => {
+    if (!bootstrapped || needsOnboarding) return;
+    try {
+      if (!localStorage.getItem(TUTORIAL_SEEN_KEY)) setShowTutorial(true);
+    } catch {
+      // localStorage unavailable — skip the auto-tour silently.
+    }
+  }, [bootstrapped, needsOnboarding]);
+
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    try {
+      localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
+    } catch {
+      // ignore
+    }
+  };
+
+  if (!bootstrapped) return null;
+
+  if (needsOnboarding) {
+    return (
+      <Onboarding
+        onDone={() => {
+          setNeedsOnboarding(false);
+          setView("dashboard");
+        }}
+      />
+    );
   }
 
   return (
-    <>
-      <header className="topbar">
-        <div className="brand">
+    <div className="shell">
+      <nav className="rail">
+        <div className="rail__brand">
+          <Flame size={22} />
+          <strong>Auracle</strong>
+        </div>
+        <span className="tier-chip">{licensed ? "Licensed" : "Community"}</span>
+
+        <button
+          type="button"
+          className={`nav-item${view === "dashboard" ? " active" : ""}`}
+          onClick={() => setView("dashboard")}
+        >
+          <NavIcon name="home" /> Home
+        </button>
+        <button
+          type="button"
+          className={`nav-item${view === "settings" ? " active" : ""}`}
+          onClick={() => setView("settings")}
+        >
+          <NavIcon name="settings" /> Settings
+        </button>
+        <button
+          type="button"
+          className={`nav-item${view === "help" ? " active" : ""}`}
+          onClick={() => setView("help")}
+        >
+          <NavIcon name="help" /> Help
+        </button>
+
+        <div className="rail__foot">
           <span
             className={`logo-dot ${health?.state ?? ""}`}
-            title={health?.state ? `Stack: ${health.state}` : "Stack health"}
+            title={health?.state ? `Engine: ${health.state}` : "Engine status"}
           />
-          <strong>Auracle</strong>
           <span className="version">v{version}</span>
         </div>
+      </nav>
 
-        {/* Minimal chrome: two doors only. Forge is reached from a
-            Home card (a drill-in under Home), and the one door into
-            the web product is Home's "Open Auracle" — so the top bar
-            never re-lists destinations the platform already owns.
-            Home stays lit while drilled into Forge. */}
-        {!needsOnboarding && (
-          <nav className="tabs">
-            <button
-              type="button"
-              className={`tab ${view === "dashboard" ? "active" : ""}`}
-              onClick={() => setView("dashboard")}
-            >
-              Home
-            </button>
-            <button
-              type="button"
-              className={`tab ${view === "settings" ? "active" : ""}`}
-              onClick={() => setView("settings")}
-            >
-              Settings
-            </button>
-          </nav>
-        )}
-      </header>
-
-      <main>
-        {view === "onboarding" && (
-          <Onboarding
-            onDone={() => {
-              setNeedsOnboarding(false);
-              setView("dashboard");
-            }}
+      <div className="content">
+        {view === "dashboard" && (
+          <Dashboard
+            onOpenTutorial={() => setShowTutorial(true)}
+            onGotoSettings={() => setView("settings")}
           />
         )}
-        {view === "dashboard" && <Dashboard />}
         {view === "settings" && <Settings />}
-      </main>
-    </>
+        {view === "help" && <Help onOpenTutorial={() => setShowTutorial(true)} />}
+      </div>
+
+      {showTutorial && <Tutorial onClose={closeTutorial} />}
+    </div>
+  );
+}
+
+// ── Help view ───────────────────────────────────────────────────────
+
+function Help({ onOpenTutorial }: { onOpenTutorial: () => void }) {
+  return (
+    <div className="view-narrow">
+      <h1>Help</h1>
+      <div className="card">
+        <div className="row">
+          <div>
+            <div>Take the tour</div>
+            <div className="muted fs-sm mt-1">A 4-step walkthrough of the launcher.</div>
+          </div>
+          <button type="button" className="ghost" onClick={onOpenTutorial}>
+            Open tour
+          </button>
+        </div>
+        <div className="row">
+          <div>
+            <div>Documentation &amp; glossary</div>
+            <div className="muted fs-sm mt-1">Every metric and term the UI uses.</div>
+          </div>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              void openInBrowser("http://localhost:1969/ui/help");
+            }}
+          >
+            Open ↗
+          </button>
+        </div>
+        <div className="row">
+          <div>
+            <div>Web console</div>
+            <div className="muted fs-sm mt-1">The full operational web product.</div>
+          </div>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              void openInBrowser("http://localhost:1969/ui");
+            }}
+          >
+            Open ↗
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Rail icons (inline, no icon-font dependency) ────────────────────
+
+function NavIcon({ name }: { name: "home" | "settings" | "help" }) {
+  const common = {
+    width: 17,
+    height: 17,
+    viewBox: "0 0 20 20",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.6,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+  if (name === "home") {
+    return (
+      <svg {...common}>
+        <path d="M3 9.5 L10 4 L17 9.5" />
+        <path d="M5 8.5 V16 H15 V8.5" />
+      </svg>
+    );
+  }
+  if (name === "settings") {
+    return (
+      <svg {...common}>
+        <path d="M3 6 H17 M3 10 H17 M3 14 H17" />
+        <circle cx="7" cy="6" r="1.7" fill="currentColor" stroke="none" />
+        <circle cx="13" cy="10" r="1.7" fill="currentColor" stroke="none" />
+        <circle cx="8" cy="14" r="1.7" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M8.2 8 a2 2 0 1 1 2.6 2 c-0.6 0.35 -0.8 0.8 -0.8 1.4" />
+      <circle cx="10" cy="14.3" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
