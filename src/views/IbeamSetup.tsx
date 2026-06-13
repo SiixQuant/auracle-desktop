@@ -92,7 +92,7 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
   const uninstall = () => runBusy("uninstall", cmd.ibeamUninstall);
 
   if (!status) {
-    return <div className="subcard muted mono">probing ibeam…</div>;
+    return <div className="subcard muted fs-xs">Checking…</div>;
   }
 
   return (
@@ -101,14 +101,14 @@ export default function IbeamSetup({ onStateChange }: IbeamSetupProps) {
         <StatePill state={status.state} />
         {status.state.state !== "not_installed" && (
           <span className="muted fs-xs">
-            auto-managed via Docker · re-auths on every daily session reset
+            Stays logged in for you, even through IBKR&apos;s daily reset.
           </span>
         )}
       </div>
       {status.state.state === "not_installed" && (
         <div className="muted fs-xs mb-2 lh-relaxed">
-          Stays connected continuously — no daily re-login. Requires Docker
-          (running) and IBKR Mobile 2FA push notifications enabled on your phone.
+          Stay connected with no daily re-login. Needs Docker running and IBKR
+          Mobile 2FA turned on, so you can approve sign-in from your phone.
         </div>
       )}
 
@@ -277,10 +277,9 @@ function CredentialsForm({
       }}
     >
       <p className="muted fs-xs m-0 lh-relaxed">
-        Stored encrypted in the launcher&apos;s vault, injected into the
-        container only at start time. Account ID and paper / live mode
-        are detected automatically after the first login — you don&apos;t
-        need to type them.
+        Encrypted and only used to start your connection — never stored as
+        plain text. Your account and paper / live mode are detected
+        automatically after first login.
       </p>
       <div>
         <label htmlFor="ibeam-username" className="fs-xs muted">

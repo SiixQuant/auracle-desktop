@@ -122,9 +122,7 @@ async fn probe_ibkr() -> BrokerStatus {
     let base = BrokerStatus {
         id: "ibkr".to_string(),
         label: "Interactive Brokers".to_string(),
-        description: "Client Portal Gateway at localhost:5000. \
-                      The default broker for Auracle stacks."
-            .to_string(),
+        description: "Your market data and trading account.".to_string(),
         capabilities: vec!["positions", "account", "quotes", "bars", "options_chain"],
         state: BrokerState::Offline {
             hint: "default".to_string(),

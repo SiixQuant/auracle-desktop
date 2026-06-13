@@ -106,8 +106,8 @@ export default function BrokerConnectionsCard() {
           </div>
         )}
         {!statuses && !error && (
-          <div className="muted mono fs-xs mt-1">
-            probing brokers…
+          <div className="muted fs-xs mt-1">
+            Checking…
           </div>
         )}
         {statuses && <BrokerList statuses={statuses} onRefresh={refresh} />}
@@ -135,7 +135,7 @@ function BrokerList({
       ))}
       {soon.length > 0 && (
         <div className="broker-soon">
-          More brokers on the roadmap — {soon.map((b) => b.label).join(" · ")}.
+          More brokers coming soon — {soon.map((b) => b.label).join(", ")}.
         </div>
       )}
     </>
