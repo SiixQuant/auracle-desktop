@@ -1,22 +1,33 @@
-// BrokerConnections — Settings card showing the live state of every
-// broker integration and the next action the user can take per
-// connection.
+// BrokerConnections — a compact, enterprise-grade connections
+// directory for the Settings page.
 //
-// Rendered states (driven by BrokerStatus.state.state):
+// Layout (per the connections-directory pattern used by Stripe / Datadog
+// / Linear): a search box + category filter, then status-first sections
+// — "Connected" pinned on top, then the catalog grouped by category
+// (Brokers · Crypto exchanges · Market data). Each row is a fixed
+// 4-zone lane: monogram · name + asset chips + capability badges ·
+// status pill · one action.
 //
-//   offline          → install / start instructions inline
-//   unauthenticated  → "Connect" button that opens IBKR login webview
-//   connected        → account id readout + Test + Disconnect controls
-//   error            → red pill + detail; "Refresh" retries
-//   not_implemented  → ghost pill + "coming soon"
+// Honesty contract:
+//   * The Data / Trade capability badges reflect REAL engine + adapter
+//     support (broker_connections.rs sets provides_data /
+//     provides_execution from what actually ships). They are neutral,
+//     hairline chips — never colored — so they describe a source's
+//     capability without implying a live connection.
+//   * The colored status pill is the ONLY claim about this launcher's
+//     connection. "Coming soon" rows are dimmed, carry no action
+//     button (structurally — the action switch returns null), and are
+//     aria-disabled, so a non-connectable source can never be misread
+//     as working.
+//   * IBKR is the one source with a one-click connect flow today; its
+//     row hosts the IbeamSetup sub-card.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import IncidentCard from "@/components/IncidentCard";
 import IbeamSetup from "@/views/IbeamSetup";
 import {
   cmd,
-  openInBrowser,
   type BrokerState,
   type BrokerStatus,
 } from "@/lib/tauri";
@@ -83,7 +94,7 @@ export default function BrokerConnectionsCard() {
   return (
     <div className="card">
       <div className="card-head">
-        <span className="card-title">Broker connections</span>
+        <span className="card-title">Connections</span>
         <button
           type="button"
           className="ghost btn-sm"
@@ -93,74 +104,322 @@ export default function BrokerConnectionsCard() {
           {refreshing ? "Checking…" : "Refresh"}
         </button>
       </div>
-      <CanonicalSourceBanner />
-        {houstonConflict && (
-          <HoustonConflictBanner
-            containerName={houstonConflict}
-            onResolved={refresh}
-          />
-        )}
-        {error && (
-          <div className="mono err-text mb-3">
-            {error}
-          </div>
-        )}
-        {!statuses && !error && (
-          <div className="muted fs-xs mt-1">
-            Checking…
-          </div>
-        )}
-        {statuses && <BrokerList statuses={statuses} onRefresh={refresh} />}
+      <p className="muted fs-sm m-0 mb-3">
+        Connect once — used everywhere in Auracle.
+      </p>
+      {houstonConflict && (
+        <HoustonConflictBanner
+          containerName={houstonConflict}
+          onResolved={refresh}
+        />
+      )}
+      {error && <div className="mono err-text mb-3">{error}</div>}
+      {!statuses && !error && (
+        <div className="muted fs-xs mt-1">Checking…</div>
+      )}
+      {statuses && <BrokerDirectory statuses={statuses} onRefresh={refresh} />}
     </div>
   );
 }
 
-/** Splits brokers into real integrations (full rows) and not-yet-shipped
- *  ones. The latter used to render three full label/description/pill
- *  blocks that did nothing but take space — they now collapse into a
- *  single muted "on the roadmap" line, so the card is all signal. */
-function BrokerList({
+// ── Directory ───────────────────────────────────────────────────────
+
+const CATEGORY_ORDER: BrokerStatus["category"][] = ["broker", "crypto", "data"];
+const CATEGORY_LABEL: Record<BrokerStatus["category"], string> = {
+  broker: "Brokers",
+  crypto: "Crypto exchanges",
+  data: "Market data",
+};
+type Filter = "all" | BrokerStatus["category"];
+
+function BrokerDirectory({
   statuses,
   onRefresh,
 }: {
   statuses: BrokerStatus[];
   onRefresh: () => void;
 }) {
-  const real = statuses.filter((b) => b.state.state !== "not_implemented");
-  const soon = statuses.filter((b) => b.state.state === "not_implemented");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+
+  const q = query.trim().toLowerCase();
+  const matchesSearch = (b: BrokerStatus) =>
+    !q ||
+    b.label.toLowerCase().includes(q) ||
+    b.category.toLowerCase().includes(q) ||
+    b.description.toLowerCase().includes(q) ||
+    b.assets.some((a) => a.toLowerCase().includes(q));
+
+  const connectable = (b: BrokerStatus) => b.state.state !== "not_implemented";
+
+  // "Your connections" = sources with a real connect flow. Shown
+  // status-first and filtered by SEARCH only (never by the category
+  // chip) so a live connection never vanishes when the user filters
+  // to a category it doesn't belong to.
+  const connected = useMemo(
+    () => statuses.filter((b) => connectable(b) && matchesSearch(b)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [statuses, q],
+  );
+  // The catalog respects both search and the category chip.
+  const catalog = useMemo(
+    () =>
+      statuses.filter(
+        (b) =>
+          !connectable(b) &&
+          matchesSearch(b) &&
+          (filter === "all" || b.category === filter),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [statuses, filter, q],
+  );
+  const totalShown = connected.length + catalog.length;
+
   return (
     <>
-      {real.map((b) => (
-        <BrokerRow key={b.id} broker={b} onRefresh={onRefresh} />
-      ))}
-      {soon.length > 0 && (
-        <div className="broker-soon">
-          More brokers coming soon — {soon.map((b) => b.label).join(", ")}.
+      <div className="dir-toolbar">
+        <div className="dir-search">
+          <SearchIcon />
+          <input
+            type="text"
+            value={query}
+            placeholder="Search brokers and data sources"
+            aria-label="Search brokers and data sources"
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
+        <div className="dir-filters" role="tablist" aria-label="Filter by type">
+          {(["all", "broker", "crypto", "data"] as Filter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="tab"
+              aria-selected={filter === f}
+              className={`dir-filter ${filter === f ? "active" : ""}`}
+              onClick={() => setFilter(f)}
+            >
+              {f === "all" ? "All" : CATEGORY_LABEL[f]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {totalShown === 0 && (
+        <div className="muted fs-sm dir-empty">
+          No sources match “{query.trim()}”.{" "}
+          <button type="button" className="linklike" onClick={() => setQuery("")}>
+            Clear search
+          </button>
+        </div>
+      )}
+
+      {connected.length > 0 && (
+        <section className="dir-section">
+          <div className="dir-section__head">
+            <span>Your connections</span>
+            <span className="dir-section__count">{connected.length}</span>
+          </div>
+          {connected.map((b) => (
+            <DirectoryRow key={b.id} broker={b} onRefresh={onRefresh} />
+          ))}
+        </section>
+      )}
+
+      {CATEGORY_ORDER.map((cat) => {
+        const rows = catalog.filter((b) => b.category === cat);
+        if (rows.length === 0) return null;
+        return (
+          <section className="dir-section" key={cat}>
+            <div className="dir-section__head">
+              <span>{CATEGORY_LABEL[cat]}</span>
+              <span className="dir-section__count">{rows.length}</span>
+            </div>
+            {rows.map((b) => (
+              <DirectoryRow key={b.id} broker={b} onRefresh={onRefresh} />
+            ))}
+          </section>
+        );
+      })}
+
+      <p className="dir-legend">
+        <span className="cap-badge"><DataIcon />Data</span> = engine can pull
+        market data ·{" "}
+        <span className="cap-badge"><TradeIcon />Trade</span> = can place orders.
+        More one-click connections coming.
+      </p>
+    </>
+  );
+}
+
+// ── Row ─────────────────────────────────────────────────────────────
+
+function DirectoryRow({
+  broker,
+  onRefresh,
+}: {
+  broker: BrokerStatus;
+  onRefresh: () => void;
+}) {
+  const isIbkr = broker.id === "ibkr";
+  const soon = broker.state.state === "not_implemented";
+
+  return (
+    <div
+      className={`dir-row ${soon ? "is-soon" : ""}`}
+      aria-disabled={soon || undefined}
+    >
+      <div className="dir-row__top">
+        <Monogram id={broker.id} label={broker.label} />
+        <div className="dir-row__meta">
+          <div className="dir-name">
+            {broker.label}
+            {soon && <span className="sr-only"> (not yet available)</span>}
+          </div>
+          <div className="dir-tags">
+            <AssetChips assets={broker.assets} />
+            <CapabilityBadges
+              data={broker.provides_data}
+              trade={broker.provides_execution}
+            />
+          </div>
+        </div>
+        <StatePill state={broker.state} />
+        <div className="dir-row__action">
+          <RowAction broker={broker} onRefresh={onRefresh} />
+        </div>
+      </div>
+      {isIbkr && !soon && (
+        <div className="dir-row__expand">
+          <IbeamSetup onStateChange={onRefresh} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One primary action per row, mapped 1:1 to state. Coming-soon
+ *  returns null — structurally impossible to show a clickable connect
+ *  on a non-integrated source (honesty contract). IBKR's connect flow
+ *  lives in the IbeamSetup sub-card, so its row needs no extra button. */
+function RowAction({
+  broker,
+  onRefresh,
+}: {
+  broker: BrokerStatus;
+  onRefresh: () => void;
+}) {
+  if (broker.state.state === "not_implemented") return null;
+  if (broker.id === "ibkr") return null; // IbeamSetup owns IBKR actions
+  if (broker.state.state === "error") {
+    return (
+      <button type="button" className="ghost btn-sm" onClick={onRefresh}>
+        Retry
+      </button>
+    );
+  }
+  return null;
+}
+
+function StatePill({ state }: { state: BrokerState }) {
+  const cfg: Record<
+    BrokerState["state"],
+    { variant: string; label: string }
+  > = {
+    offline: { variant: "warn", label: "set up" },
+    unauthenticated: { variant: "warn", label: "log in" },
+    connected: { variant: "ok", label: "connected" },
+    error: { variant: "err", label: "error" },
+    not_implemented: { variant: "soon", label: "coming soon" },
+  };
+  const s = cfg[state.state];
+  return <span className={`dir-pill ${s.variant}`}>{s.label}</span>;
+}
+
+// ── Atoms ───────────────────────────────────────────────────────────
+
+const ASSET_LABEL: Record<string, string> = {
+  equities: "Stocks",
+  options: "Options",
+  futures: "Futures",
+  forex: "Forex",
+  crypto: "Crypto",
+  indices: "Indices",
+  metals: "Metals",
+};
+
+function AssetChips({ assets }: { assets: string[] }) {
+  const shown = assets.slice(0, 3);
+  const extra = assets.length - shown.length;
+  return (
+    <>
+      {shown.map((a) => (
+        <span key={a} className="achip">
+          {ASSET_LABEL[a] ?? a}
+        </span>
+      ))}
+      {extra > 0 && <span className="achip achip--more">+{extra}</span>}
+    </>
+  );
+}
+
+function CapabilityBadges({
+  data,
+  trade,
+}: {
+  data: boolean;
+  trade: boolean;
+}) {
+  return (
+    <>
+      {data && (
+        <span className="cap-badge" title="Engine can pull market data">
+          <DataIcon />
+          Data
+        </span>
+      )}
+      {trade && (
+        <span className="cap-badge" title="Can place orders">
+          <TradeIcon />
+          Trade
+        </span>
       )}
     </>
   );
 }
 
-/** Header explaining the role of this card: one broker session,
- *  consumed by every surface (Forge agent, launcher Dashboard,
- *  Houston web UI). The card owns connection + auth state; the
- *  other surfaces read from it. */
-function CanonicalSourceBanner() {
+/** Deterministic 2-letter monogram on a brand-tinted square — keeps the
+ *  left edge a clean scan line even with no logo asset. */
+function Monogram({ id, label }: { id: string; label: string }) {
+  const initials = label
+    .replace(/[^A-Za-z0-9 ]/g, "")
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const hue =
+    [...id].reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
   return (
-    <p className="muted fs-sm m-0 mb-3">
-      One connection for everything — set it up once.
-    </p>
+    <div
+      className="dir-logo"
+      aria-hidden="true"
+      style={{
+        background: `hsl(${hue} 38% 22%)`,
+        color: `hsl(${hue} 70% 78%)`,
+      }}
+    >
+      {initials}
+    </div>
   );
 }
 
+// ── Houston gateway conflict (port 5000) ────────────────────────────
+
 /** Port conflict — Houston's bundled IBKR gateway and the launcher's
  *  ibeam container both bind localhost:5000, so one has to yield.
- *  Default recommendation: let the launcher take over (auto-reauth is
- *  the whole point). Renders through the shared incident contract;
- *  the action operates directly on the detected container name — no
- *  compose intermediary, so it works even when the stack's .env is
- *  missing optional vars that would fail compose before the rm. */
+ *  Operates directly on the detected container name (no compose
+ *  intermediary) so it works even when the stack's .env is missing
+ *  optional vars that would fail compose before the rm. */
 function HoustonConflictBanner({
   containerName,
   onResolved,
@@ -198,215 +457,33 @@ function HoustonConflictBanner({
   );
 }
 
-function BrokerRow({
-  broker,
-  onRefresh,
-}: {
-  broker: BrokerStatus;
-  onRefresh: () => void;
-}) {
-  // IBKR row delegates ALL action surface to the IbeamSetup sub-card
-  // below — that card owns the install/start/stop/restart/logs flow.
-  // Suppressing BrokerDetail + BrokerActions for IBKR prevents
-  // doubled-up "Gateway didn't respond" + "Get gateway" controls
-  // that say the same thing the ibeam card already says, just less
-  // actionably. Other brokers (Alpaca, Tradier, Hyperliquid) still
-  // render the full original action surface.
-  const isIbkr = broker.id === "ibkr";
+// ── Icons (inline, currentColor) ────────────────────────────────────
 
+function SearchIcon() {
   return (
-    <div className="list-row">
-      <div className="row" style={{ alignItems: "flex-start" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="hstack">
-            <strong>{broker.label}</strong>
-            <StatePill state={broker.state} />
-          </div>
-          <div className="muted fs-xs mt-1">
-            {broker.description}
-          </div>
-          {!isIbkr && <BrokerDetail broker={broker} />}
-        </div>
-        {!isIbkr && <BrokerActions broker={broker} onRefresh={onRefresh} />}
-      </div>
-      {isIbkr && <IbeamSetup onStateChange={onRefresh} />}
-    </div>
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
   );
 }
 
-function StatePill({ state }: { state: BrokerState }) {
-  const cfg: Record<BrokerState["state"], { variant: string; label: string }> = {
-    offline: { variant: "err", label: "offline" },
-    unauthenticated: { variant: "warn", label: "log in needed" },
-    connected: { variant: "ok", label: "connected" },
-    error: { variant: "err", label: "error" },
-    not_implemented: { variant: "neutral", label: "coming soon" },
-  };
-  const s = cfg[state.state];
-  return <span className={`chip ${s.variant}`}>{s.label}</span>;
-}
-
-function BrokerDetail({ broker }: { broker: BrokerStatus }) {
-  const s = broker.state;
-  if (s.state === "offline") {
-    return (
-      <pre className="logs logs-compact mt-2">{s.hint}</pre>
-    );
-  }
-  if (s.state === "error") {
-    return (
-      <div className="mono err-text mt-2">
-        {s.detail}
-      </div>
-    );
-  }
-  if (s.state === "connected") {
-    return (
-      <div className="muted mono fs-xs mt-2">
-        account · {s.account_id}
-        {s.account_label ? ` · ${s.account_label}` : null}
-      </div>
-    );
-  }
-  if (s.state === "unauthenticated") {
-    return (
-      <div className="muted fs-xs mt-2">
-        Gateway is running — log in to start pulling data.
-      </div>
-    );
-  }
-  return null;
-}
-
-function BrokerActions({
-  broker,
-  onRefresh,
-}: {
-  broker: BrokerStatus;
-  onRefresh: () => void;
-}) {
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(
-    null,
+function DataIcon() {
+  // Database cylinder — clearly distinct from the Trade chart glyph.
+  return (
+    <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+      <ellipse cx="8" cy="4" rx="5" ry="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M3 8c0 1.1 2.2 2 5 2s5-.9 5-2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
   );
+}
 
-  const s = broker.state;
-
-  const runTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const result = await cmd.forgeBrokerTest(broker.id);
-      // result is the raw JSON string of the account summary
-      const parsed = (() => {
-        try {
-          return JSON.parse(result);
-        } catch {
-          return result;
-        }
-      })();
-      const summary =
-        typeof parsed === "object" && parsed !== null
-          ? `net liq ${(parsed as Record<string, unknown>).net_liquidation ?? "?"} · ${
-              (parsed as Record<string, unknown>).currency ?? "?"
-            }`
-          : String(parsed);
-      setTestResult({ ok: true, msg: summary });
-    } catch (err) {
-      setTestResult({ ok: false, msg: String(err) });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  if (s.state === "not_implemented") {
-    return (
-      <span className="muted mono fs-xs">
-        roadmap
-      </span>
-    );
-  }
-
-  if (s.state === "offline") {
-    return (
-      <button
-        type="button"
-        className="ghost fs-xs"
-        onClick={() => openInBrowser("https://www.interactivebrokers.com/en/trading/ib-api.php#client-portal-api")}
-      >
-        Get gateway
-      </button>
-    );
-  }
-
-  if (s.state === "unauthenticated") {
-    return (
-      <div className="vstack">
-        <button
-          type="button"
-          className="primary fs-xs"
-          onClick={async () => {
-            try {
-              await cmd.openIbkrLogin(s.login_url);
-            } catch (err) {
-              // Embedded webview might error on self-signed cert
-              // first time — fall back to the user's default browser.
-              console.warn("openIbkrLogin failed, falling back:", err);
-              await openInBrowser(s.login_url);
-            }
-            // Poll once after a short delay; the auto-poll above
-            // handles the steady state.
-            setTimeout(onRefresh, 4000);
-          }}
-        >
-          Connect
-        </button>
-        <button
-          type="button"
-          className="ghost fs-xs"
-          onClick={() => openInBrowser(s.login_url)}
-        >
-          Open in browser
-        </button>
-      </div>
-    );
-  }
-
-  if (s.state === "connected") {
-    return (
-      <div className="vstack" style={{ alignItems: "flex-end" }}>
-        <button
-          type="button"
-          className="ghost fs-xs"
-          onClick={runTest}
-          disabled={testing}
-        >
-          {testing ? "Testing…" : "Test pull"}
-        </button>
-        {testResult && (
-          <div
-            className={`mono fs-2xs ${testResult.ok ? "ok-text" : "err-text"}`}
-            style={{ maxWidth: 200, textAlign: "right", whiteSpace: "pre-wrap" }}
-          >
-            {testResult.ok ? "✓ " : "✗ "}
-            {testResult.msg}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (s.state === "error") {
-    return (
-      <button
-        type="button"
-        className="ghost fs-xs"
-        onClick={onRefresh}
-      >
-        Retry
-      </button>
-    );
-  }
-
-  return null;
+function TradeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+      <path d="M3 9l3-3 2.5 2.5L13 4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 4h3v3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
