@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 
+import ConfirmRow from "@/components/ConfirmRow";
 import IncidentCard from "@/components/IncidentCard";
 import BrokerConnectionsCard from "@/views/BrokerConnections";
 import {
@@ -18,12 +19,130 @@ import {
 
 export default function Settings() {
   return (
-    <>
+    <div className="view-narrow">
       <h1>Settings</h1>
+      <LicenseCard />
       <WorkspaceCard />
       <BrokerConnectionsCard />
       <SystemCard />
+    </div>
+  );
+}
+
+// ── License ──────────────────────────────────────────────────────
+//
+// Moved here from the home in the v7.1 hub: license is a one-time
+// global setup, not a daily glance. The rail shows the tier
+// (Community / Licensed); full management lives here.
+
+function LicenseCard() {
+  const [stored, setStored] = useState<string | null | undefined>(undefined);
+  const [editing, setEditing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    try {
+      setStored(await cmd.licenseGet());
+    } catch {
+      setStored(null);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  if (stored === undefined) return null;
+
+  return (
+    <>
+      <h2>License</h2>
+      {stored && !editing ? (
+        <div className="card">
+          <div className="wrap-row">
+            <div style={{ flex: 1 }}>
+              <strong>License active</strong>
+              <div className="muted mono mt-1">{stored.slice(0, 16)}…</div>
+            </div>
+            <span className="badge ok">activated</span>
+            <button type="button" className="ghost" onClick={() => setEditing(true)}>
+              Change
+            </button>
+            <ConfirmRow
+              trigger="Clear"
+              title="Remove the stored license key?"
+              body="You can paste it again from your purchase email anytime."
+              confirmLabel="Remove"
+              onConfirm={async () => {
+                setClearError(null);
+                try {
+                  await cmd.licenseClear();
+                  await refresh();
+                } catch (err) {
+                  setClearError("Could not clear: " + err);
+                }
+              }}
+            />
+          </div>
+          {clearError && <div className="err-text fs-xs mt-2">{clearError}</div>}
+        </div>
+      ) : (
+        <ActivationCard
+          onSaved={() => {
+            setEditing(false);
+            void refresh();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function ActivationCard({ onSaved }: { onSaved: () => void }) {
+  const [value, setValue] = useState("");
+  const [status, setStatus] = useState("");
+
+  const save = async () => {
+    const v = value.trim();
+    if (!v) {
+      setStatus("Paste a key first.");
+      return;
+    }
+    try {
+      await cmd.licenseSet(v);
+      setStatus("Saved.");
+      setTimeout(onSaved, 600);
+    } catch (err) {
+      setStatus("Could not save: " + err);
+    }
+  };
+
+  return (
+    <div className="card">
+      <p className="muted m-0 mb-3">
+        Paste the license key from your purchase email to activate Auracle.
+        Leave it blank to stay on the Community tier.
+      </p>
+      <input
+        type="password"
+        placeholder="akey_…"
+        autoComplete="off"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <div className="hstack mt-4">
+        <button type="button" className="primary" onClick={save}>
+          Save
+        </button>
+        <span
+          className={
+            /^(Could not|Paste)/.test(status) ? "err-text fs-xs" : "muted mono fs-xs"
+          }
+        >
+          {status}
+        </span>
+      </div>
+    </div>
   );
 }
 
