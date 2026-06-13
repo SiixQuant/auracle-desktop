@@ -25,7 +25,7 @@ export default function Settings() {
         <div className="sgcell"><LicenseCard /></div>
         <div className="sgcell"><WorkspaceCard /></div>
         <div className="sgcell"><SystemCard /></div>
-        <div className="sgcell"><BrokerConnectionsCard /></div>
+        <div className="sgcell full"><BrokerConnectionsCard /></div>
       </div>
     </div>
   );
