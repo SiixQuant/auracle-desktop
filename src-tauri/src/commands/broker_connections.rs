@@ -168,6 +168,9 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
 /// launcher's. (When the launcher later derives rows live from the
 /// engine `GET /api/connectors` registry, every asset passes through
 /// here.)
+// Used by the parity test today; reserved for the live /api/connectors
+// derivation path, so it's intentionally retained in non-test builds.
+#[cfg_attr(not(test), allow(dead_code))]
 fn engine_kind_to_launcher(kind: &str) -> Option<&'static str> {
     match kind {
         "stock" | "etf" => Some("equities"),
