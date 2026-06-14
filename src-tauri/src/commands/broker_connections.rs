@@ -198,9 +198,9 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
 /// (adapter.asset_kinds — stock/etf/option/future/fx/crypto) → launcher
 /// display labels. Any asset a row claims MUST resolve through this map;
 /// it is the one bridge between the engine's vocabulary and the
-/// launcher's. (When the launcher later derives rows live from the
-/// engine `GET /api/connectors` registry, every asset passes through
-/// here.)
+/// launcher's. The live capability overlay derives every row's assets
+/// from the engine's public `GET /ui/api/connectors` registry through
+/// this map.
 fn engine_kind_to_launcher(kind: &str) -> Option<&'static str> {
     match kind {
         "stock" | "etf" => Some("equities"),
@@ -256,39 +256,60 @@ async fn fetch_engine_connectors() -> Option<Vec<EngineConnector>> {
 
 /// Overlay the engine's capability TRUTH onto an already-built catalog.
 ///
-/// Pure (no IO) so it's unit-testable. For each engine connector we find
-/// the catalog row whose `id` matches the engine `name` (case-insensitive)
-/// and overwrite ONLY the capability-claim fields:
-///   * `assets` — engine `asset_classes` translated through the one
-///     vocabulary map; unmappable kinds dropped; deduped, first-seen order
-///     preserved.
-///   * `provides_execution` — engine `trading`.
-///   * `provides_data` — engine `market_data != "none"`.
+/// Pure (no IO) so it's unit-testable. The engine can emit MORE THAN ONE
+/// connector under the same `name` — a broker row (`trading=true`) and a
+/// data-provider row (`trading=false`) for the same venue, e.g. `alpaca`.
+/// So we first AGGREGATE engine connectors by name with union/OR semantics,
+/// then overlay the combined truth onto the matching catalog row. (A plain
+/// last-write-wins would let the data row clobber the broker row and hide a
+/// real execution capability — an under-claim is as dishonest as an
+/// over-claim.) For each name we overwrite ONLY the capability-claim fields:
+///   * `assets` — UNION of every same-name connector's `asset_classes`
+///     translated through the one vocabulary map; unmappable kinds dropped;
+///     deduped, first-seen order preserved.
+///   * `provides_execution` — OR of every same-name connector's `trading`.
+///   * `provides_data` — OR of `market_data != "none"` across them.
 ///
-/// Everything else (label, description, capabilities, category,
-/// connect_method, and the live-probed `state`) is launcher-owned and left
-/// untouched. Rows with no engine match keep their static values.
+/// Matching is case-insensitive on `id` == engine `name`. Everything else
+/// (label, description, capabilities, category, connect_method, and the
+/// live-probed `state`) is launcher-owned and left untouched. Rows with no
+/// engine match keep their static values.
 fn apply_engine_overlay(catalog: &mut [BrokerStatus], engine: &[EngineConnector]) {
-    for conn in engine {
-        let Some(row) = catalog
-            .iter_mut()
-            .find(|r| r.id.eq_ignore_ascii_case(&conn.name))
-        else {
-            continue;
-        };
+    use std::collections::HashMap;
 
-        // Translate + dedupe, preserving first-seen order.
-        let mut assets: Vec<&'static str> = Vec::new();
+    struct Agg {
+        assets: Vec<&'static str>,
+        trading: bool,
+        has_data: bool,
+    }
+
+    // Fold every engine connector into one aggregate per lowercased name.
+    let mut by_name: HashMap<String, Agg> = HashMap::new();
+    for conn in engine {
+        let agg = by_name
+            .entry(conn.name.to_ascii_lowercase())
+            .or_insert(Agg {
+                assets: Vec::new(),
+                trading: false,
+                has_data: false,
+            });
         for kind in &conn.asset_classes {
             if let Some(label) = engine_kind_to_launcher(kind) {
-                if !assets.contains(&label) {
-                    assets.push(label);
+                if !agg.assets.contains(&label) {
+                    agg.assets.push(label);
                 }
             }
         }
-        row.assets = assets;
-        row.provides_execution = conn.trading;
-        row.provides_data = conn.market_data != "none";
+        agg.trading |= conn.trading;
+        agg.has_data |= conn.market_data != "none";
+    }
+
+    for row in catalog.iter_mut() {
+        if let Some(agg) = by_name.get(&row.id.to_ascii_lowercase()) {
+            row.assets = agg.assets.clone();
+            row.provides_execution = agg.trading;
+            row.provides_data = agg.has_data;
+        }
     }
 }
 
@@ -305,11 +326,10 @@ const IBKR_ASSETS: &[&str] = &["equities", "options", "futures"];
 /// and the polygon US-equity daily ingest. The `assets` of any
 /// capability-claiming row are a subset of that engine truth; sources
 /// with no engine path claim NO capability (both flags false) and their
-/// chips are descriptive only. The parity test below enforces this, and
-/// it is the same truth the engine exposes at GET /api/connectors — the
-/// authoritative source the launcher will consume live once that
-/// registry is reachable unauthenticated (currently `require_user`-gated;
-/// see the run report).
+/// chips are descriptive only. The parity test below enforces this for the
+/// static fallback, and it is the same truth the engine exposes at its
+/// public `GET /ui/api/connectors` registry — which the live overlay
+/// consumes to keep these claims sourced from one place.
 fn catalog_entries() -> Vec<BrokerStatus> {
     vec![
         // ── Brokers (execution adapters: asset_kinds = stock/etf) ────
@@ -738,6 +758,34 @@ mod tests {
         assert!(!polygon.provides_execution, "trading=false → no execution");
         assert!(polygon.provides_data, "market_data=historical → data");
         assert_eq!(polygon.assets, vec!["equities"]);
+    }
+
+    /// The engine emits TWO connectors under the same name (a broker row
+    /// and a data-provider row), e.g. `alpaca`. The overlay must UNION
+    /// them, not let the last one win — otherwise the data row (trading=
+    /// false) would hide the broker row's real execution capability.
+    #[test]
+    fn engine_overlay_unions_same_name_broker_and_data_rows() {
+        let mut catalog = vec![row("alpaca", vec![], false, false)];
+        // Order matters for the bug: the data row (trading=false) comes
+        // LAST, so a naive last-write-wins would clear execution.
+        let engine = vec![
+            conn("alpaca", &["stock", "etf"], true, "none"), // broker: trades
+            conn("alpaca", &["stock", "etf"], false, "historical+snapshot"), // data
+        ];
+
+        apply_engine_overlay(&mut catalog, &engine);
+
+        let alpaca = catalog.iter().find(|r| r.id == "alpaca").unwrap();
+        assert!(
+            alpaca.provides_execution,
+            "broker row's trading must survive the data row (OR-merge)"
+        );
+        assert!(
+            alpaca.provides_data,
+            "data row's market_data must survive the broker row (OR-merge)"
+        );
+        assert_eq!(alpaca.assets, vec!["equities"], "unioned + deduped");
     }
 
     /// Translated assets are deduped (stock+etf both → equities once) with
