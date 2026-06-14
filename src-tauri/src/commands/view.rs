@@ -183,6 +183,29 @@ pub async fn open_auracle_ide() -> Result<(), String> {
     use std::path::Path;
     use std::process::Command;
 
+    // Honest gate: never open the workspace into a dead/unknown engine.
+    // Confirm Houston is healthy with a FRESH /healthz poll (the same
+    // signal the tray + Dashboard use) before launching — the frontend
+    // button is already gated on the cached health, but that can be a
+    // poll-interval stale, and a direct command call would bypass it
+    // entirely. Fail with a plain, actionable message instead.
+    match super::healthcheck::healthcheck_now().await {
+        Ok(h) if h.state == "healthy" => {}
+        Ok(h) => {
+            return Err(format!(
+                "The local engine isn't ready (status: {}). Start it and \
+                 wait for it to be ready, then open the workspace.",
+                h.state
+            ));
+        }
+        Err(e) => {
+            return Err(format!(
+                "Couldn't reach the local engine to confirm it's running \
+                 ({e}). Start it first, then open the workspace."
+            ));
+        }
+    }
+
     // 1. Explicit override.
     if let Ok(custom) = std::env::var("AURACLE_IDE_PATH") {
         let custom = custom.trim().to_string();
