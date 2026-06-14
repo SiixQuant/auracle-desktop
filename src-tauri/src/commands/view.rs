@@ -38,7 +38,8 @@ const EMBEDDED_LABEL: &str = "auracle-embedded";
 // Jupyter refuses cross-origin framing, so a direct :1969 embed leaves
 // the notebooks panel blank. Requires Caddy's local CA to be trusted on
 // the host (see the launcher's first-run cert step / docs).
-const AURACLE_URL: &str = "https://localhost/ui";
+const AURACLE_ORIGIN: &str = "https://localhost";
+const AURACLE_DEFAULT_PATH: &str = "/ui";
 // JupyterLab opens as its OWN top-level window (not an iframe inside the
 // workspace): WKWebView renders a heavy SPA like Lab reliably as a top-level
 // page but not nested in an iframe, so the inline Research panel goes blank in
@@ -105,8 +106,24 @@ const EMBEDDED_INIT_SCRIPT: &str = r#"
 })();
 "#;
 
-/// Open the embedded Auracle window. Reuses an existing window if
-/// already open (focuses it); otherwise creates a fresh one.
+/// Build the embedded-window URL from an optional relative path.
+///
+/// Defaults to the workspace root (`/ui`). Only a plain same-origin path
+/// is honored — anything that could redirect the window off `localhost`
+/// (a scheme, a protocol-relative `//host`, or a value not starting with
+/// `/`) falls back to the default, so a stray caller value can never
+/// point the embedded webview at an arbitrary origin.
+fn embedded_url(path: Option<String>) -> String {
+    let rel = path.unwrap_or_default();
+    let rel = rel.trim();
+    let safe = rel.starts_with('/') && !rel.starts_with("//") && !rel.contains("://");
+    let rel = if safe { rel } else { AURACLE_DEFAULT_PATH };
+    format!("{AURACLE_ORIGIN}{rel}")
+}
+
+/// Open the embedded Auracle window at `path` (defaults to `/ui`). Reuses
+/// an existing window if already open — navigating it to `path` and
+/// focusing it — otherwise creates a fresh one.
 ///
 /// Frontend calls this only when `get_view_mode()` returned
 /// `embedded`. Browser mode is handled in JS via the opener plugin
@@ -118,8 +135,16 @@ const EMBEDDED_INIT_SCRIPT: &str = r#"
 /// launcher restarts — customer doesn't have to re-enter credentials
 /// every time they reopen the launcher.
 #[tauri::command]
-pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn open_embedded_auracle(
+    app: tauri::AppHandle,
+    path: Option<String>,
+) -> Result<(), String> {
+    let url = tauri::Url::parse(&embedded_url(path)).map_err(to_error_string)?;
     if let Some(existing) = app.get_webview_window(EMBEDDED_LABEL) {
+        // Navigate the open window to the requested page so the toggle's
+        // deep links (blotter, help) land where the user clicked instead
+        // of showing whatever page was open before.
+        existing.navigate(url).map_err(to_error_string)?;
         existing.show().map_err(to_error_string)?;
         existing.set_focus().map_err(to_error_string)?;
         return Ok(());
@@ -130,7 +155,6 @@ pub async fn open_embedded_auracle(app: tauri::AppHandle) -> Result<(), String> 
     if !super::cert_trust::caddy_ca_trusted().await.unwrap_or(false) {
         super::cert_trust::trust_caddy_ca().await?;
     }
-    let url = tauri::Url::parse(AURACLE_URL).map_err(to_error_string)?;
     WebviewWindowBuilder::new(&app, EMBEDDED_LABEL, WebviewUrl::External(url))
         .title("Auracle")
         .inner_size(1280.0, 800.0)
