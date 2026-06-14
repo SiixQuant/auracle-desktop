@@ -510,8 +510,10 @@ mod tests {
             "coinbase" | "kraken" | "binance" | "bybit" | "okx" => &["crypto"],
             _ => return None,
         };
-        let mut labels: Vec<&'static str> =
-            kinds.iter().filter_map(|k| engine_kind_to_launcher(k)).collect();
+        let mut labels: Vec<&'static str> = kinds
+            .iter()
+            .filter_map(|k| engine_kind_to_launcher(k))
+            .collect();
         labels.sort();
         labels.dedup();
         Some(labels)
@@ -536,7 +538,9 @@ mod tests {
                 assert!(
                     allowed.contains(a),
                     "{} advertises asset {:?} the engine cannot back (allowed: {:?})",
-                    row.id, a, allowed
+                    row.id,
+                    a,
+                    allowed
                 );
             }
         }
@@ -562,8 +566,14 @@ mod tests {
     fn ibkr_assets_subset_of_engine_truth() {
         let allowed = engine_truth("ibkr").unwrap();
         for a in IBKR_ASSETS {
-            assert!(allowed.contains(a), "IBKR advertises {a:?} outside engine truth");
+            assert!(
+                allowed.contains(a),
+                "IBKR advertises {a:?} outside engine truth"
+            );
         }
-        assert!(!IBKR_ASSETS.contains(&"forex"), "IBKR adapter declares no fx");
+        assert!(
+            !IBKR_ASSETS.contains(&"forex"),
+            "IBKR adapter declares no fx"
+        );
     }
 }
