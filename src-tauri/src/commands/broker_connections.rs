@@ -156,46 +156,91 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
     // and auracle/brokers), with a "coming soon" launcher-connect state.
     // Honesty rule: provides_data / provides_execution must track what
     // actually ships, never the roadmap.
-    Ok(vec![
-        ibkr,
-        // ── Brokers (data + execution) ──────────────────────────────
+    let mut out = vec![ibkr];
+    out.extend(catalog_entries());
+    Ok(out)
+}
+
+/// THE single asset-vocabulary translator: engine canonical asset kinds
+/// (adapter.asset_kinds — stock/etf/option/future/fx/crypto) → launcher
+/// display labels. Any asset a row claims MUST resolve through this map;
+/// it is the one bridge between the engine's vocabulary and the
+/// launcher's. (When the launcher later derives rows live from the
+/// engine `GET /api/connectors` registry, every asset passes through
+/// here.)
+// Used by the parity test today; reserved for the live /api/connectors
+// derivation path, so it's intentionally retained in non-test builds.
+#[cfg_attr(not(test), allow(dead_code))]
+fn engine_kind_to_launcher(kind: &str) -> Option<&'static str> {
+    match kind {
+        "stock" | "etf" => Some("equities"),
+        "option" => Some("options"),
+        "future" => Some("futures"),
+        "fx" => Some("forex"),
+        "crypto" => Some("crypto"),
+        "index" => Some("indices"),
+        _ => None,
+    }
+}
+
+/// Asset classes IBKR can trade, per the engine adapter
+/// (auracle/brokers/ibkr/adapter.py `asset_kinds = stock/etf/future/option`
+/// → equities/options/futures). NOTE: no forex — the IBKR adapter does
+/// not declare `fx`, so the launcher must not advertise it.
+const IBKR_ASSETS: &[&str] = &["equities", "options", "futures"];
+
+/// The non-IBKR catalog. HONESTY CONTRACT: a row may claim a capability
+/// (provides_data / provides_execution) ONLY for asset classes the
+/// ENGINE can actually back — execution adapters' `asset_kinds`
+/// (auracle/brokers/*), the ccxt_source SPOT ingest for crypto venues,
+/// and the polygon US-equity daily ingest. The `assets` of any
+/// capability-claiming row are a subset of that engine truth; sources
+/// with no engine path claim NO capability (both flags false) and their
+/// chips are descriptive only. The parity test below enforces this, and
+/// it is the same truth the engine exposes at GET /api/connectors — the
+/// authoritative source the launcher will consume live once that
+/// registry is reachable unauthenticated (currently `require_user`-gated;
+/// see the run report).
+fn catalog_entries() -> Vec<BrokerStatus> {
+    vec![
+        // ── Brokers (execution adapters: asset_kinds = stock/etf) ────
         catalog_entry(
             "alpaca",
             "Alpaca",
-            "Commission-free US stocks, options & crypto. Free real-time data.",
+            "Commission-free US stocks & ETFs. Free real-time data.",
             "broker",
-            vec!["equities", "options", "crypto"],
+            vec!["equities"],
             true,
             true,
         ),
         catalog_entry(
             "tradier",
             "Tradier",
-            "Equities & options with a clean options chain.",
+            "US equities & ETFs.",
             "broker",
-            vec!["equities", "options"],
+            vec!["equities"],
             false,
             true,
         ),
         catalog_entry(
             "oanda",
             "OANDA",
-            "Dedicated forex & metals with streaming prices.",
+            "Dedicated forex & metals (not yet wired into Auracle).",
             "broker",
-            vec!["forex", "metals"],
+            vec!["forex"],
             false,
             false,
         ),
         catalog_entry(
             "tradovate",
             "Tradovate",
-            "Flat-fee futures and futures options.",
+            "Flat-fee futures.",
             "broker",
             vec!["futures"],
             false,
             true,
         ),
-        // ── Crypto exchanges (data via ccxt; execution on the roadmap) ─
+        // ── Crypto exchanges (data via the ccxt SPOT ingest only) ────
         catalog_entry(
             "coinbase",
             "Coinbase",
@@ -208,36 +253,36 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
         catalog_entry(
             "kraken",
             "Kraken",
-            "Crypto spot & futures. Data via ccxt.",
+            "Crypto spot. Data via ccxt.",
             "crypto",
-            vec!["crypto", "futures"],
+            vec!["crypto"],
             true,
             false,
         ),
         catalog_entry(
             "binance",
             "Binance",
-            "Largest crypto venue — spot, futures, options. Data via ccxt.",
+            "Largest crypto venue — spot. Data via ccxt.",
             "crypto",
-            vec!["crypto", "futures", "options"],
+            vec!["crypto"],
             true,
             false,
         ),
         catalog_entry(
             "bybit",
             "Bybit",
-            "Crypto perpetuals, futures & options. Data via ccxt.",
+            "Crypto spot. Data via ccxt.",
             "crypto",
-            vec!["crypto", "futures", "options"],
+            vec!["crypto"],
             true,
             false,
         ),
         catalog_entry(
             "okx",
             "OKX",
-            "Full-spectrum crypto — spot, perps, options. Data via ccxt.",
+            "Crypto spot. Data via ccxt.",
             "crypto",
-            vec!["crypto", "futures", "options"],
+            vec!["crypto"],
             true,
             false,
         ),
@@ -246,24 +291,28 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
             "Hyperliquid",
             "On-chain perps DEX. Wallet-signed, no API key.",
             "crypto",
-            vec!["crypto", "futures"],
+            vec!["crypto"],
             false,
             true,
         ),
-        // ── Market-data providers (data only) ───────────────────────
+        // ── Market-data providers ───────────────────────────────────
         catalog_entry(
             "polygon",
             "Polygon.io",
-            "Normalized US equities, options, forex & crypto data.",
+            "US equities daily bars.",
             "data",
-            vec!["equities", "options", "forex", "crypto", "indices"],
+            vec!["equities"],
             true,
             false,
         ),
+        // The four below have NO engine ingest/adapter path yet, so they
+        // claim NO capability (no Data/Trade badge). Their chips are a
+        // descriptive note of what the source offers, not an Auracle
+        // claim — they read as "coming soon".
         catalog_entry(
             "databento",
             "Databento",
-            "Institutional L2/L3 depth for equities, futures & options.",
+            "Institutional L2/L3 depth (not yet wired into Auracle).",
             "data",
             vec!["equities", "futures", "options"],
             false,
@@ -272,7 +321,7 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
         catalog_entry(
             "finnhub",
             "Finnhub",
-            "Equities, forex & crypto quotes with a free tier.",
+            "Equities, forex & crypto quotes (not yet wired into Auracle).",
             "data",
             vec!["equities", "forex", "crypto"],
             false,
@@ -281,7 +330,7 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
         catalog_entry(
             "tiingo",
             "Tiingo",
-            "Low-cost real-time US equities & crypto (IEX feed).",
+            "Low-cost real-time US equities & crypto (not yet wired into Auracle).",
             "data",
             vec!["equities", "crypto", "forex"],
             false,
@@ -290,13 +339,13 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
         catalog_entry(
             "twelvedata",
             "Twelve Data",
-            "Multi-asset quotes — equities, forex, crypto, indices.",
+            "Multi-asset quotes (not yet wired into Auracle).",
             "data",
             vec!["equities", "forex", "crypto", "indices"],
             false,
             false,
         ),
-    ])
+    ]
 }
 
 /// Build the IBKR status entry. Three roundtrips at most:
@@ -313,7 +362,7 @@ async fn probe_ibkr() -> BrokerStatus {
         description: "Your market data and trading account.".to_string(),
         capabilities: vec!["positions", "account", "quotes", "bars", "options_chain"],
         category: "broker",
-        assets: vec!["equities", "options", "futures", "forex"],
+        assets: IBKR_ASSETS.to_vec(),
         provides_data: true,
         provides_execution: true,
         connect_method: "gateway",
@@ -437,5 +486,94 @@ pub async fn forge_broker_test(broker_id: String) -> Result<String, String> {
             Err(e) => Err(e.to_user_string()),
         },
         other => Err(format!("broker {other:?} not yet supported")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Engine adapter / ingest truth, encoded from the source of truth:
+    /// execution adapters' `asset_kinds` (auracle/brokers/<name>/adapter.py),
+    /// the ccxt_source SPOT ingest for crypto venues, and the polygon
+    /// US-equity daily ingest. Returns the ALLOWED launcher labels (run
+    /// through the one vocabulary translator) for a source that has an
+    /// engine path, or None for sources Auracle cannot back yet.
+    fn engine_truth(id: &str) -> Option<Vec<&'static str>> {
+        let kinds: &[&str] = match id {
+            "ibkr" => &["stock", "etf", "future", "option"],
+            "alpaca" => &["stock", "etf"],
+            "tradier" => &["stock", "etf"],
+            "tradovate" => &["future"],
+            "hyperliquid" => &["crypto"],
+            "polygon" => &["stock", "etf"],
+            "coinbase" | "kraken" | "binance" | "bybit" | "okx" => &["crypto"],
+            _ => return None,
+        };
+        let mut labels: Vec<&'static str> = kinds
+            .iter()
+            .filter_map(|k| engine_kind_to_launcher(k))
+            .collect();
+        labels.sort();
+        labels.dedup();
+        Some(labels)
+    }
+
+    /// HONESTY CONTRACT: any catalog row that CLAIMS a capability
+    /// (provides_data || provides_execution) may advertise only asset
+    /// classes the engine can actually back. Fails the build on drift.
+    #[test]
+    fn launcher_assets_subset_of_engine_truth() {
+        for row in catalog_entries() {
+            if !(row.provides_data || row.provides_execution) {
+                continue; // no claim → chips are descriptive only
+            }
+            let allowed = engine_truth(&row.id).unwrap_or_else(|| {
+                panic!(
+                    "{} claims a capability but has no engine adapter/ingest path",
+                    row.id
+                )
+            });
+            for a in &row.assets {
+                assert!(
+                    allowed.contains(a),
+                    "{} advertises asset {:?} the engine cannot back (allowed: {:?})",
+                    row.id,
+                    a,
+                    allowed
+                );
+            }
+        }
+    }
+
+    /// Sources with no engine path must claim NO capability (both flags
+    /// false) — otherwise a Data/Trade badge would be fabricated.
+    #[test]
+    fn unsupported_sources_claim_no_capability() {
+        for row in catalog_entries() {
+            if engine_truth(&row.id).is_none() {
+                assert!(
+                    !row.provides_data && !row.provides_execution,
+                    "{} has no engine path yet must not light Data/Trade",
+                    row.id
+                );
+            }
+        }
+    }
+
+    /// IBKR (probed dynamically) must also stay within engine truth.
+    #[test]
+    fn ibkr_assets_subset_of_engine_truth() {
+        let allowed = engine_truth("ibkr").unwrap();
+        for a in IBKR_ASSETS {
+            assert!(
+                allowed.contains(a),
+                "IBKR advertises {a:?} outside engine truth"
+            );
+        }
+        assert!(
+            !IBKR_ASSETS.contains(&"forex"),
+            "IBKR adapter declares no fx"
+        );
     }
 }
