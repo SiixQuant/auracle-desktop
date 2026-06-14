@@ -62,18 +62,37 @@ per machine on first launch:
 
 ### macOS
 
-> "Auracle Desktop can't be opened because Apple cannot check it for
-> malicious software."
+> "Apple could not verify 'Auracle Desktop.app' is free of malware that
+> may harm your Mac or compromise your privacy." — **Not Opened** /
+> **Move to Trash**
 
-1. Click **Cancel** on the warning
-2. In Finder, right-click **Auracle Desktop.app** → **Open**
-3. Click **Open** on the confirmation
+Click **Done** (never "Move to Trash"), then trust the app — the steps
+differ by macOS version:
 
-Or skip the click-through:
+**macOS 15 Sequoia and later** (Apple removed the old right-click → Open
+bypass here):
+
+1. Open **System Settings → Privacy & Security**
+2. Scroll to Security — you'll see *""Auracle Desktop.app" was blocked…"*
+3. Click **Open Anyway**, then confirm with Touch ID / your password
+
+**macOS 14 Sonoma and earlier:**
+
+1. In Finder, right-click **Auracle Desktop.app** → **Open**
+2. Click **Open** on the confirmation
+
+**Any version — the reliable one-liner** (clears the download quarantine
+so the app launches normally):
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Auracle Desktop.app"
 ```
+
+> Builds are ad-hoc signed but not yet Apple-Developer-ID **notarized**,
+> so a freshly downloaded copy is quarantined and Gatekeeper blocks the
+> first launch. Notarized builds (no warning at all) ship once an Apple
+> Developer ID is added to the release pipeline — the workflow is already
+> wired for it, gated on the `APPLE_*` secrets.
 
 ### Windows
 
