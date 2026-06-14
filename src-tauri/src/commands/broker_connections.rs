@@ -22,13 +22,23 @@
 
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 const IBKR_GATEWAY_BASE: &str = "https://localhost:5000/v1/api";
 /// Short timeout — this command runs every time the user opens
 /// Settings; we don't want it blocking the page render.
 const PROBE_TIMEOUT_SECS: u64 = 3;
+
+/// Direct engine origin for the public connector registry. This is the
+/// authoritative source for capability CLAIMS (which asset classes a
+/// source can be backed for, whether it trades, whether it serves data).
+/// Plain http on the loopback engine port — no TLS, no auth.
+const ENGINE_CONNECTORS_URL: &str = "http://127.0.0.1:1969/ui/api/connectors";
+/// Even shorter than the broker probe: the registry is a cheap local read,
+/// and if the engine isn't up we want to fall back to the static catalog
+/// fast rather than stalling the Settings page.
+const ENGINE_FETCH_TIMEOUT_SECS: u64 = 3;
 
 /// Possible states a single broker connection can be in. The frontend
 /// renders different controls per state, so the variants describe
@@ -158,6 +168,29 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
     // actually ships, never the roadmap.
     let mut out = vec![ibkr];
     out.extend(catalog_entries());
+
+    // Capability CLAIMS (which assets a source can be backed for, whether
+    // it trades, whether it serves data) now come from ONE place — the
+    // engine registry — so the launcher can't drift or over-claim. If the
+    // engine is reachable we overlay its truth onto the catalog built
+    // above; otherwise we keep the static values (offline fallback). The
+    // live-probed IBKR `state` is preserved either way — the overlay only
+    // touches assets / provides_*.
+    match fetch_engine_connectors().await {
+        Some(engine) => {
+            log::info!(
+                "broker catalog: applied live engine capability overlay ({} connectors)",
+                engine.len()
+            );
+            apply_engine_overlay(&mut out, &engine);
+        }
+        None => {
+            log::info!(
+                "broker catalog: engine registry unreachable — using static capability fallback"
+            );
+        }
+    }
+
     Ok(out)
 }
 
@@ -165,12 +198,9 @@ pub async fn forge_broker_status(_app: AppHandle) -> Result<Vec<BrokerStatus>, S
 /// (adapter.asset_kinds — stock/etf/option/future/fx/crypto) → launcher
 /// display labels. Any asset a row claims MUST resolve through this map;
 /// it is the one bridge between the engine's vocabulary and the
-/// launcher's. (When the launcher later derives rows live from the
-/// engine `GET /api/connectors` registry, every asset passes through
-/// here.)
-// Used by the parity test today; reserved for the live /api/connectors
-// derivation path, so it's intentionally retained in non-test builds.
-#[cfg_attr(not(test), allow(dead_code))]
+/// launcher's. The live capability overlay derives every row's assets
+/// from the engine's public `GET /ui/api/connectors` registry through
+/// this map.
 fn engine_kind_to_launcher(kind: &str) -> Option<&'static str> {
     match kind {
         "stock" | "etf" => Some("equities"),
@@ -180,6 +210,106 @@ fn engine_kind_to_launcher(kind: &str) -> Option<&'static str> {
         "crypto" => Some("crypto"),
         "index" => Some("indices"),
         _ => None,
+    }
+}
+
+/// One connector as published by the engine registry. Only the fields the
+/// launcher actually consumes for capability CLAIMS are modeled; everything
+/// else (the launcher's presentation layer — label/description/connect
+/// method — and any future engine fields) is ignored. `#[serde(default)]`
+/// on every field means a missing or extra field never breaks parsing.
+#[derive(Deserialize)]
+struct EngineConnector {
+    name: String,
+    #[serde(default)]
+    asset_classes: Vec<String>,
+    #[serde(default)]
+    trading: bool,
+    #[serde(default)]
+    market_data: String,
+}
+
+/// Top-level shape of `GET /ui/api/connectors`. Only `connectors` matters;
+/// `counts` / `as_of` and anything else the engine adds are dropped.
+#[derive(Deserialize)]
+struct EngineConnectorsResponse {
+    #[serde(default)]
+    connectors: Vec<EngineConnector>,
+}
+
+/// Fetch the engine's public connector registry. Returns `None` on ANY
+/// failure (engine down, timeout, non-200, unparseable body) so the caller
+/// transparently falls back to the static catalog. Best-effort: never
+/// surfaces an error to the UI.
+async fn fetch_engine_connectors() -> Option<Vec<EngineConnector>> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(ENGINE_FETCH_TIMEOUT_SECS))
+        .build()
+        .ok()?;
+    let resp = client.get(ENGINE_CONNECTORS_URL).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let parsed: EngineConnectorsResponse = resp.json().await.ok()?;
+    Some(parsed.connectors)
+}
+
+/// Overlay the engine's capability TRUTH onto an already-built catalog.
+///
+/// Pure (no IO) so it's unit-testable. The engine can emit MORE THAN ONE
+/// connector under the same `name` — a broker row (`trading=true`) and a
+/// data-provider row (`trading=false`) for the same venue, e.g. `alpaca`.
+/// So we first AGGREGATE engine connectors by name with union/OR semantics,
+/// then overlay the combined truth onto the matching catalog row. (A plain
+/// last-write-wins would let the data row clobber the broker row and hide a
+/// real execution capability — an under-claim is as dishonest as an
+/// over-claim.) For each name we overwrite ONLY the capability-claim fields:
+///   * `assets` — UNION of every same-name connector's `asset_classes`
+///     translated through the one vocabulary map; unmappable kinds dropped;
+///     deduped, first-seen order preserved.
+///   * `provides_execution` — OR of every same-name connector's `trading`.
+///   * `provides_data` — OR of `market_data != "none"` across them.
+///
+/// Matching is case-insensitive on `id` == engine `name`. Everything else
+/// (label, description, capabilities, category, connect_method, and the
+/// live-probed `state`) is launcher-owned and left untouched. Rows with no
+/// engine match keep their static values.
+fn apply_engine_overlay(catalog: &mut [BrokerStatus], engine: &[EngineConnector]) {
+    use std::collections::HashMap;
+
+    struct Agg {
+        assets: Vec<&'static str>,
+        trading: bool,
+        has_data: bool,
+    }
+
+    // Fold every engine connector into one aggregate per lowercased name.
+    let mut by_name: HashMap<String, Agg> = HashMap::new();
+    for conn in engine {
+        let agg = by_name
+            .entry(conn.name.to_ascii_lowercase())
+            .or_insert(Agg {
+                assets: Vec::new(),
+                trading: false,
+                has_data: false,
+            });
+        for kind in &conn.asset_classes {
+            if let Some(label) = engine_kind_to_launcher(kind) {
+                if !agg.assets.contains(&label) {
+                    agg.assets.push(label);
+                }
+            }
+        }
+        agg.trading |= conn.trading;
+        agg.has_data |= conn.market_data != "none";
+    }
+
+    for row in catalog.iter_mut() {
+        if let Some(agg) = by_name.get(&row.id.to_ascii_lowercase()) {
+            row.assets = agg.assets.clone();
+            row.provides_execution = agg.trading;
+            row.provides_data = agg.has_data;
+        }
     }
 }
 
@@ -196,11 +326,10 @@ const IBKR_ASSETS: &[&str] = &["equities", "options", "futures"];
 /// and the polygon US-equity daily ingest. The `assets` of any
 /// capability-claiming row are a subset of that engine truth; sources
 /// with no engine path claim NO capability (both flags false) and their
-/// chips are descriptive only. The parity test below enforces this, and
-/// it is the same truth the engine exposes at GET /api/connectors — the
-/// authoritative source the launcher will consume live once that
-/// registry is reachable unauthenticated (currently `require_user`-gated;
-/// see the run report).
+/// chips are descriptive only. The parity test below enforces this for the
+/// static fallback, and it is the same truth the engine exposes at its
+/// public `GET /ui/api/connectors` registry — which the live overlay
+/// consumes to keep these claims sourced from one place.
 fn catalog_entries() -> Vec<BrokerStatus> {
     vec![
         // ── Brokers (execution adapters: asset_kinds = stock/etf) ────
@@ -575,5 +704,208 @@ mod tests {
             !IBKR_ASSETS.contains(&"forex"),
             "IBKR adapter declares no fx"
         );
+    }
+
+    /// Helper: a minimal catalog row for overlay tests. Capability fields
+    /// are deliberately seeded WRONG so a passing assertion proves the
+    /// overlay (not the seed) produced the value.
+    fn row(id: &str, assets: Vec<&'static str>, data: bool, exec: bool) -> BrokerStatus {
+        BrokerStatus {
+            id: id.to_string(),
+            label: "L".to_string(),
+            description: "D".to_string(),
+            capabilities: vec!["seed_cap"],
+            category: "broker",
+            assets,
+            provides_data: data,
+            provides_execution: exec,
+            connect_method: "seed_method",
+            state: BrokerState::NotImplemented,
+        }
+    }
+
+    fn conn(name: &str, classes: &[&str], trading: bool, market_data: &str) -> EngineConnector {
+        EngineConnector {
+            name: name.to_string(),
+            asset_classes: classes.iter().map(|s| s.to_string()).collect(),
+            trading,
+            market_data: market_data.to_string(),
+        }
+    }
+
+    /// The overlay replaces the launcher's static capability values with
+    /// the engine's truth, matched case-insensitively by id == name.
+    #[test]
+    fn engine_overlay_sets_capability_from_engine_truth() {
+        let mut catalog = vec![
+            // Deliberately wrong: alpaca should be equities-only, trading.
+            row("alpaca", vec!["equities", "options"], false, false),
+            row("polygon", vec!["equities"], false, true),
+        ];
+        let engine = vec![
+            conn("alpaca", &["stock", "etf"], true, "historical+snapshot"),
+            conn("polygon", &["stock", "etf"], false, "historical"),
+        ];
+
+        apply_engine_overlay(&mut catalog, &engine);
+
+        let alpaca = catalog.iter().find(|r| r.id == "alpaca").unwrap();
+        assert_eq!(alpaca.assets, vec!["equities"]); // stock+etf → equities, deduped
+        assert!(alpaca.provides_execution, "trading=true → execution");
+        assert!(alpaca.provides_data, "market_data set → data");
+
+        let polygon = catalog.iter().find(|r| r.id == "polygon").unwrap();
+        assert!(!polygon.provides_execution, "trading=false → no execution");
+        assert!(polygon.provides_data, "market_data=historical → data");
+        assert_eq!(polygon.assets, vec!["equities"]);
+    }
+
+    /// The engine emits TWO connectors under the same name (a broker row
+    /// and a data-provider row), e.g. `alpaca`. The overlay must UNION
+    /// them, not let the last one win — otherwise the data row (trading=
+    /// false) would hide the broker row's real execution capability.
+    #[test]
+    fn engine_overlay_unions_same_name_broker_and_data_rows() {
+        let mut catalog = vec![row("alpaca", vec![], false, false)];
+        // Order matters for the bug: the data row (trading=false) comes
+        // LAST, so a naive last-write-wins would clear execution.
+        let engine = vec![
+            conn("alpaca", &["stock", "etf"], true, "none"), // broker: trades
+            conn("alpaca", &["stock", "etf"], false, "historical+snapshot"), // data
+        ];
+
+        apply_engine_overlay(&mut catalog, &engine);
+
+        let alpaca = catalog.iter().find(|r| r.id == "alpaca").unwrap();
+        assert!(
+            alpaca.provides_execution,
+            "broker row's trading must survive the data row (OR-merge)"
+        );
+        assert!(
+            alpaca.provides_data,
+            "data row's market_data must survive the broker row (OR-merge)"
+        );
+        assert_eq!(alpaca.assets, vec!["equities"], "unioned + deduped");
+    }
+
+    /// Translated assets are deduped (stock+etf both → equities once) with
+    /// first-seen order preserved across the mapped kinds.
+    #[test]
+    fn engine_overlay_dedupes_translated_assets() {
+        let mut catalog = vec![row("multi", vec![], false, false)];
+        let engine = vec![conn(
+            "multi",
+            &["stock", "etf", "future", "option"],
+            true,
+            "historical",
+        )];
+
+        apply_engine_overlay(&mut catalog, &engine);
+
+        let multi = catalog.iter().find(|r| r.id == "multi").unwrap();
+        assert_eq!(multi.assets, vec!["equities", "futures", "options"]);
+    }
+
+    /// market_data == "none" means the source serves no data, even if
+    /// other fields are present.
+    #[test]
+    fn engine_overlay_market_data_none_clears_data_flag() {
+        let mut catalog = vec![row("execonly", vec!["equities"], true, false)];
+        let engine = vec![conn("execonly", &["stock"], true, "none")];
+
+        apply_engine_overlay(&mut catalog, &engine);
+
+        let r = catalog.iter().find(|r| r.id == "execonly").unwrap();
+        assert!(!r.provides_data, "market_data=none → no data");
+        assert!(r.provides_execution, "trading=true preserved");
+    }
+
+    /// A catalog row with no matching engine connector keeps its static
+    /// values verbatim — the overlay touches nothing it can't match.
+    #[test]
+    fn engine_overlay_leaves_unmatched_rows() {
+        let mut catalog = vec![row("orphan", vec!["forex", "metals"], true, true)];
+        let engine = vec![conn("alpaca", &["stock"], true, "historical")];
+
+        apply_engine_overlay(&mut catalog, &engine);
+
+        let orphan = catalog.iter().find(|r| r.id == "orphan").unwrap();
+        assert_eq!(orphan.assets, vec!["forex", "metals"]);
+        assert!(orphan.provides_data);
+        assert!(orphan.provides_execution);
+    }
+
+    /// Matching is case-insensitive (engine "IBKR" matches catalog "ibkr"),
+    /// and launcher-owned presentation fields are never disturbed.
+    #[test]
+    fn engine_overlay_is_case_insensitive_and_preserves_presentation() {
+        let mut catalog = vec![row("ibkr", vec!["equities"], false, false)];
+        let engine = vec![conn(
+            "IBKR",
+            &["stock", "future", "option"],
+            true,
+            "historical+snapshot",
+        )];
+
+        apply_engine_overlay(&mut catalog, &engine);
+
+        let ibkr = catalog.iter().find(|r| r.id == "ibkr").unwrap();
+        assert_eq!(ibkr.assets, vec!["equities", "futures", "options"]);
+        assert!(ibkr.provides_execution);
+        assert!(ibkr.provides_data);
+        // Presentation + connect method left alone.
+        assert_eq!(ibkr.label, "L");
+        assert_eq!(ibkr.connect_method, "seed_method");
+        assert_eq!(ibkr.capabilities, vec!["seed_cap"]);
+    }
+
+    /// The registry payload parses even when it carries extra unknown
+    /// fields (forward-compat) and connectors omit some fields (defaults).
+    #[test]
+    fn engine_connectors_response_parses() {
+        let payload = r#"{
+            "connectors": [
+                {
+                    "name": "ibkr",
+                    "kind": "broker",
+                    "asset_classes": ["etf", "future", "option", "stock"],
+                    "trading": true,
+                    "market_data": "historical+snapshot",
+                    "paper": "yes",
+                    "live": "yes",
+                    "order_types": ["market", "limit"],
+                    "auth_method": "gateway_session",
+                    "source": "adapter",
+                    "known_limitations": "none",
+                    "some_future_field": 42
+                },
+                {
+                    "name": "polygon",
+                    "kind": "data_provider",
+                    "asset_classes": ["etf", "stock"],
+                    "trading": false,
+                    "market_data": "historical"
+                },
+                { "name": "minimal" }
+            ],
+            "counts": { "broker": 2, "data_provider": 1 },
+            "as_of": "2026-06-14T00:00:00Z"
+        }"#;
+
+        let parsed: EngineConnectorsResponse = serde_json::from_str(payload).unwrap();
+        assert_eq!(parsed.connectors.len(), 3);
+
+        let ibkr = &parsed.connectors[0];
+        assert_eq!(ibkr.name, "ibkr");
+        assert_eq!(ibkr.asset_classes, vec!["etf", "future", "option", "stock"]);
+        assert!(ibkr.trading);
+        assert_eq!(ibkr.market_data, "historical+snapshot");
+
+        // Omitted fields fall back to defaults (no panic).
+        let minimal = &parsed.connectors[2];
+        assert_eq!(minimal.name, "minimal");
+        assert!(minimal.asset_classes.is_empty());
+        assert!(!minimal.trading);
+        assert_eq!(minimal.market_data, "");
     }
 }
