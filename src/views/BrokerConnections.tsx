@@ -34,6 +34,7 @@ import alpacaLogo from "@/assets/brokers/alpaca.svg";
 import ibkrLogo from "@/assets/brokers/ibkr.svg";
 import {
   cmd,
+  openInBrowser,
   type BrokerState,
   type BrokerStatus,
 } from "@/lib/tauri";
@@ -309,10 +310,13 @@ function DirectoryRow({
   );
 }
 
-/** One primary action per row, mapped 1:1 to state. Coming-soon
- *  returns null — structurally impossible to show a clickable connect
- *  on a non-integrated source (honesty contract). IBKR's connect flow
- *  lives in the IbeamSetup sub-card, so its row needs no extra button. */
+/** One primary action per row, mapped 1:1 to state. Coming-soon returns
+ *  null — structurally impossible to show a clickable connect on a
+ *  non-integrated source (honesty contract). For IBKR, the managed
+ *  gateway lifecycle lives in the IbeamSetup sub-card, but when the
+ *  gateway is up-and-unauthenticated the row offers a one-click "Sign in"
+ *  that opens the broker's own Client Portal login (the portal-open the
+ *  earlier wizard had). */
 function RowAction({
   broker,
   onRefresh,
@@ -321,7 +325,17 @@ function RowAction({
   onRefresh: () => void;
 }) {
   if (broker.state.state === "not_implemented") return null;
-  if (broker.id === "ibkr") return null; // IbeamSetup owns IBKR actions
+  if (broker.id === "ibkr") {
+    if (broker.state.state === "unauthenticated") {
+      return (
+        <IbkrSignInButton
+          loginUrl={broker.state.login_url}
+          onRefresh={onRefresh}
+        />
+      );
+    }
+    return null; // offline/connected/error handled by the IbeamSetup card
+  }
   if (broker.state.state === "error") {
     return (
       <button type="button" className="ghost btn-sm" onClick={onRefresh}>
@@ -330,6 +344,41 @@ function RowAction({
     );
   }
   return null;
+}
+
+/** Opens the IBKR Client Portal login in the launcher's embedded webview
+ *  (open_ibkr_login), falling back to the system browser if the embedded
+ *  window can't be created. Re-probes shortly after so the row flips to
+ *  "connected" once the user signs in + approves 2FA. */
+function IbkrSignInButton({
+  loginUrl,
+  onRefresh,
+}: {
+  loginUrl: string;
+  onRefresh: () => void;
+}) {
+  const [opening, setOpening] = useState(false);
+  return (
+    <button
+      type="button"
+      className="primary btn-sm"
+      disabled={opening}
+      onClick={async () => {
+        setOpening(true);
+        try {
+          await cmd.openIbkrLogin(loginUrl);
+        } catch (err) {
+          console.warn("openIbkrLogin failed, falling back to browser:", err);
+          await openInBrowser(loginUrl);
+        } finally {
+          setOpening(false);
+        }
+        setTimeout(onRefresh, 4000);
+      }}
+    >
+      {opening ? "Opening…" : "Sign in"}
+    </button>
+  );
 }
 
 function StatePill({ state }: { state: BrokerState }) {
