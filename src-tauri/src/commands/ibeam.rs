@@ -92,15 +92,34 @@ pub struct IbeamStatus {
     pub has_credentials: bool,
 }
 
-/// Simplified credential shape — just what the user MUST provide.
-/// Account ID and trading mode are derived automatically from the
-/// gateway's response after first successful auth (the account
-/// number's "U" / "DU" prefix tells us live vs paper) and cached
-/// to the vault so subsequent restarts skip the probe.
+/// Credential shape the user provides at setup: IBKR username +
+/// password + the declared trading mode (paper vs live). Trading mode
+/// is NOT auto-detected — the gateway login depends on it, so the user
+/// must declare it; it defaults to paper.
 #[derive(Debug, Deserialize)]
 pub struct IbeamCredentials {
     pub username: String,
     pub password: String,
+    /// "paper" | "live" — which IBKR environment the gateway authenticates
+    /// against (drives IBEAM_TRADING_MODE). Safe default is paper; the
+    /// user declares it at setup. It CANNOT be auto-detected before login
+    /// because the login itself depends on the mode.
+    #[serde(default = "default_trading_mode")]
+    pub trading_mode: String,
+}
+
+fn default_trading_mode() -> String {
+    "paper".to_string()
+}
+
+/// Coerce any user/cached value to exactly "paper" or "live" — anything
+/// unrecognized falls back to the safe "paper" (never silently live).
+fn normalize_trading_mode(raw: &str) -> &'static str {
+    if raw.trim().eq_ignore_ascii_case("live") {
+        "live"
+    } else {
+        "paper"
+    }
 }
 
 fn auracle_root() -> Result<PathBuf, String> {
@@ -112,17 +131,20 @@ fn ibeam_dir() -> Result<PathBuf, String> {
     Ok(auracle_root()?.join(IBEAM_DIR))
 }
 
-/// Read the two credential slots that the user actually types in.
-/// None if either is missing. account_id and trading mode are
-/// derived post-auth and cached separately (see derive_and_cache_account
-/// below); they're not part of the credentials *required* to start.
+/// Read the stored credentials. None if username or password is missing.
+/// Trading mode is read from its own vault slot (defaulting to the safe
+/// "paper" if unset) so a restart always feeds the gateway the mode the
+/// user declared at setup.
 async fn read_credentials(app: &AppHandle) -> Result<Option<IbeamCredentials>, String> {
     let username = secret_store::get(app, KEY_IBKR_USERNAME)?;
     let password = secret_store::get(app, KEY_IBKR_PASSWORD)?;
+    let trading_mode =
+        secret_store::get(app, KEY_IBKR_TRADING_MODE)?.unwrap_or_else(|| "paper".to_string());
     match (username, password) {
         (Some(u), Some(p)) if !u.is_empty() && !p.is_empty() => Ok(Some(IbeamCredentials {
             username: u,
             password: p,
+            trading_mode: normalize_trading_mode(&trading_mode).to_string(),
         })),
         _ => Ok(None),
     }
@@ -253,10 +275,15 @@ pub async fn ibeam_install(app: AppHandle, creds: IbeamCredentials) -> Result<()
     // state with a compose file pointing at empty env vars.
     secret_store::put(&app, KEY_IBKR_USERNAME, &creds.username)?;
     secret_store::put(&app, KEY_IBKR_PASSWORD, &creds.password)?;
-    // Trading mode defaults to "paper" until the post-auth probe
-    // identifies the actual account tier. Caching here so a restart
-    // before the first successful auth doesn't error on missing slot.
-    secret_store::put(&app, KEY_IBKR_TRADING_MODE, "paper")?;
+    // The user declares paper vs live at setup (the login depends on it,
+    // so it can't be auto-detected first). Normalize to a safe value and
+    // cache it; write_env_file feeds it to the gateway via
+    // IBEAM_TRADING_MODE so a live account isn't silently run on paper.
+    secret_store::put(
+        &app,
+        KEY_IBKR_TRADING_MODE,
+        normalize_trading_mode(&creds.trading_mode),
+    )?;
 
     let dir = ibeam_dir()?;
     std::fs::create_dir_all(&dir).map_err(to_error_string)?;
@@ -513,13 +540,17 @@ fn write_env_file(creds: &IbeamCredentials) -> Result<PathBuf, String> {
             .unwrap_or(0),
     );
     let path = dir.join(format!("auracle-ibeam-env-{suffix}"));
-    // Only the two creds the user actually entered. IBEAM_TRADING_MODE
-    // defaults to "paper" in compose; the post-auth probe will reset
-    // it once we know the actual account tier.
+    // Account + password + the declared trading mode. Writing
+    // IBEAM_TRADING_MODE explicitly (rather than letting compose default
+    // it to "paper") is what keeps a live account from being silently
+    // run against the paper gateway.
     let contents = format!(
         "IBEAM_ACCOUNT={}\n\
-         IBEAM_PASSWORD={}\n",
-        creds.username, creds.password,
+         IBEAM_PASSWORD={}\n\
+         IBEAM_TRADING_MODE={}\n",
+        creds.username,
+        creds.password,
+        normalize_trading_mode(&creds.trading_mode),
     );
     std::fs::write(&path, contents).map_err(to_error_string)?;
     // Tighten perms on unix — Windows has different ACL semantics

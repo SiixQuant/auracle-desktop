@@ -245,6 +245,10 @@ export interface IbeamStatus {
 export interface IbeamCredentials {
   username: string;
   password: string;
+  /** "paper" | "live" — which IBKR environment the gateway logs into.
+   *  Declared by the user at setup (login depends on it, so it can't be
+   *  auto-detected first); defaults to paper. */
+  trading_mode: "paper" | "live";
 }
 
 export interface ToolInvocationResult {

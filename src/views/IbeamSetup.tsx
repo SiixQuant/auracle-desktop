@@ -264,6 +264,7 @@ function CredentialsForm({
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"paper" | "live">("paper");
 
   const ready = username.length > 0 && password.length > 0 && !busy;
 
@@ -273,14 +274,43 @@ function CredentialsForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!ready) return;
-        onSubmit({ username, password });
+        onSubmit({ username, password, trading_mode: mode });
       }}
     >
       <p className="muted fs-xs m-0 lh-relaxed">
         Encrypted and only used to start your connection — never stored as
-        plain text. Your account and paper / live mode are detected
-        automatically after first login.
+        plain text.
       </p>
+      <div>
+        <label className="fs-xs muted">Account type</label>
+        <div className="seg-toggle mt-1" role="tablist" aria-label="IBKR account type">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "paper"}
+            className={`seg-tab ${mode === "paper" ? "active" : ""}`}
+            disabled={busy}
+            onClick={() => setMode("paper")}
+          >
+            Paper
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "live"}
+            className={`seg-tab ${mode === "live" ? "active" : ""}`}
+            disabled={busy}
+            onClick={() => setMode("live")}
+          >
+            Live
+          </button>
+        </div>
+        <p className="muted fs-2xs m-0 mt-1 lh-relaxed">
+          {mode === "paper"
+            ? "Practice account (IBKR usernames usually start with DU)."
+            : "Real-money account — orders execute for real. Pick this only for a live IBKR account."}
+        </p>
+      </div>
       <div>
         <label htmlFor="ibeam-username" className="fs-xs muted">
           IBKR username
