@@ -145,7 +145,8 @@ export const cmd = {
   // View mode
   getViewMode: () => invoke<ViewMode>("get_view_mode"),
   setViewMode: (mode: ViewMode) => invoke<void>("set_view_mode", { mode }),
-  openEmbeddedAuracle: () => invoke<void>("open_embedded_auracle"),
+  openEmbeddedAuracle: (path?: string) =>
+    invoke<void>("open_embedded_auracle", { path }),
   // Launch the native Auracle IDE — the primary workspace app the
   // launcher now hands the user into. Rejects with a plain message
   // when the IDE isn't installed on this machine.
@@ -640,6 +641,32 @@ export async function openInBrowser(url: string): Promise<void> {
     return openUrl(url);
   }
   window.open(url, "_blank", "noopener");
+}
+
+/**
+ * Open a Houston web-console page, honoring the Settings "Web console"
+ * preference: "App window" (embedded) opens the page in the embedded
+ * WebviewWindow via `open_embedded_auracle`; "browser" hands the URL to
+ * the system browser. This is the single door every web-console link
+ * goes through, so the toggle actually governs where they open.
+ *
+ * Defaults to the browser when the preference can't be read or we're
+ * running outside Tauri (the dev preview) — never a silent no-op.
+ *
+ * @param path same-origin path under the web console, e.g. "/ui/blotter".
+ */
+export async function openWebConsole(path = "/ui"): Promise<void> {
+  let mode: ViewMode = "browser";
+  try {
+    mode = await cmd.getViewMode();
+  } catch {
+    mode = "browser";
+  }
+  if (mode === "embedded") {
+    await cmd.openEmbeddedAuracle(path);
+    return;
+  }
+  await openInBrowser(`http://localhost:1969${path}`);
 }
 
 /**

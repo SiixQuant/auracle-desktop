@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Flame from "@/components/Flame";
 import {
   cmd,
-  openInBrowser,
+  openWebConsole as openWebUi,
   type BrokerAccountSummary,
   type BrokerDataQuality,
   type BrokerMarketDataStatus,
@@ -167,13 +167,14 @@ export default function Dashboard({
   };
 
   const openWebConsole = () => {
-    // Houston routes to login/dashboard as appropriate; if the engine
-    // is down the page fails honestly rather than us guessing /setup.
-    void openInBrowser("http://localhost:1969/ui/dashboard");
+    // Honors the Settings "Web console" preference (browser vs embedded
+    // app window). Houston routes to login/dashboard as appropriate; if
+    // the engine is down the page fails honestly rather than us guessing.
+    void openWebUi("/ui/dashboard");
   };
 
   const openTrade = () => {
-    void openInBrowser("http://localhost:1969/ui/blotter");
+    void openWebUi("/ui/blotter");
   };
 
   const engineStarting = starting || health?.state === "starting";

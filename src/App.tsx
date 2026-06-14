@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 
 import Flame from "@/components/Flame";
 import Tutorial from "@/components/Tutorial";
-import { cmd, openInBrowser, type HealthSnapshot } from "@/lib/tauri";
+import { cmd, openWebConsole, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
 import Onboarding from "@/views/Onboarding";
 import Settings from "@/views/Settings";
@@ -193,7 +193,7 @@ function Help({ onOpenTutorial }: { onOpenTutorial: () => void }) {
             type="button"
             className="ghost"
             onClick={() => {
-              void openInBrowser("http://localhost:1969/ui/help");
+              void openWebConsole("/ui/help");
             }}
           >
             Open ↗
@@ -208,7 +208,7 @@ function Help({ onOpenTutorial }: { onOpenTutorial: () => void }) {
             type="button"
             className="ghost"
             onClick={() => {
-              void openInBrowser("http://localhost:1969/ui");
+              void openWebConsole("/ui");
             }}
           >
             Open ↗
