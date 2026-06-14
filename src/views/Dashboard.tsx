@@ -138,6 +138,17 @@ export default function Dashboard({
 
   const launch = async () => {
     setIdeError(null);
+    // Defensive: the Launch button is already gated on a healthy engine,
+    // but the cached health can be up to a poll-interval stale, so refuse
+    // here too rather than open the workspace into a non-ready engine.
+    // (The Rust side re-confirms with a fresh /healthz poll as well.)
+    if (health?.state !== "healthy") {
+      setIdeError(
+        `The engine isn't ready (${health?.state ?? "checking"}). ` +
+          `Start it and wait for "ready" before opening the workspace.`,
+      );
+      return;
+    }
     setLaunching(true);
     try {
       await cmd.openAuracleIDE();
@@ -179,6 +190,11 @@ export default function Dashboard({
 
   const engineStarting = starting || health?.state === "starting";
   const engineDown = !engineStarting && health?.state === "down";
+  // Only a CONFIRMED-healthy engine may be launched into. `health === null`
+  // means the first poll hasn't returned yet (checking), and "degraded"
+  // means Houston is up but unhealthy (e.g. DB unreachable) — neither is
+  // safe to open the workspace into.
+  const engineReady = health?.state === "healthy";
   const eng = engineStarting
     ? { text: "Local engine — starting…", short: "starting", dot: "hollow" }
     : engineView(health);
@@ -217,7 +233,7 @@ export default function Dashboard({
                 <PowerIcon />
                 Start engine
               </button>
-            ) : (
+            ) : engineReady ? (
               <button
                 type="button"
                 className="btn-launch"
@@ -227,6 +243,13 @@ export default function Dashboard({
                 <PlayIcon />
                 {launching ? "Opening…" : "Launch"}
                 {mode && <span className={`mode-badge ${mode}`}>{mode.toUpperCase()}</span>}
+              </button>
+            ) : (
+              // Health not yet confirmed (null = first poll pending) or
+              // degraded — don't offer to launch into an unconfirmed/
+              // unhealthy engine. The statusline below shows the live state.
+              <button type="button" className="btn-launch" disabled>
+                {health === null ? "Checking engine…" : "Engine degraded"}
               </button>
             )}
 
