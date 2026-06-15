@@ -4,6 +4,27 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.7.2]
+
+One terminal-grade look across the whole launcher.
+
+### Changed
+- **A single, calmer design language** end to end. Every screen — Home,
+  Settings, Connections, the first-run setup, and the broker connect flow —
+  now shares one quiet, sharp, terminal-style look: a true black canvas,
+  hairline separators instead of heavy boxes, monospaced figures that line
+  up, and the emerald accent reserved for what's actually live. Less chrome,
+  more signal; the data leads.
+- **Honest, legible status.** Connection and mode states read at a glance —
+  paper stays quiet, live trading is unmistakable — with consistent,
+  desaturated status colors throughout.
+- **Calmer motion + sharper focus.** No glows or flashy effects; clear
+  keyboard focus on every control; respects your "reduce motion" setting;
+  the home tiles reflow cleanly at any window size.
+
+(No behavior changed — this is a visual pass. Your connections, modes, and
+data work exactly as before.)
+
 ## [0.7.1]
 
 Your connections tell the truth from the engine, and the launcher only
