@@ -514,7 +514,7 @@ function Step3({
                   : "starting…"}
             </div>
             <div className="progress">
-              <div style={{ width: `${progress.percent ?? 0}%` }} />
+              <div style={{ transform: `scaleX(${(progress.percent ?? 0) / 100})` }} />
             </div>
           </div>
           {finished ? (

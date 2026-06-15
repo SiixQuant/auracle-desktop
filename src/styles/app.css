@@ -127,6 +127,7 @@ html, body {
   color: var(--fg-muted);
   margin-left: var(--s-2);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────── */
@@ -355,21 +356,26 @@ h2 {
 }
 .linklike:hover { text-decoration: underline; }
 
-.dir-section { margin-top: var(--s-3); }
+.dir-section { margin-top: var(--s-4); }
+/* Sub-section mono-label — same Percept treatment as .card-title
+ * (SF Mono, tracked, uppercase, tertiary), one tier smaller. */
 .dir-section__head {
   display: flex;
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-2) 0 6px;
+  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.8px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--fg-faint);
+  color: var(--fg-muted);
   border-bottom: 1px solid var(--line);
 }
 .dir-section__count {
   font-family: var(--font-mono);
-  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-faint);
 }
 
 .dir-row { border-bottom: 1px solid var(--line); }
@@ -395,6 +401,7 @@ h2 {
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
@@ -428,31 +435,38 @@ h2 {
   margin-top: 3px;
 }
 .achip {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   color: var(--fg-muted);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 1px 5px;
   white-space: nowrap;
 }
 .achip--more { color: var(--fg-faint); border-style: dashed; }
+/* Capability chip — mono, hairline, tertiary. Data/Trade only render
+ * when the capability is real (honesty contract), so the active state
+ * carries a surgical emerald-soft tint to mark a live capability. */
 .cap-badge {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--fg-dim);
+  color: var(--accent);
   padding: 1px 5px 1px 4px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--accent-dim);
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background: var(--accent-soft);
 }
-.cap-badge svg { color: var(--fg-muted); }
+.cap-badge svg { color: var(--accent); }
 
 /* Connect-method tag — how you link the broker. "Portal" (an in-launcher
  * gateway login flow) is accented because it's connectable now; API key /
  * Wallet are neutral (honest: no portal yet). */
 .method-tag {
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-muted);
   padding: 1px 6px;
@@ -469,6 +483,7 @@ h2 {
 .dir-pill {
   justify-self: end;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -562,7 +577,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 /* ── Utility ────────────────────────────────────────────────────── */
 
 .muted { color: var(--fg-dim); }
-.mono  { font-family: var(--font-mono); font-size: var(--t-xs); }
+.mono  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--t-xs); }
 
 .badge {
   display: inline-block;
@@ -602,9 +617,17 @@ input[type="text"]:focus, input[type="password"]:focus {
   margin: 0 0 var(--s-2);
 }
 
-/* Determinate progress bar (installer). */
+/* Determinate progress bar (installer). The fill is driven by
+ * transform: scaleX (origin left) rather than width so progress
+ * animates on the compositor — no per-frame layout thrash. */
 .progress       { height: 6px; background: var(--surface-2); border-radius: var(--r-pill); overflow: hidden; }
-.progress > div { height: 100%; background: var(--accent); transition: width 0.4s ease; }
+.progress > div {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 0.4s ease;
+}
 
 /* Wizard step footer — back/next rail under each step's content. */
 .step-footer {
@@ -625,6 +648,7 @@ input[type="text"]:focus, input[type="password"]:focus {
   padding: 2px 8px;
   border-radius: var(--r-pill);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -718,6 +742,7 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .kpi__value {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--t-md);
   font-weight: 500;
 }
@@ -727,19 +752,20 @@ table.data-table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--t-xs);
 }
 .data-table thead tr { border-bottom: 1px solid var(--line); color: var(--fg-dim); }
 .data-table tbody tr { border-bottom: 1px solid var(--line); }
 
-/* ── Sub-card — nested panel inside a row (ibeam under IBKR) ─────
- * Quieter tier of .card: tighter radius, surface tint, line border. */
+/* ── Sub-panel — implied-chrome region inside a row (ibeam under IBKR) ──
+ * NOT a nested card (the rubric + detector reject cards-in-cards). A
+ * hairline top divider sets it off from the row above and a faint
+ * surface tint groups it, with no enclosing box. */
 .subcard {
-  margin-top: var(--s-2);
-  padding: var(--s-3);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
+  margin-top: var(--s-3);
+  padding: var(--s-3) 0 var(--s-1);
+  border-top: 1px solid var(--line);
 }
 
 /* ── Density utilities ───────────────────────────────────────────
@@ -778,7 +804,7 @@ table.data-table {
 
 /* Table cells (status/positions tables) — quiet, right-aligned numerics. */
 .cell     { padding: var(--s-1) var(--s-2); text-align: left;  font-weight: 400; }
-.cell-num { padding: var(--s-1) var(--s-2); text-align: right; font-weight: 400; }
+.cell-num { padding: var(--s-1) var(--s-2); text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; }
 
 /* ═══ Hub shell (v7.1 — left rail + content) ═════════════════════════ */
 
@@ -875,8 +901,19 @@ table.data-table {
   justify-content: space-between;
   gap: var(--s-2);
   margin-bottom: var(--s-3);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line);
 }
-.card-title { font-size: var(--t-sm); font-weight: 600; letter-spacing: -0.01em; }
+/* Section header = mono-label (Percept): SF Mono, tracked, uppercase,
+ * tertiary ink. The data does the talking; the label recedes. */
+.card-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
 
 /* ── Home hub ─────────────────────────────────────────────────────── */
 
@@ -970,7 +1007,7 @@ table.data-table {
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
 .tile { background: var(--bg-elev); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; }
 .tile__label { font-size: 10.5px; color: var(--fg-muted); }
-.tile__value { font-family: var(--font-mono); font-size: 18px; margin-top: 4px; }
+.tile__value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18px; margin-top: 4px; }
 .tile__foot { font-size: 10px; color: var(--fg-muted); margin-top: 8px; }
 /* Whole glance dims when any of its three fetches is stale, so no tile
  * reads as live while the header shows the amber "stale" stamp. */
