@@ -206,6 +206,18 @@ pub async fn open_auracle_ide() -> Result<(), String> {
         }
     }
 
+    // Auto-provision the IDE's connection BEFORE launching, so it opens
+    // already connected with nothing for the user to paste: hand the
+    // per-user API key from the now-healthy local engine into the IDE's
+    // config file over loopback. Best-effort — a failure or a
+    // not-yet-set-up engine just means the IDE opens to its Connect modal
+    // as before, never a fake "connected" state.
+    match provision_ide_config().await {
+        Ok(true) => {}  // config written; the IDE auto-connects on launch
+        Ok(false) => {} // engine healthy but no owner account yet — nothing to hand off
+        Err(e) => eprintln!("auracle: IDE auto-provision skipped ({e})"),
+    }
+
     // 1. Explicit override.
     if let Ok(custom) = std::env::var("AURACLE_IDE_PATH") {
         let custom = custom.trim().to_string();
@@ -259,6 +271,130 @@ fn launch_path(path: &str) -> Result<(), String> {
     }
     .map(|_| ())
     .map_err(to_error_string)
+}
+
+// ── IDE connection auto-provisioning (onboarding slice c) ───────────────
+//
+// The IDE reads `~/.config/zed/auracle.json` ({engine_url, api_key}) and
+// auto-connects on launch when a key is present. The launcher is the only
+// component positioned to hand it that key without the user pasting it:
+// it talks to the local engine over loopback, asks for the owner's
+// per-user API key via the engine's loopback-only handoff endpoint, and
+// writes the IDE config. The key never leaves this machine.
+
+/// Engine loopback-only key-handoff endpoint (see
+/// connect_agent.ide_provision_local on the engine side).
+const PROVISION_URL: &str = "http://127.0.0.1:1969/ui/api/ide/provision-local";
+
+#[derive(serde::Deserialize)]
+struct ProvisionResponse {
+    #[serde(default)]
+    api_key: Option<String>,
+    #[serde(default)]
+    engine_url: Option<String>,
+}
+
+/// Read the per-install IDE-handoff secret the engine wrote to the
+/// bind-mounted keys dir (`<install>/data/keys/.ide-handoff-secret`).
+/// Only an on-box process can read it; presenting it proves to the
+/// engine that this caller runs on the same machine (a remote attacker,
+/// even one forging Host / X-Forwarded-*, cannot). Returns None if the
+/// file is absent/unreadable — the caller then skips provisioning.
+fn read_handoff_secret() -> Option<String> {
+    let install = super::installer::resolve_install_path().ok()?;
+    let path = install
+        .join("data")
+        .join("keys")
+        .join(".ide-handoff-secret");
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Ask the local engine for the owner's API key and write the IDE config.
+///
+/// Returns `Ok(true)` when the config was written (IDE will auto-connect),
+/// `Ok(false)` when there's nothing to hand off — no on-box handoff
+/// secret readable, or the engine is up but has no owner account yet
+/// (HTTP 409) — and `Err` on a real failure. Never fabricates a key; on
+/// `Ok(false)` the IDE simply opens to its Connect modal as before.
+///
+/// Authenticates by presenting the on-box handoff secret as
+/// `X-Auracle-Handoff-Token`, and sends no `Origin` header (reqwest adds
+/// none) so the engine's gates accept it.
+async fn provision_ide_config() -> Result<bool, String> {
+    // No on-box secret readable → we can't prove we're local; don't try.
+    // (Engine not installed here, older engine without the secret, or a
+    // permissions quirk — all honestly "can't provision", not an error.)
+    let secret = match read_handoff_secret() {
+        Some(token) => token,
+        None => return Ok(false),
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(to_error_string)?;
+    let resp = client
+        .post(PROVISION_URL)
+        .header("X-Auracle-Handoff-Token", secret)
+        .send()
+        .await
+        .map_err(to_error_string)?;
+
+    // 409 = engine healthy but no owner account yet. Not an error — the
+    // user finishes first-run setup; there's simply no key to hand off.
+    if resp.status().as_u16() == 409 {
+        return Ok(false);
+    }
+    if !resp.status().is_success() {
+        return Err(format!(
+            "engine returned {} when provisioning the IDE key",
+            resp.status()
+        ));
+    }
+
+    let body: ProvisionResponse = resp.json().await.map_err(to_error_string)?;
+    let api_key = match body.api_key {
+        Some(key) if !key.is_empty() => key,
+        _ => return Ok(false),
+    };
+    let engine_url = body
+        .engine_url
+        .filter(|url| !url.is_empty())
+        .unwrap_or_else(|| "http://127.0.0.1:1969".to_string());
+
+    write_ide_config(&engine_url, &api_key)?;
+    Ok(true)
+}
+
+/// Write `{engine_url, api_key}` to the IDE's config file
+/// (`~/.config/zed/auracle.json`), creating the directory if needed.
+/// Mirrors exactly what the IDE's own Connect modal would save, so the
+/// IDE's startup auto-connect picks it up. The file is chmod 0600 — it
+/// carries the per-user API key.
+fn write_ide_config(engine_url: &str, api_key: &str) -> Result<(), String> {
+    use std::fs;
+    let home = std::env::var_os("HOME")
+        .ok_or_else(|| "HOME not set; can't locate the IDE config dir".to_string())?;
+    let dir = std::path::Path::new(&home).join(".config").join("zed");
+    fs::create_dir_all(&dir).map_err(to_error_string)?;
+    let path = dir.join("auracle.json");
+    let text = serde_json::to_string_pretty(&serde_json::json!({
+        "engine_url": engine_url,
+        "api_key": api_key,
+    }))
+    .map_err(to_error_string)?;
+    fs::write(&path, text).map_err(to_error_string)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // Best-effort: the key is already protected by the dir, but lock
+        // the file down too. Don't fail the whole handoff on a chmod.
+        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
 }
 
 /// Open JupyterLab in its own top-level window. The inline iframe panel in
