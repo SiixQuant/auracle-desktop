@@ -42,7 +42,7 @@
   --ok-soft:     rgba(52, 211, 153, 0.12);
   --ok-dim:      rgba(52, 211, 153, 0.30);
   --warn-soft:   rgba(251, 191, 36, 0.12);
-  --warn-dim:    rgba(251, 191, 36, 0.32);
+  --warn-dim:    rgba(251, 191, 36, 0.30);
   --err-soft:    rgba(248, 113, 113, 0.12);
   --err-dim:     rgba(248, 113, 113, 0.30);
 
@@ -308,6 +308,7 @@ h2 {
   transition: background-color 0.12s, color 0.12s;
 }
 .seg-tab:hover { color: var(--fg); }
+.seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent-dim); }
 .seg-tab.active { background: var(--accent-soft); color: var(--accent); }
 /* Mode-aware selected tabs (ibeam paper/live) — same token vocabulary as
  * the Dashboard .mode-badge so a chosen mode reads its own salience, not a
@@ -825,8 +826,9 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .pane-head__label,
 .micro-label {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
