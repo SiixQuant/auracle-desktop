@@ -41,3 +41,10 @@ dist/
 
 # Logs
 *.log
+
+# impeccable design skill — local tooling, not vendored
+.claude/skills/
+.github/skills/
+.claude/settings.local.json
+.impeccable/
+skills-lock.json
