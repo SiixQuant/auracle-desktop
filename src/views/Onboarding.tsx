@@ -45,12 +45,12 @@ export default function Onboarding({ onDone }: OnboardingProps) {
 
   return (
     <div
-      className="card"
+      className="ob-shell"
       style={{ maxWidth: 640, margin: "48px auto", padding: 32 }}
     >
       <div className="hstack" style={{ marginBottom: 24 }}>
-        <span className="logo-dot healthy" style={{ width: 14, height: 14 }} />
-        <h1 className="m-0">Welcome to Auracle Desktop</h1>
+        <span className="logo-dot healthy" style={{ width: 12, height: 12 }} />
+        <h1 className="ob-title m-0">Welcome to Auracle Desktop</h1>
       </div>
 
       <Stepper current={step} />
@@ -154,28 +154,33 @@ function Step1({ onNext }: { onNext: () => void }) {
       }
     >
       <div className="step-head">Let&apos;s get you set up</div>
-      <p>
+      <p className="muted">
         Auracle Desktop manages a self-hosted algorithmic-trading platform
         that runs locally on your machine. The first thing it needs is a
         working Docker runtime.
       </p>
 
-      <h2>Docker runtime</h2>
+      <span className="ob-label">Docker runtime</span>
       <DockerCheck docker={docker} onTriggerPoll={startPoll} />
 
-      <h2>What you&apos;ll get after install</h2>
-      <ul className="muted fs-sm" style={{ paddingLeft: 20, lineHeight: 1.6 }}>
+      <span className="ob-label">What you&apos;ll get after install</span>
+      <ul className="ob-values">
         <li>
-          The Auracle platform at <code>localhost:1969</code> — Home, Build,
-          Research, and Trade in one place: backtests, schedules, brokers,
-          live runs
+          The <strong>Auracle platform</strong> at <code>localhost:1969</code>{" "}
+          — Home, Build, Research, and Trade in one place: backtests,
+          schedules, brokers, live runs
         </li>
         <li>
-          The Seer IDE — an AI engineer inside Build that drafts, edits, and
-          backtests strategies with you
+          The <strong>Seer IDE</strong> — an AI engineer inside Build that
+          drafts, edits, and backtests strategies with you
         </li>
-        <li>MCP server so Claude / Cursor can drive Auracle as an agent</li>
-        <li>TimescaleDB for tick-level price storage</li>
+        <li>
+          <strong>MCP server</strong> so Claude / Cursor can drive Auracle as
+          an agent
+        </li>
+        <li>
+          <strong>TimescaleDB</strong> for tick-level price storage
+        </li>
       </ul>
     </Actions>
   );
@@ -190,7 +195,7 @@ function DockerCheck({
 }) {
   if (!docker) {
     return (
-      <div className="hstack">
+      <div className="ob-status">
         <span className="chip neutral">checking</span>
       </div>
     );
@@ -199,7 +204,7 @@ function DockerCheck({
   if (!docker.installed) {
     return (
       <>
-        <div className="hstack">
+        <div className="ob-status">
           <span className="chip err">not installed</span>
           <span className="muted fs-sm">
             Install Docker Desktop, leave this window open — the status
@@ -209,7 +214,7 @@ function DockerCheck({
         <div className="wrap-row mt-2">
           <button
             type="button"
-            className="ghost fs-xs"
+            className="ghost btn-sm"
             onClick={async () => {
               await openInBrowser(
                 docker.install_url ||
@@ -222,7 +227,7 @@ function DockerCheck({
           </button>
           <button
             type="button"
-            className="ghost fs-xs"
+            className="ghost btn-sm"
             onClick={async () => {
               try {
                 const landing = await cmd.dockerInstallLandingUrl();
@@ -244,7 +249,7 @@ function DockerCheck({
 
   if (!docker.running) {
     return (
-      <div className="hstack">
+      <div className="ob-status">
         <span className="chip warn">installed · not running</span>
         <span className="muted fs-sm">
           Start <strong>{runtimeName(docker.runtime)}</strong> — this updates
@@ -255,9 +260,9 @@ function DockerCheck({
   }
 
   return (
-    <div className="hstack">
+    <div className="ob-status">
       <span className="chip ok">running</span>
-      <span className="muted mono fs-xs">
+      <span className="muted mono">
         {docker.version || "docker"} · {runtimeName(docker.runtime)}
       </span>
     </div>
@@ -440,7 +445,7 @@ function Step3({
         ) : preflight ? (
           <PreflightResults report={preflight} />
         ) : (
-          <div className="hstack">
+          <div className="ob-status">
             <span className="chip neutral">running checks</span>
           </div>
         )}
@@ -496,9 +501,9 @@ function Step3({
 
       {(installing || finished) && (
         <>
-          <h2 style={{ marginTop: 24 }}>
+          <span className="ob-label">
             {finished ? "Install complete" : "Setting up Auracle"}
-          </h2>
+          </span>
           {!finished && (
             <p className="muted">
               Pulling Docker images and starting services. Safe to leave this
@@ -549,17 +554,15 @@ function PreflightResults({ report }: { report: PreflightReport }) {
         const variant = c.passed ? "ok" : c.level === "warning" ? "warn" : "err";
         const label = c.passed ? "pass" : c.level === "warning" ? "warn" : "fail";
         return (
-          <div key={i} className="row">
-            <div>
-              <div className="hstack" style={{ gap: 8 }}>
-                <span className={`chip ${variant}`}>{label}</span>
-                <strong className="fs-sm">{c.name}</strong>
-              </div>
-              <div className="muted fs-xs mt-1">{c.message}</div>
-              {c.remediation && (
-                <div className="muted fs-xs mt-1">{c.remediation}</div>
-              )}
+          <div key={i} className="ob-check">
+            <div className="ob-check__head">
+              <span className={`chip ${variant}`}>{label}</span>
+              <span className="ob-check__name">{c.name}</span>
             </div>
+            <div className="muted fs-xs mt-1">{c.message}</div>
+            {c.remediation && (
+              <div className="muted fs-xs mt-1">{c.remediation}</div>
+            )}
           </div>
         );
       })}
