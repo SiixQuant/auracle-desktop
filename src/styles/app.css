@@ -120,7 +120,7 @@ html, body {
   transition: background-color 0.3s, box-shadow 0.3s;
 }
 
-.logo-dot.healthy  { background: var(--ok);  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+.logo-dot.healthy  { background: var(--accent); }
 .logo-dot.degraded { background: var(--warn); }
 .logo-dot.down     { background: var(--err); }
 .logo-dot.starting { background: var(--accent); animation: pulse 1.5s infinite; }
