@@ -302,7 +302,10 @@ struct ProvisionResponse {
 /// file is absent/unreadable — the caller then skips provisioning.
 fn read_handoff_secret() -> Option<String> {
     let install = super::installer::resolve_install_path().ok()?;
-    let path = install.join("data").join("keys").join(".ide-handoff-secret");
+    let path = install
+        .join("data")
+        .join("keys")
+        .join(".ide-handoff-secret");
     std::fs::read_to_string(path)
         .ok()
         .map(|s| s.trim().to_string())
