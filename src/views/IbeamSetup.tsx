@@ -246,7 +246,7 @@ function StatePill({ state }: { state: IbeamStatus["state"] }) {
     stopped: { variant: "neutral", label: "stopped" },
     running:
       state.state === "running" && state.auth_ok
-        ? { variant: "ok", label: "auto-managed" }
+        ? { variant: "live", label: "auto-managed" }
         : { variant: "warn", label: "starting · 2fa" },
     docker_unavailable: { variant: "err", label: "docker offline" },
     other: { variant: "err", label: "issue" },
@@ -282,13 +282,13 @@ function CredentialsForm({
         plain text.
       </p>
       <div>
-        <label className="fs-xs muted">Account type</label>
+        <label className="micro-label">Account type</label>
         <div className="seg-toggle mt-1" role="tablist" aria-label="IBKR account type">
           <button
             type="button"
             role="tab"
             aria-selected={mode === "paper"}
-            className={`seg-tab ${mode === "paper" ? "active" : ""}`}
+            className={`seg-tab seg-tab--paper ${mode === "paper" ? "active" : ""}`}
             disabled={busy}
             onClick={() => setMode("paper")}
           >
@@ -298,7 +298,7 @@ function CredentialsForm({
             type="button"
             role="tab"
             aria-selected={mode === "live"}
-            className={`seg-tab ${mode === "live" ? "active" : ""}`}
+            className={`seg-tab seg-tab--live ${mode === "live" ? "active" : ""}`}
             disabled={busy}
             onClick={() => setMode("live")}
           >
@@ -312,7 +312,7 @@ function CredentialsForm({
         </p>
       </div>
       <div>
-        <label htmlFor="ibeam-username" className="fs-xs muted">
+        <label htmlFor="ibeam-username" className="micro-label">
           IBKR username
         </label>
         <input
@@ -328,7 +328,7 @@ function CredentialsForm({
         />
       </div>
       <div>
-        <label htmlFor="ibeam-password" className="fs-xs muted">
+        <label htmlFor="ibeam-password" className="micro-label">
           IBKR password
         </label>
         <input

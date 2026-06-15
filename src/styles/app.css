@@ -309,6 +309,14 @@ h2 {
 }
 .seg-tab:hover { color: var(--fg); }
 .seg-tab.active { background: var(--accent-soft); color: var(--accent); }
+/* Mode-aware selected tabs (ibeam paper/live) — same token vocabulary as
+ * the Dashboard .mode-badge so a chosen mode reads its own salience, not a
+ * generic emerald "on". PAPER = the safe default: quiet neutral surface +
+ * dim ink. LIVE = real money: high-contrast desaturated --err (alert, no
+ * glow). These override the default .active emerald only on the toggle that
+ * opts in via the --paper / --live modifier. */
+.seg-tab--paper.active { background: var(--surface-2); color: var(--fg-dim); }
+.seg-tab--live.active  { background: var(--err-soft);  color: var(--err); }
 
 /* Collapsed "more brokers coming" line (Settings → Brokers) — replaces
  * three full not-implemented broker blocks with one quiet line. */
@@ -764,6 +772,10 @@ input[type="text"]:focus, input[type="password"]:focus {
 .chip.warn    { background: var(--warn-soft);    color: var(--warn); }
 .chip.err     { background: var(--err-soft);     color: var(--err); }
 .chip.neutral { background: var(--surface-3);    color: var(--fg-dim); }
+/* live = the ONE place a chip earns surgical emerald: a genuinely
+ * connected/authenticated session (ibeam auth_ok). Reserved for real
+ * "connected" truth — transient/starting states stay desaturated. */
+.chip.live    { background: var(--accent-soft);  color: var(--accent); }
 
 /* ── Banners — inline notices inside cards/views ──────────────────
  * info = accent-tinted guidance; warn = needs attention; err = failed.
