@@ -37,6 +37,14 @@
   --ok:          #34d399;                       /* desaturated success */
   --warn:        #fbbf24;                       /* desaturated amber */
   --err:         #f87171;                       /* desaturated red */
+  /* Status soft/dim fills — derived from the desaturated states above so
+     every pill/chip/badge/banner fill matches its text token (one source). */
+  --ok-soft:     rgba(52, 211, 153, 0.12);
+  --ok-dim:      rgba(52, 211, 153, 0.30);
+  --warn-soft:   rgba(251, 191, 36, 0.12);
+  --warn-dim:    rgba(251, 191, 36, 0.32);
+  --err-soft:    rgba(248, 113, 113, 0.12);
+  --err-dim:     rgba(248, 113, 113, 0.30);
 
   /* Radius — locked design: soft 6 / 8 / 10 (owner refinement) */
   --r-sm: 6px;
@@ -494,9 +502,9 @@ h2 {
 /* The connected pill is the most assertive element on screen — it's the
  * one real "you're live" claim, so it gets a stronger fill + border than
  * the (intentionally quiet) capability badges and filter chips. */
-.dir-pill.ok   { background: rgba(16, 185, 129, 0.16); color: var(--ok);   border: 1px solid var(--accent-dim); }
-.dir-pill.warn { background: rgba(245, 166, 35, 0.12); color: var(--warn); }
-.dir-pill.err  { background: rgba(239, 68, 68, 0.12);  color: var(--err); }
+.dir-pill.ok   { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-dim); }
+.dir-pill.warn { background: var(--warn-soft);   color: var(--warn);   border: 1px solid var(--warn-dim); }
+.dir-pill.err  { background: var(--err-soft);    color: var(--err);    border: 1px solid var(--err-dim); }
 /* Coming-soon pill must stay legible even on the dimmed (55%) row —
  * use the mid foreground, not the faintest. */
 .dir-pill.soon { background: transparent;              color: var(--fg-muted); border: 1px solid var(--line); }
@@ -552,8 +560,8 @@ button.ghost {
   transition: background-color 0.15s, border-color 0.15s;
 }
 button.ghost:hover        { background: var(--surface-2); border-color: var(--line-strong); }
-button.ghost.danger       { color: var(--err); border-color: rgba(239, 68, 68, 0.3); }
-button.ghost.danger:hover { background: rgba(239, 68, 68, 0.08); }
+button.ghost.danger       { color: var(--err); border-color: var(--err-dim); }
+button.ghost.danger:hover { background: var(--err-soft); }
 
 /* ── Inputs ─────────────────────────────────────────────────────── */
 
@@ -588,8 +596,8 @@ input[type="text"]:focus, input[type="password"]:focus {
   letter-spacing: 0.02em;
 }
 .badge.ok   { background: var(--accent-soft);            color: var(--accent); }
-.badge.warn { background: rgba(245, 158, 11, 0.12);      color: var(--warn); }
-.badge.err  { background: rgba(239, 68, 68, 0.12);       color: var(--err); }
+.badge.warn { background: var(--warn-soft);      color: var(--warn); }
+.badge.err  { background: var(--err-soft);       color: var(--err); }
 
 /* ── Wizard stepper (onboarding) ─────────────────────────────────
  * Named steps; three states: done (walked), current (emphasized),
@@ -654,8 +662,8 @@ input[type="text"]:focus, input[type="password"]:focus {
   text-transform: uppercase;
 }
 .chip.ok      { background: var(--accent-soft);          color: var(--ok); }
-.chip.warn    { background: rgba(245, 166, 35, 0.12);    color: var(--warn); }
-.chip.err     { background: rgba(239, 68, 68, 0.12);     color: var(--err); }
+.chip.warn    { background: var(--warn-soft);    color: var(--warn); }
+.chip.err     { background: var(--err-soft);     color: var(--err); }
 .chip.neutral { background: var(--surface-3);            color: var(--fg-dim); }
 
 /* ── Banners — inline notices inside cards/views ──────────────────
@@ -671,8 +679,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 .banner strong { color: var(--fg); }
 .banner.info { background: var(--accent-soft);        border: 1px solid var(--accent-dim); }
-.banner.warn { background: rgba(245, 166, 35, 0.08);  border: 1px solid rgba(245, 166, 35, 0.35); }
-.banner.err  { background: rgba(239, 68, 68, 0.08);   border: 1px solid rgba(239, 68, 68, 0.30); color: var(--err); }
+.banner.warn { background: var(--warn-soft);  border: 1px solid var(--warn-dim); }
+.banner.err  { background: var(--err-soft);   border: 1px solid var(--err-dim); color: var(--err); }
 .banner.err strong { color: var(--err); }
 
 /* ── Logs / code blocks ─────────────────────────────────────────── */
@@ -760,8 +768,8 @@ table.data-table {
 
 /* ── Sub-panel — implied-chrome region inside a row (ibeam under IBKR) ──
  * NOT a nested card (the rubric + detector reject cards-in-cards). A
- * hairline top divider sets it off from the row above and a faint
- * surface tint groups it, with no enclosing box. */
+ * hairline top divider sets it off from the row above — no fill, no
+ * enclosing box; implied chrome only. */
 .subcard {
   margin-top: var(--s-3);
   padding: var(--s-3) 0 var(--s-1);
