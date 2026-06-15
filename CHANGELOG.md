@@ -4,6 +4,35 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.7.1]
+
+Your connections tell the truth from the engine, and the launcher only
+acts when the engine is really ready.
+
+### Added
+- **Live broker & data capabilities.** The connections directory now reads
+  each broker's and data source's real capabilities (asset classes,
+  data-vs-trade) live from your running engine, falling back to a built-in
+  list when the engine is offline — so what you see is what the engine can
+  actually do, never a hand-maintained guess.
+
+### Changed
+- **Honest launch.** "Launch" only opens the workspace once the engine is
+  confirmed healthy; it tells you when the engine is starting, degraded, or
+  down instead of opening into a dead backend.
+- **Web console placement.** The Settings toggle now actually opens the web
+  console where you choose — your own browser or a dedicated app window.
+- **Paper vs live, declared up front.** You set paper or live at broker
+  setup (paper by default), and that choice is honored on every start — a
+  live account is never silently run on paper.
+- **Clearer connections directory.** Compact, searchable broker/data list
+  with honest per-row connect methods (portal vs API key vs coming soon).
+
+### Fixed
+- **macOS first-launch steps.** The README now gives the correct unblock
+  steps for recent macOS (the app is not yet notarized — Gatekeeper asks
+  once on a fresh download; an in-app update installs normally).
+
 ## [0.7.0]
 
 The design system reaches every surface, and updates explain
