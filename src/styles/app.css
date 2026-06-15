@@ -544,7 +544,7 @@ button.primary {
   cursor: pointer;
   transition: background-color 0.15s, box-shadow 0.15s;
 }
-button.primary:hover    { background: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-soft); }
+button.primary:hover    { background: var(--accent-2); }
 button.primary:disabled { opacity: 0.4; cursor: wait; box-shadow: none; }
 
 button.ghost {
@@ -993,7 +993,7 @@ table.data-table {
   background: var(--accent);
   color: #04140d;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   padding: 12px 24px;
   font-size: 15px;
   font-weight: 600;
@@ -1041,7 +1041,7 @@ table.data-table {
 
 /* Account tiles — hairline tone panels (white 0.02 + white 0.06 line),
  * NOT solid cards: implied chrome, the data does the talking. */
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 11px; }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 13px 14px; }
 /* Label = mono-label spec (SF Mono, tracked, uppercase, tertiary ink). */
 .tile__label {
@@ -1108,3 +1108,28 @@ table.data-table {
 .tut-dots { display: flex; gap: 6px; }
 .tut-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); }
 .tut-dot.on { background: var(--accent); }
+
+/* ── Responsive — stack the home hub when the window narrows ───────
+ * Below ~720px the fixed 212px aside + main column collide. Drop to a
+ * single column: aside falls under main with a top hairline instead of
+ * a left one. Tiles already auto-fit/wrap (no fixed 3-up). */
+@media (max-width: 720px) {
+  .hub { flex-direction: column; }
+  .hub__aside {
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* ── Reduced motion — honor the OS preference ─────────────────────
+ * Covert/minimal: motion only conveys state. When the user asks for
+ * less, neutralize transitions + the status-dot pulse to instant. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
