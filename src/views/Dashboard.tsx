@@ -304,7 +304,7 @@ export default function Dashboard({
               <div className="tile__label">Unrealized P&amp;L</div>
               <div
                 className="tile__value"
-                style={{ color: pnl === null ? "var(--fg)" : pnl >= 0 ? "#6fcfa8" : "var(--err)" }}
+                style={{ color: pnl === null ? "var(--fg)" : pnl >= 0 ? "var(--ok)" : "var(--err)" }}
               >
                 {fmtSigned(pnl, ccy)}
               </div>
@@ -454,7 +454,7 @@ function ExposureBars({ positions }: { positions: BrokerPosition[] | null }) {
             width={w - 2}
             height={h}
             rx="1.5"
-            fill={i === 0 ? "#10b981" : "#3a6a5c"}
+            fill={i === 0 ? "var(--accent)" : "var(--fg-muted)"}
           />
         );
       })}
