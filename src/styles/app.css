@@ -7,37 +7,40 @@
  */
 
 :root {
-  /* Surface — creative dark (layered, not flat black) */
-  --bg:          #0a0c10;
-  --bg-rail:     #0c0f15;
-  --bg-elev:     #12161c;
-  --hero-bg:     #0b0e13;
-  --surface:     rgba(255, 255, 255, 0.025);
-  --surface-2:   rgba(255, 255, 255, 0.05);
-  --surface-3:   rgba(255, 255, 255, 0.08);
+  /* Surface — Percept terminal: pure black base, tone steps above (NOT white washes) */
+  --bg:          #000000;
+  --bg-rail:     #050505;
+  --bg-elev:     #111111;
+  --hero-bg:     #0a0a0a;
+  --surface:     rgba(255, 255, 255, 0.02);
+  --surface-2:   rgba(255, 255, 255, 0.04);
+  --surface-3:   rgba(255, 255, 255, 0.07);
+  /* Barely-there grid texture (deliberate, ~4%) — apply on canvas surfaces */
+  --grid-h:      rgba(255, 255, 255, 0.04);
+  --grid-v:      rgba(255, 255, 255, 0.025);
 
-  /* Foreground — brighter, high legibility ("everything very visible") */
-  --fg:          #f3f6f9;
-  --fg-dim:      #aab4c0;
-  --fg-muted:    #8a95a3;
-  --fg-faint:    #5d6877;
+  /* Foreground — Percept ramp (primary → muted), high-contrast not glowing */
+  --fg:          #e6edf3;
+  --fg-dim:      #9da7b3;
+  --fg-muted:    #5a636e;
+  --fg-faint:    #3a4049;
 
-  /* Lines — crisper hairlines */
-  --line:        #1c232c;
-  --line-strong: #313b46;
+  /* Lines — implied chrome: hairline low-alpha, whispered not announced */
+  --line:        rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.10);
 
-  /* Brand + status — exact platform values (Houston _base.html law) */
-  --accent:      #10b981;                      /* emerald — matches logo + marketing */
+  /* Brand + status — emerald used SURGICALLY (live/active + primary); states desaturated */
+  --accent:      #10b981;                      /* emerald — surgical, matches logo + marketing */
   --accent-2:    #059669;                      /* hover/pressed tier */
   --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-dim:  rgba(16, 185, 129, 0.40);
-  --ok:          #10b981;
-  --warn:        #f5a623;
-  --err:         #ef4444;
+  --accent-dim:  rgba(16, 185, 129, 0.30);
+  --ok:          #34d399;                       /* desaturated success */
+  --warn:        #fbbf24;                       /* desaturated amber */
+  --err:         #f87171;                       /* desaturated red */
 
-  /* Radius — platform law: 4 / 6 / 10 */
-  --r-sm: 4px;
-  --r-md: 6px;
+  /* Radius — locked design: soft 6 / 8 / 10 (owner refinement) */
+  --r-sm: 6px;
+  --r-md: 8px;
   --r-lg: 10px;
   --r-pill: 999px;
 
@@ -57,10 +60,10 @@
   --t-lg: 18px;
   --t-xl: 24px;
 
-  /* Fonts — Inter and JetBrains Mono lead, matching the platform */
+  /* Fonts — Inter sans; SF Mono leads for data/labels (Percept). tabular-nums on data. */
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Monaco,
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Monaco,
                "Cascadia Mono", Consolas, "Courier New", monospace;
 }
 
