@@ -7,37 +7,48 @@
  */
 
 :root {
-  /* Surface — creative dark (layered, not flat black) */
-  --bg:          #0a0c10;
-  --bg-rail:     #0c0f15;
-  --bg-elev:     #12161c;
-  --hero-bg:     #0b0e13;
-  --surface:     rgba(255, 255, 255, 0.025);
-  --surface-2:   rgba(255, 255, 255, 0.05);
-  --surface-3:   rgba(255, 255, 255, 0.08);
+  /* Surface — Percept terminal: pure black base, tone steps above (NOT white washes) */
+  --bg:          #000000;
+  --bg-rail:     #050505;
+  --bg-elev:     #111111;
+  --hero-bg:     #0a0a0a;
+  --surface:     rgba(255, 255, 255, 0.02);
+  --surface-2:   rgba(255, 255, 255, 0.04);
+  --surface-3:   rgba(255, 255, 255, 0.07);
+  /* Barely-there grid texture (deliberate, ~4%) — apply on canvas surfaces */
+  --grid-h:      rgba(255, 255, 255, 0.04);
+  --grid-v:      rgba(255, 255, 255, 0.025);
 
-  /* Foreground — brighter, high legibility ("everything very visible") */
-  --fg:          #f3f6f9;
-  --fg-dim:      #aab4c0;
-  --fg-muted:    #8a95a3;
-  --fg-faint:    #5d6877;
+  /* Foreground — Percept ramp (primary → muted), high-contrast not glowing */
+  --fg:          #e6edf3;
+  --fg-dim:      #9da7b3;
+  --fg-muted:    #5a636e;
+  --fg-faint:    #3a4049;
 
-  /* Lines — crisper hairlines */
-  --line:        #1c232c;
-  --line-strong: #313b46;
+  /* Lines — implied chrome: hairline low-alpha, whispered not announced */
+  --line:        rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.10);
 
-  /* Brand + status — exact platform values (Houston _base.html law) */
-  --accent:      #10b981;                      /* emerald — matches logo + marketing */
+  /* Brand + status — emerald used SURGICALLY (live/active + primary); states desaturated */
+  --accent:      #10b981;                      /* emerald — surgical, matches logo + marketing */
   --accent-2:    #059669;                      /* hover/pressed tier */
   --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-dim:  rgba(16, 185, 129, 0.40);
-  --ok:          #10b981;
-  --warn:        #f5a623;
-  --err:         #ef4444;
+  --accent-dim:  rgba(16, 185, 129, 0.30);
+  --ok:          #34d399;                       /* desaturated success */
+  --warn:        #fbbf24;                       /* desaturated amber */
+  --err:         #f87171;                       /* desaturated red */
+  /* Status soft/dim fills — derived from the desaturated states above so
+     every pill/chip/badge/banner fill matches its text token (one source). */
+  --ok-soft:     rgba(52, 211, 153, 0.12);
+  --ok-dim:      rgba(52, 211, 153, 0.30);
+  --warn-soft:   rgba(251, 191, 36, 0.12);
+  --warn-dim:    rgba(251, 191, 36, 0.30);
+  --err-soft:    rgba(248, 113, 113, 0.12);
+  --err-dim:     rgba(248, 113, 113, 0.30);
 
-  /* Radius — platform law: 4 / 6 / 10 */
-  --r-sm: 4px;
-  --r-md: 6px;
+  /* Radius — locked design: soft 6 / 8 / 10 (owner refinement) */
+  --r-sm: 6px;
+  --r-md: 8px;
   --r-lg: 10px;
   --r-pill: 999px;
 
@@ -57,10 +68,10 @@
   --t-lg: 18px;
   --t-xl: 24px;
 
-  /* Fonts — Inter and JetBrains Mono lead, matching the platform */
+  /* Fonts — Inter sans; SF Mono leads for data/labels (Percept). tabular-nums on data. */
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Monaco,
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Monaco,
                "Cascadia Mono", Consolas, "Courier New", monospace;
 }
 
@@ -109,7 +120,7 @@ html, body {
   transition: background-color 0.3s, box-shadow 0.3s;
 }
 
-.logo-dot.healthy  { background: var(--ok);  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+.logo-dot.healthy  { background: var(--accent); }
 .logo-dot.degraded { background: var(--warn); }
 .logo-dot.down     { background: var(--err); }
 .logo-dot.starting { background: var(--accent); animation: pulse 1.5s infinite; }
@@ -124,6 +135,7 @@ html, body {
   color: var(--fg-muted);
   margin-left: var(--s-2);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────── */
@@ -296,7 +308,16 @@ h2 {
   transition: background-color 0.12s, color 0.12s;
 }
 .seg-tab:hover { color: var(--fg); }
+.seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent-dim); }
 .seg-tab.active { background: var(--accent-soft); color: var(--accent); }
+/* Mode-aware selected tabs (ibeam paper/live) — same token vocabulary as
+ * the Dashboard .mode-badge so a chosen mode reads its own salience, not a
+ * generic emerald "on". PAPER = the safe default: quiet neutral surface +
+ * dim ink. LIVE = real money: high-contrast desaturated --err (alert, no
+ * glow). These override the default .active emerald only on the toggle that
+ * opts in via the --paper / --live modifier. */
+.seg-tab--paper.active { background: var(--surface-2); color: var(--fg-dim); }
+.seg-tab--live.active  { background: var(--err-soft);  color: var(--err); }
 
 /* Collapsed "more brokers coming" line (Settings → Brokers) — replaces
  * three full not-implemented broker blocks with one quiet line. */
@@ -352,21 +373,26 @@ h2 {
 }
 .linklike:hover { text-decoration: underline; }
 
-.dir-section { margin-top: var(--s-3); }
+.dir-section { margin-top: var(--s-4); }
+/* Sub-section mono-label — same Percept treatment as .card-title
+ * (SF Mono, tracked, uppercase, tertiary), one tier smaller. */
 .dir-section__head {
   display: flex;
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-2) 0 6px;
+  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.8px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--fg-faint);
+  color: var(--fg-muted);
   border-bottom: 1px solid var(--line);
 }
 .dir-section__count {
   font-family: var(--font-mono);
-  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-faint);
 }
 
 .dir-row { border-bottom: 1px solid var(--line); }
@@ -392,6 +418,7 @@ h2 {
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
@@ -425,31 +452,38 @@ h2 {
   margin-top: 3px;
 }
 .achip {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   color: var(--fg-muted);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 1px 5px;
   white-space: nowrap;
 }
 .achip--more { color: var(--fg-faint); border-style: dashed; }
+/* Capability chip — mono, hairline, tertiary. Data/Trade only render
+ * when the capability is real (honesty contract), so the active state
+ * carries a surgical emerald-soft tint to mark a live capability. */
 .cap-badge {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--fg-dim);
+  color: var(--accent);
   padding: 1px 5px 1px 4px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--accent-dim);
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background: var(--accent-soft);
 }
-.cap-badge svg { color: var(--fg-muted); }
+.cap-badge svg { color: var(--accent); }
 
 /* Connect-method tag — how you link the broker. "Portal" (an in-launcher
  * gateway login flow) is accented because it's connectable now; API key /
  * Wallet are neutral (honest: no portal yet). */
 .method-tag {
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-muted);
   padding: 1px 6px;
@@ -466,6 +500,7 @@ h2 {
 .dir-pill {
   justify-self: end;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -476,9 +511,9 @@ h2 {
 /* The connected pill is the most assertive element on screen — it's the
  * one real "you're live" claim, so it gets a stronger fill + border than
  * the (intentionally quiet) capability badges and filter chips. */
-.dir-pill.ok   { background: rgba(16, 185, 129, 0.16); color: var(--ok);   border: 1px solid var(--accent-dim); }
-.dir-pill.warn { background: rgba(245, 166, 35, 0.12); color: var(--warn); }
-.dir-pill.err  { background: rgba(239, 68, 68, 0.12);  color: var(--err); }
+.dir-pill.ok   { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-dim); }
+.dir-pill.warn { background: var(--warn-soft);   color: var(--warn);   border: 1px solid var(--warn-dim); }
+.dir-pill.err  { background: var(--err-soft);    color: var(--err);    border: 1px solid var(--err-dim); }
 /* Coming-soon pill must stay legible even on the dimmed (55%) row —
  * use the mid foreground, not the faintest. */
 .dir-pill.soon { background: transparent;              color: var(--fg-muted); border: 1px solid var(--line); }
@@ -518,8 +553,14 @@ button.primary {
   cursor: pointer;
   transition: background-color 0.15s, box-shadow 0.15s;
 }
-button.primary:hover    { background: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-soft); }
+button.primary:hover    { background: var(--accent-2); }
 button.primary:disabled { opacity: 0.4; cursor: wait; box-shadow: none; }
+/* Visible emerald focus ring (zero-blur, rubric-allowed) — a crisp
+ * keyline against the panel, not a glow. */
+button.primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-dim);
+}
 
 button.ghost {
   background: transparent;
@@ -534,8 +575,15 @@ button.ghost {
   transition: background-color 0.15s, border-color 0.15s;
 }
 button.ghost:hover        { background: var(--surface-2); border-color: var(--line-strong); }
-button.ghost.danger       { color: var(--err); border-color: rgba(239, 68, 68, 0.3); }
-button.ghost.danger:hover { background: rgba(239, 68, 68, 0.08); }
+button.ghost.danger       { color: var(--err); border-color: var(--err-dim); }
+button.ghost.danger:hover { background: var(--err-soft); }
+/* Same crisp emerald focus ring as the primary — every control is
+ * keyboard-visible. */
+button.ghost:focus-visible {
+  outline: none;
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
 
 /* ── Inputs ─────────────────────────────────────────────────────── */
 
@@ -559,7 +607,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 /* ── Utility ────────────────────────────────────────────────────── */
 
 .muted { color: var(--fg-dim); }
-.mono  { font-family: var(--font-mono); font-size: var(--t-xs); }
+.mono  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--t-xs); }
 
 .badge {
   display: inline-block;
@@ -570,38 +618,57 @@ input[type="text"]:focus, input[type="password"]:focus {
   letter-spacing: 0.02em;
 }
 .badge.ok   { background: var(--accent-soft);            color: var(--accent); }
-.badge.warn { background: rgba(245, 158, 11, 0.12);      color: var(--warn); }
-.badge.err  { background: rgba(239, 68, 68, 0.12);       color: var(--err); }
+.badge.warn { background: var(--warn-soft);      color: var(--warn); }
+.badge.err  { background: var(--err-soft);       color: var(--err); }
 
 /* ── Wizard stepper (onboarding) ─────────────────────────────────
- * Named steps; three states: done (walked), current (emphasized),
- * upcoming (quiet). The bar is the state — no extra icons. */
+ * Named steps as mono-labels (SF Mono, tracked, uppercase) over a
+ * hairline keyline. Three states: done (walked → primary ink, dim
+ * keyline), current (surgical emerald text + emerald keyline),
+ * upcoming (muted ink, hairline keyline). The keyline + ink ARE the
+ * state — implied chrome, no heavy filled pills, no extra icons. */
 .stepper { display: flex; gap: var(--s-3); margin-bottom: var(--s-6); }
 .step {
   flex: 1;
-  padding: var(--s-2) 0;
-  border-top: 3px solid var(--line);
+  padding: var(--s-2) 0 0;
+  /* Hairline keyline — implied chrome, not a 3px announced bar. */
+  border-top: 1px solid var(--line);
   text-align: center;
-  font-size: var(--t-xs);
-  color: var(--fg-muted);
-  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--fg-muted);
 }
+/* Done = walked: primary-secondary ink, a dim emerald keyline marks
+ * the trail behind the current step. */
 .step.done    { border-top-color: var(--accent-dim); color: var(--fg-dim); }
-.step.current { border-top-color: var(--accent);     color: var(--fg); font-weight: 600; }
+/* Current = emphasized: surgical emerald text + a solid emerald
+ * keyline. The one place emerald lands in the chrome. */
+.step.current { border-top-color: var(--accent);     color: var(--accent); }
 
-/* Step lead title — bigger than the uppercase h2 section labels so a
- * step reads as a chapter, not a field label. */
+/* Step lead title — tracking-tight medium heading so a step reads as a
+ * chapter, not a field label (and not a brand hero). */
 .step-head {
   font-size: var(--t-lg);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   margin: 0 0 var(--s-2);
 }
 
-/* Determinate progress bar (installer). */
+/* Determinate progress bar (installer). The fill is driven by
+ * transform: scaleX (origin left) rather than width so progress
+ * animates on the compositor — no per-frame layout thrash. */
 .progress       { height: 6px; background: var(--surface-2); border-radius: var(--r-pill); overflow: hidden; }
-.progress > div { height: 100%; background: var(--accent); transition: width 0.4s ease; }
+.progress > div {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 0.4s ease;
+}
 
 /* Wizard step footer — back/next rail under each step's content. */
 .step-footer {
@@ -613,6 +680,79 @@ input[type="text"]:focus, input[type="password"]:focus {
   border-top: 1px solid var(--line);
 }
 
+/* ── Onboarding shared (S4 first-run) ─────────────────────────────
+ * The wizard panels reuse the launcher vocabulary so the operator's
+ * eye doesn't recalibrate between first-run and the running app. */
+
+/* The wizard's single hairline tone panel (white 0.02 + white 0.06
+ * line, 10px radius). The ONE panel of the flow — everything inside
+ * uses implied hairline chrome, never a nested card. */
+.ob-shell {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+/* Welcome title — tracking-tight medium heading (this is product
+ * first-run, not a brand hero): one tier down from the 24px h1, and
+ * 500 weight per the rubric. */
+.ob-title {
+  font-size: var(--t-lg);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Section label inside a step — mono-label spec (SF Mono, tracked,
+ * uppercase, tertiary) over a hairline divider. Replaces the sans h2
+ * inside the wizard so "DOCKER RUNTIME" reads as a machine label, not
+ * a heading. */
+.ob-label {
+  display: block;
+  margin: var(--s-5) 0 var(--s-2);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+/* Status line — a check (Docker / preflight / engine) on its own row.
+ * Implied chrome: a hairline top divider sets it off, NO enclosing
+ * card (never cards-in-cards). Versions/numbers inside ride mono +
+ * tabular via the existing .mono utility. */
+.ob-status {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-3) 0;
+}
+.ob-status + .ob-status { border-top: 1px solid var(--line); }
+
+/* Value list — what you get after install. Hairline-separated rows,
+ * not bullet glyphs: the data does the talking. Body in the ramp,
+ * inline <code> stays mono. */
+.ob-values { list-style: none; margin: var(--s-2) 0 0; padding: 0; }
+.ob-values li {
+  padding: var(--s-2) 0;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  color: var(--fg-dim);
+}
+.ob-values li + li { border-top: 1px solid var(--line); }
+.ob-values strong { color: var(--fg); font-weight: 500; }
+
+/* Preflight check row — name + state chip on the lead line, message
+ * and remediation in the ramp below. Hairline-separated; no nested
+ * card. Mirrors the .row sibling-border idiom. */
+.ob-check { padding: var(--s-3) 0; }
+.ob-check + .ob-check { border-top: 1px solid var(--line); }
+.ob-check__head { display: flex; align-items: center; gap: var(--s-2); }
+.ob-check__name { font-size: var(--t-sm); font-weight: 500; color: var(--fg); }
+
 /* ── Chips — mono data-state pills (broker state, data tier, ibeam) ──
  * The compact cousin of .badge: same tint vocabulary, mono/uppercase
  * for machine-state words. Views map their states to a variant —
@@ -622,14 +762,21 @@ input[type="text"]:focus, input[type="password"]:focus {
   padding: 2px 8px;
   border-radius: var(--r-pill);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
-.chip.ok      { background: var(--accent-soft);          color: var(--ok); }
-.chip.warn    { background: rgba(245, 166, 35, 0.12);    color: var(--warn); }
-.chip.err     { background: rgba(239, 68, 68, 0.12);     color: var(--err); }
-.chip.neutral { background: var(--surface-3);            color: var(--fg-dim); }
+/* Each fill matches its own text token (one source) — ok rides the
+ * desaturated --ok family, not the surgical-emerald --accent fill. */
+.chip.ok      { background: var(--ok-soft);      color: var(--ok); }
+.chip.warn    { background: var(--warn-soft);    color: var(--warn); }
+.chip.err     { background: var(--err-soft);     color: var(--err); }
+.chip.neutral { background: var(--surface-3);    color: var(--fg-dim); }
+/* live = the ONE place a chip earns surgical emerald: a genuinely
+ * connected/authenticated session (ibeam auth_ok). Reserved for real
+ * "connected" truth — transient/starting states stay desaturated. */
+.chip.live    { background: var(--accent-soft);  color: var(--accent); }
 
 /* ── Banners — inline notices inside cards/views ──────────────────
  * info = accent-tinted guidance; warn = needs attention; err = failed.
@@ -644,8 +791,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 .banner strong { color: var(--fg); }
 .banner.info { background: var(--accent-soft);        border: 1px solid var(--accent-dim); }
-.banner.warn { background: rgba(245, 166, 35, 0.08);  border: 1px solid rgba(245, 166, 35, 0.35); }
-.banner.err  { background: rgba(239, 68, 68, 0.08);   border: 1px solid rgba(239, 68, 68, 0.30); color: var(--err); }
+.banner.warn { background: var(--warn-soft);  border: 1px solid var(--warn-dim); }
+.banner.err  { background: var(--err-soft);   border: 1px solid var(--err-dim); color: var(--err); }
 .banner.err strong { color: var(--err); }
 
 /* ── Logs / code blocks ─────────────────────────────────────────── */
@@ -679,8 +826,9 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .pane-head__label,
 .micro-label {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
@@ -697,7 +845,17 @@ pre.logs.logs-compact { max-height: 200px; }
   gap: var(--s-3);
   margin: var(--s-5) 0 var(--s-2);
 }
-.section-head h2 { margin: 0; }
+/* Section head label = mono-label (Percept): SF Mono, tracked, uppercase,
+ * tertiary ink — over a hairline divider. The data does the talking. */
+.section-head h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
 .section-head__actions {
   display: flex;
   align-items: center;
@@ -715,6 +873,7 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .kpi__value {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--t-md);
   font-weight: 500;
 }
@@ -724,19 +883,20 @@ table.data-table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--t-xs);
 }
 .data-table thead tr { border-bottom: 1px solid var(--line); color: var(--fg-dim); }
 .data-table tbody tr { border-bottom: 1px solid var(--line); }
 
-/* ── Sub-card — nested panel inside a row (ibeam under IBKR) ─────
- * Quieter tier of .card: tighter radius, surface tint, line border. */
+/* ── Sub-panel — implied-chrome region inside a row (ibeam under IBKR) ──
+ * NOT a nested card (the rubric + detector reject cards-in-cards). A
+ * hairline top divider sets it off from the row above — no fill, no
+ * enclosing box; implied chrome only. */
 .subcard {
-  margin-top: var(--s-2);
-  padding: var(--s-3);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
+  margin-top: var(--s-3);
+  padding: var(--s-3) 0 var(--s-1);
+  border-top: 1px solid var(--line);
 }
 
 /* ── Density utilities ───────────────────────────────────────────
@@ -775,7 +935,7 @@ table.data-table {
 
 /* Table cells (status/positions tables) — quiet, right-aligned numerics. */
 .cell     { padding: var(--s-1) var(--s-2); text-align: left;  font-weight: 400; }
-.cell-num { padding: var(--s-1) var(--s-2); text-align: right; font-weight: 400; }
+.cell-num { padding: var(--s-1) var(--s-2); text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; }
 
 /* ═══ Hub shell (v7.1 — left rail + content) ═════════════════════════ */
 
@@ -872,8 +1032,19 @@ table.data-table {
   justify-content: space-between;
   gap: var(--s-2);
   margin-bottom: var(--s-3);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line);
 }
-.card-title { font-size: var(--t-sm); font-weight: 600; letter-spacing: -0.01em; }
+/* Section header = mono-label (Percept): SF Mono, tracked, uppercase,
+ * tertiary ink. The data does the talking; the label recedes. */
+.card-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
 
 /* ── Home hub ─────────────────────────────────────────────────────── */
 
@@ -906,7 +1077,7 @@ table.data-table {
   overflow: hidden;
   background: var(--hero-bg);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   min-height: 172px;
 }
 /* The flame is an immersive right-side backdrop (not a flex sibling),
@@ -923,7 +1094,9 @@ table.data-table {
   pointer-events: none;
 }
 .hero__body { position: relative; z-index: 1; padding: 24px 26px; max-width: 440px; min-width: 0; }
-.hero__title { font-size: 23px; font-weight: 700; letter-spacing: -0.3px; margin: 0; }
+/* Medium weight, tracking-tight — this is product, not brand: no oversized
+ * hero (rubric: headings 500, ~-0.02em, no showy display type). */
+.hero__title { font-size: var(--t-lg); font-weight: 500; letter-spacing: -0.02em; margin: 0; }
 .hero__sub { color: var(--fg-dim); font-size: 13px; margin: 7px 0 0; line-height: 1.5; }
 
 .btn-launch {
@@ -933,7 +1106,7 @@ table.data-table {
   background: var(--accent);
   color: #04140d;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   padding: 12px 24px;
   font-size: 15px;
   font-weight: 600;
@@ -942,12 +1115,17 @@ table.data-table {
   margin-top: 18px;
   transition: background-color 0.15s, box-shadow 0.15s;
 }
-.btn-launch:hover { background: var(--accent-2); box-shadow: 0 0 0 4px var(--accent-soft); }
-.btn-launch:disabled { opacity: 0.55; cursor: wait; box-shadow: none; }
+.btn-launch:hover { background: var(--accent-2); }
+/* Real focus ring (rubric: visible emerald focus ring on interactives) —
+ * not a decorative hover glow. */
+.btn-launch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-dim); }
+.btn-launch:disabled { opacity: 0.55; cursor: wait; }
 
 .statusline { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--fg-dim); margin-top: 15px; }
 .sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--fg-muted); }
-.sdot.ok     { background: #c4ccd6; }
+/* OK = a healthy/live capability — the one place emerald is surgical here.
+ * No glow (rubric): the dot is the signal, not a halo. */
+.sdot.ok     { background: var(--accent); }
 .sdot.warn   { background: var(--warn); }
 .sdot.err    { background: var(--err); }
 .sdot.hollow { background: transparent; border: 1.5px solid var(--fg-muted); box-sizing: border-box; }
@@ -956,30 +1134,61 @@ table.data-table {
 .hlink { background: none; border: none; padding: 0; font-family: inherit; font-size: 12px; color: var(--fg-muted); cursor: pointer; }
 .hlink:hover { color: var(--fg-dim); text-decoration: underline; text-underline-offset: 2px; }
 
-/* Mode badge (paper / live) */
-.mode-badge { font-size: 10px; font-weight: 600; border-radius: var(--r-sm); padding: 2px 7px; letter-spacing: 0.3px; }
-.mode-badge.paper { background: #11314a; color: #7fc4ee; }
-/* LIVE = real money. Deliberately NOT the amber used for staleness /
- * warnings, so it reads as its own high-salience mode, not an alert. */
-.mode-badge.live  { background: rgba(239, 68, 68, 0.18); color: #ff9a9a; box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.45); }
+/* Mode badge (paper / live) — restrained Percept status pills. */
+.mode-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  letter-spacing: 0.06em;
+}
+/* PAPER = the safe default, so it stays quiet: neutral surface + dim ink,
+ * a hairline ring rather than a colored fill. It must not compete with
+ * the live badge for attention. */
+.mode-badge.paper { background: var(--surface-2); color: var(--fg-dim); box-shadow: inset 0 0 0 1px var(--line); }
+/* LIVE = real money. High-contrast desaturated-red pill via the --err
+ * token family — high salience, but NO glow (rubric: high-contrast, not
+ * glowing). The inset 1px --err-dim ring sharpens the edge. */
+.mode-badge.live  { background: var(--err-soft); color: var(--err); box-shadow: inset 0 0 0 1px var(--err-dim); }
 
-/* Account tiles */
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
-.tile { background: var(--bg-elev); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; }
-.tile__label { font-size: 10.5px; color: var(--fg-muted); }
-.tile__value { font-family: var(--font-mono); font-size: 18px; margin-top: 4px; }
-.tile__foot { font-size: 10px; color: var(--fg-muted); margin-top: 8px; }
+/* Account tiles — hairline tone panels (white 0.02 + white 0.06 line),
+ * NOT solid cards: implied chrome, the data does the talking. */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 11px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 13px 14px; }
+/* Label = mono-label spec (SF Mono, tracked, uppercase, tertiary ink). */
+.tile__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.tile__value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18px; margin-top: 4px; letter-spacing: -0.01em; }
+.tile__foot { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 10px; color: var(--fg-muted); margin-top: 8px; }
 /* Whole glance dims when any of its three fetches is stale, so no tile
  * reads as live while the header shows the amber "stale" stamp. */
 .tiles.is-stale { opacity: 0.6; }
-.asof { font-size: 11px; color: var(--fg-muted); }
+/* The "as of HH:MM:SS · Ns ago" stamp is data — mono + tabular so the
+ * digits don't shimmy as the clock ticks. */
+.asof { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--fg-muted); }
 .asof.stale { color: var(--warn); }
 
 /* Today aside */
-.aside__title { font-size: 13px; font-weight: 600; }
+/* Panel head = mono-label (Percept): SF Mono, tracked, uppercase, tertiary. */
+.aside__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
 .aside__row { display: flex; align-items: center; gap: 9px; font-size: 12px; }
 .aside__row .lbl { flex: 1; color: var(--fg-dim); }
-.aside__row .val { color: var(--fg-muted); }
+/* The value is the datum (engine state, broker, feed, version) — mono +
+ * tabular so the status column reads like a terminal readout. */
+.aside__row .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg-muted); }
 .aside__sep { height: 1px; background: var(--line); }
 
 /* Animated flame (hero) */
@@ -1002,13 +1211,38 @@ table.data-table {
   max-width: 90%;
   background: var(--bg-elev);
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   padding: 22px 24px;
 }
-.tut-step-label { font-size: 11px; color: var(--fg-muted); }
-.tut-title { font-size: 18px; font-weight: 600; margin: 6px 0 8px; }
+.tut-step-label { font-family: var(--font-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
+.tut-title { font-size: var(--t-lg); font-weight: 500; letter-spacing: -0.02em; margin: 6px 0 8px; }
 .tut-body { color: var(--fg-dim); font-size: 13px; line-height: 1.6; margin: 0; }
 .tut-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
 .tut-dots { display: flex; gap: 6px; }
 .tut-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); }
 .tut-dot.on { background: var(--accent); }
+
+/* ── Responsive — stack the home hub when the window narrows ───────
+ * Below ~720px the fixed 212px aside + main column collide. Drop to a
+ * single column: aside falls under main with a top hairline instead of
+ * a left one. Tiles already auto-fit/wrap (no fixed 3-up). */
+@media (max-width: 720px) {
+  .hub { flex-direction: column; }
+  .hub__aside {
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* ── Reduced motion — honor the OS preference ─────────────────────
+ * Covert/minimal: motion only conveys state. When the user asks for
+ * less, neutralize transitions + the status-dot pulse to instant. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
