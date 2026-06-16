@@ -1,5 +1,7 @@
-// Flame — the official Auracle mark (white flame "A" with an emerald
-// inner core; source of truth: auracle/branding/auracle-mark.svg).
+// Flame — the official Auracle mark (white flame "A" with an accent
+// inner core; source of truth: auracle/branding/auracle-mark.svg). The
+// core + aura track var(--accent) (Nous-blue) so the mark stays in lockstep
+// with the theme accent.
 //
 // Three forms:
 //   <Flame />                 small static mark for the rail/brand.
@@ -29,12 +31,12 @@ export default function Flame({
         aria-hidden="true"
         style={fill ? { position: "absolute", inset: 0 } : undefined}
       >
-        <circle className="flame-aura" cx="80" cy="80" r="50" fill="none" stroke="#10b981" strokeWidth="1.4" />
-        <circle className="flame-aura b" cx="80" cy="80" r="34" fill="none" stroke="#10b981" strokeWidth="1.4" />
+        <circle className="flame-aura" cx="80" cy="80" r="50" fill="none" stroke="var(--accent)" strokeWidth="1.4" />
+        <circle className="flame-aura b" cx="80" cy="80" r="34" fill="none" stroke="var(--accent)" strokeWidth="1.4" />
         <circle cx="80" cy="80" r="22" fill="#0f151c" />
         <g transform="translate(62,62) scale(1.15)">
           <path d="M16 3 L29 27 L22 27 L16 16 L10 27 L3 27 Z" fill="#f3f6f9" />
-          <path d="M16 11 L21 21 L11 21 Z" fill="#10b981" />
+          <path d="M16 11 L21 21 L11 21 Z" fill="var(--accent)" />
         </g>
       </svg>
     );
@@ -43,7 +45,7 @@ export default function Flame({
   return (
     <svg {...dim} viewBox="0 0 32 32" aria-hidden="true">
       <path d="M16 3 L29 27 L22 27 L16 16 L10 27 L3 27 Z" fill="#f3f6f9" />
-      <path d="M16 11 L21 21 L11 21 Z" fill="#10b981" />
+      <path d="M16 11 L21 21 L11 21 Z" fill="var(--accent)" />
     </svg>
   );
 }
