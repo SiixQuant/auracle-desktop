@@ -4,6 +4,24 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.7.3]
+
+A refreshed look and a smoother hand-off into the workspace.
+
+### Added
+- **Workspace opens already connected.** When you open the workspace from
+  the app, it now wires up its connection to the local engine
+  automatically — no key to paste. If anything isn't ready yet, it falls
+  back to the manual connect screen as before.
+
+### Changed
+- **A refreshed visual identity.** A blue accent and elegant serif
+  headlines, on a deeper, more layered dark theme — Settings, Connections,
+  and Home read with clearer depth and hierarchy while staying dark.
+- **Honest, legible status throughout** carries over from the design pass:
+  states stay distinct, and text keeps strong contrast on the darker
+  surfaces.
+
 ## [0.7.2]
 
 One terminal-grade look across the whole launcher.
