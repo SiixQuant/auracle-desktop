@@ -45,11 +45,18 @@
   --elev-card:    0 1px 2px rgba(0, 0, 0, 0.45);
   --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 
-  /* Brand + status — emerald used SURGICALLY (live/active + primary); states desaturated */
-  --accent:      #10b981;                      /* emerald — surgical, matches logo + marketing */
-  --accent-2:    #059669;                      /* hover/pressed tier */
-  --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-dim:  rgba(16, 185, 129, 0.30);
+  /* Accent — Nous-blue (Hermes DNA). Primary + active/live/connected, on the
+     charcoal base. Replaces the prior surgical emerald wholesale. */
+  --accent:      #0053fd;                      /* Nous-blue */
+  --accent-2:    #0042cc;                      /* hover/pressed tier */
+  --accent-soft: rgba(0, 83, 253, 0.16);       /* a touch stronger than emerald was — blue reads quieter on dark */
+  --accent-dim:  rgba(0, 83, 253, 0.34);
+  --accent-ink:  #ffffff;                      /* text ON a filled accent — blue is dark, needs white not black */
+  /* Accent as TEXT/glyph on dark soft-fills. #0053fd is a dark blue (~0.13
+     luma) so it fails AA as small text on charcoal; this brightened blue
+     clears 4.5:1 on accent-soft over every surface. Use for ink/icons;
+     keep --accent for fills, borders, dots, and the filled-button bg. */
+  --accent-text: #7aa2ff;
   --ok:          #34d399;                       /* desaturated success */
   --warn:        #fbbf24;                       /* desaturated amber */
   --err:         #f87171;                       /* desaturated red */
@@ -89,6 +96,13 @@
                "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Monaco,
                "Cascadia Mono", Consolas, "Courier New", monospace;
+  /* Display serif (Hermes DNA) — big dramatic headline faces for heroes +
+     page titles. A system high-contrast serif stack (Bodoni 72 / Didot on
+     macOS) stands in for Hermes' proprietary "Collapse" — same drama, zero
+     licensing risk, fully offline. Cross-platform builds can bundle a free
+     OFL serif (e.g. Fraunces) later. */
+  --font-display: "Bodoni 72", "Didot", "Didot LT STD", "Playfair Display",
+               "Times New Roman", Georgia, serif;
 }
 
 * { box-sizing: border-box; }
@@ -186,9 +200,12 @@ main {
 }
 
 h1 {
-  font-size: var(--t-xl);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  /* Display serif (Hermes DNA) — page titles get the dramatic high-contrast
+     serif; the weight drops because serifs read heavier than the sans. */
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   margin: 0 0 var(--s-4);
 }
 
@@ -273,7 +290,7 @@ h2 {
 }
 .launch-card--primary:hover {
   border-color: var(--accent);
-  background: rgba(16, 185, 129, 0.16);
+  background: rgba(0, 83, 253, 0.20);
 }
 
 .launch-card__title {
@@ -282,7 +299,7 @@ h2 {
   letter-spacing: -0.01em;
   padding-right: var(--s-5);
 }
-.launch-card--primary .launch-card__title { color: var(--accent); }
+.launch-card--primary .launch-card__title { color: var(--accent-text); }
 
 .launch-card__desc {
   font-size: var(--t-sm);
@@ -305,7 +322,7 @@ h2 {
   color: var(--fg);
 }
 .launch-card--primary .launch-card__arrow { color: var(--accent-dim); }
-.launch-card--primary:hover .launch-card__arrow { color: var(--accent); }
+.launch-card--primary:hover .launch-card__arrow { color: var(--accent-text); }
 
 /* ── Segmented toggle (Settings → Workspace) ─────────────────────
  * Compact binary control — same language as Forge's Agent|Code switch,
@@ -332,7 +349,7 @@ h2 {
 }
 .seg-tab:hover { color: var(--fg); }
 .seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent-dim); }
-.seg-tab.active { background: var(--accent-soft); color: var(--accent); }
+.seg-tab.active { background: var(--accent-soft); color: var(--accent-text); }
 /* Mode-aware selected tabs (ibeam paper/live) — same token vocabulary as
  * the Dashboard .mode-badge so a chosen mode reads its own salience, not a
  * generic emerald "on". PAPER = the safe default: quiet neutral surface +
@@ -390,12 +407,12 @@ h2 {
   transition: background-color 0.12s, color 0.12s, border-color 0.12s;
 }
 .dir-filter:hover { background: var(--surface-2); color: var(--fg); border-color: var(--line-strong); }
-.dir-filter.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-dim); }
+.dir-filter.active { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-dim); }
 
 .dir-empty { padding: var(--s-4) 0; }
 .linklike {
   background: none; border: none; padding: 0;
-  color: var(--accent); cursor: pointer; font: inherit;
+  color: var(--accent-text); cursor: pointer; font: inherit;
 }
 .linklike:hover { text-decoration: underline; }
 
@@ -502,13 +519,13 @@ h2 {
   gap: 3px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--accent);
+  color: var(--accent-text);
   padding: 1px 5px 1px 4px;
   border: 1px solid var(--accent-dim);
   border-radius: var(--r-sm);
   background: var(--accent-soft);
 }
-.cap-badge svg { color: var(--accent); }
+.cap-badge svg { color: var(--accent-text); }
 
 /* Connect-method tag — how you link the broker. "Portal" (an in-launcher
  * gateway login flow) is accented because it's connectable now; API key /
@@ -523,7 +540,7 @@ h2 {
   white-space: nowrap;
 }
 .method-tag--portal {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent-dim);
   background: var(--accent-soft);
 }
@@ -542,7 +559,7 @@ h2 {
 /* The connected pill is the most assertive element on screen — it's the
  * one real "you're live" claim, so it gets a stronger fill + border than
  * the (intentionally quiet) capability badges and filter chips. */
-.dir-pill.ok   { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-dim); }
+.dir-pill.ok   { background: var(--accent-soft); color: var(--accent-text); border: 1px solid var(--accent-dim); }
 .dir-pill.warn { background: var(--warn-soft);   color: var(--warn);   border: 1px solid var(--warn-dim); }
 .dir-pill.err  { background: var(--err-soft);    color: var(--err);    border: 1px solid var(--err-dim); }
 /* Coming-soon pill must stay legible even on the dimmed (55%) row —
@@ -574,7 +591,7 @@ h2 {
 
 button.primary {
   background: var(--accent);
-  color: #000;
+  color: var(--accent-ink);
   border: 1px solid var(--accent);
   border-radius: var(--r-md);
   padding: var(--s-2) var(--s-4);
@@ -652,7 +669,7 @@ input[type="text"]:focus, input[type="password"]:focus {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.badge.ok   { background: var(--accent-soft);            color: var(--accent); }
+.badge.ok   { background: var(--accent-soft);            color: var(--accent-text); }
 .badge.warn { background: var(--warn-soft);      color: var(--warn); }
 .badge.err  { background: var(--err-soft);       color: var(--err); }
 
@@ -682,7 +699,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 .step.done    { border-top-color: var(--accent-dim); color: var(--fg-dim); }
 /* Current = emphasized: surgical emerald text + a solid emerald
  * keyline. The one place emerald lands in the chrome. */
-.step.current { border-top-color: var(--accent);     color: var(--accent); }
+.step.current { border-top-color: var(--accent);     color: var(--accent-text); }
 
 /* Step lead title — tracking-tight medium heading so a step reads as a
  * chapter, not a field label (and not a brand hero). */
@@ -811,7 +828,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 /* live = the ONE place a chip earns surgical emerald: a genuinely
  * connected/authenticated session (ibeam auth_ok). Reserved for real
  * "connected" truth — transient/starting states stay desaturated. */
-.chip.live    { background: var(--accent-soft);  color: var(--accent); }
+.chip.live    { background: var(--accent-soft);  color: var(--accent-text); }
 
 /* ── Banners — inline notices inside cards/views ──────────────────
  * info = accent-tinted guidance; warn = needs attention; err = failed.
@@ -1025,7 +1042,7 @@ table.data-table {
   color: var(--fg);
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.nav-item.active svg { color: var(--accent); }
+.nav-item.active svg { color: var(--accent-text); }
 .nav-item svg { flex: none; }
 .rail__foot {
   margin-top: auto;
@@ -1145,7 +1162,7 @@ table.data-table {
 .hero__body { position: relative; z-index: 1; padding: 24px 26px; max-width: 440px; min-width: 0; }
 /* Medium weight, tracking-tight — this is product, not brand: no oversized
  * hero (rubric: headings 500, ~-0.02em, no showy display type). */
-.hero__title { font-size: var(--t-lg); font-weight: 500; letter-spacing: -0.02em; margin: 0; }
+.hero__title { font-family: var(--font-display); font-size: 34px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.05; margin: 0; }
 .hero__sub { color: var(--fg-dim); font-size: 13px; margin: 7px 0 0; line-height: 1.5; }
 
 .btn-launch {
@@ -1153,7 +1170,7 @@ table.data-table {
   align-items: center;
   gap: 8px;
   background: var(--accent);
-  color: #04140d;
+  color: var(--accent-ink);
   border: none;
   border-radius: var(--r-lg);
   padding: 12px 24px;
