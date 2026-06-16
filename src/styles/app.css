@@ -25,11 +25,12 @@
   /* Foreground — Percept ramp (primary → muted), high-contrast not glowing */
   --fg:          #e6edf3;
   --fg-dim:      #9da7b3;
-  /* Tertiary ink nudged #5a636e→#6b7480 so micro-labels, "coming soon"
-     pills, method tags + version readouts clear ~3:1 on the lifted
-     charcoal surfaces (the old value dipped below 3:1 once cards stopped
-     being pure black). Still clearly a recede tone, not a primary. */
-  --fg-muted:    #6b7480;
+  /* Tertiary ink — used for 10–13px mono micro-labels (section heads,
+     method tags, "coming soon" pills, legend, version). Set to #7c8694 so
+     those small labels clear ~4.5:1 AA on the lifted charcoal cards
+     (#6b7480 was only ~3.9:1 — fine for large text, short for micro-text).
+     Still clearly a recede tone, not a primary. */
+  --fg-muted:    #7c8694;
   --fg-faint:    #3a4049;
 
   /* Lines — implied chrome: hairline low-alpha, whispered not announced.
@@ -387,7 +388,8 @@ h2 {
   flex: 1 1 220px;
   min-width: 200px;
 }
-.dir-search svg { position: absolute; left: 10px; color: var(--fg-faint); pointer-events: none; }
+.dir-search svg { position: absolute; left: 10px; color: var(--fg-faint); pointer-events: none; transition: color 0.15s; }
+.dir-search:focus-within svg { color: var(--fg-muted); }
 .dir-search input {
   width: 100%;
   padding: 7px 10px 7px 30px;
@@ -435,7 +437,7 @@ h2 {
 .dir-section__count {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  color: var(--fg-faint);
+  color: var(--fg-muted);
 }
 
 .dir-row { border-bottom: 1px solid var(--line); }
@@ -454,7 +456,7 @@ h2 {
 /* Row hover — a step above the card surface so the pointer target is
    obvious; available rows only (soon rows stay quiet at 55%). */
 .dir-row:not(.is-soon):hover .dir-row__top { background: var(--surface-2); }
-.dir-row.is-soon { opacity: 0.55; }
+.dir-row.is-soon { opacity: 0.7; }
 .dir-row.is-soon .dir-logo { filter: saturate(0.5); }
 
 .dir-logo {
@@ -512,7 +514,7 @@ h2 {
 .achip--more { color: var(--fg-faint); border-style: dashed; }
 /* Capability chip — mono, hairline, tertiary. Data/Trade only render
  * when the capability is real (honesty contract), so the active state
- * carries a surgical emerald-soft tint to mark a live capability. */
+ * carries a surgical accent-soft (blue) tint to mark a live capability. */
 .cap-badge {
   display: inline-flex;
   align-items: center;
@@ -559,10 +561,10 @@ h2 {
 /* The connected pill is the most assertive element on screen — it's the
  * one real "you're live" claim, so it gets a stronger fill + border than
  * the (intentionally quiet) capability badges and filter chips. */
-.dir-pill.ok   { background: var(--accent-soft); color: var(--accent-text); border: 1px solid var(--accent-dim); }
+.dir-pill.ok   { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
 .dir-pill.warn { background: var(--warn-soft);   color: var(--warn);   border: 1px solid var(--warn-dim); }
 .dir-pill.err  { background: var(--err-soft);    color: var(--err);    border: 1px solid var(--err-dim); }
-/* Coming-soon pill must stay legible even on the dimmed (55%) row —
+/* Coming-soon pill must stay legible even on the dimmed (70%) row —
  * use the mid foreground, not the faintest. */
 .dir-pill.soon { background: var(--surface-2);         color: var(--fg-muted); border: 1px solid var(--line); }
 
@@ -825,7 +827,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 .chip.warn    { background: var(--warn-soft);    color: var(--warn); }
 .chip.err     { background: var(--err-soft);     color: var(--err); }
 .chip.neutral { background: var(--surface-3);    color: var(--fg-dim); }
-/* live = the ONE place a chip earns surgical emerald: a genuinely
+/* live = the ONE place a chip earns the surgical accent (blue): a genuinely
  * connected/authenticated session (ibeam auth_ok). Reserved for real
  * "connected" truth — transient/starting states stay desaturated. */
 .chip.live    { background: var(--accent-soft);  color: var(--accent-text); }
@@ -1035,8 +1037,8 @@ table.data-table {
 }
 .nav-item:hover { background: var(--surface); color: var(--fg); }
 /* Selected — an elevated charcoal plane with an inset hairline ring and a
-   surgical emerald icon. Reads as "lifted + chosen" rather than a flat
-   emerald wash; no banned side-stripe. */
+   surgical accent (blue) icon. Reads as "lifted + chosen" rather than a
+   flat accent wash; no banned side-stripe. */
 .nav-item.active {
   background: var(--surface-2);
   color: var(--fg);
@@ -1069,10 +1071,11 @@ table.data-table {
   padding: 24px clamp(20px, 3vw, 56px) 56px;
 }
 .settings > h1 {
+  font-family: var(--font-display);
   margin: 0 0 var(--s-5);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--fg);
 }
 .settings-grid {
@@ -1087,6 +1090,11 @@ table.data-table {
 }
 .sgcell { min-width: 0; }
 .sgcell.full { grid-column: 1 / -1; }
+/* The primary Connections panel sits on its OWN deeper plane (one step
+   below the small action cards) with a crisper edge — a directory "well"
+   that rows lift out of on hover. Differentiates the primary container
+   from the 3 small cards by tone, not by another shadow (in-language). */
+.sgcell.full > .card { background: var(--hero-bg); border-color: var(--line-strong); }
 .sgcell > .card { margin-bottom: 0; }
 
 /* In-card header — title (and optional action) live inside the card,
