@@ -4,6 +4,18 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.7.4]
+
+A more layered, legible Settings & Connections screen.
+
+### Changed
+- **Settings & Connections depth + hierarchy.** The Connections panel now
+  reads as the page's primary block on its own deeper surface; the page
+  title takes the editorial serif; the connected status reads as a single
+  clear pill; small labels and counts gain contrast on the layered cards;
+  disabled rows and the search field read better. Dark theme and accent
+  unchanged — purely a clarity + polish pass.
+
 ## [0.7.3]
 
 A refreshed look and a smoother hand-off into the workspace.
