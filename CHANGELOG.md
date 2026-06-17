@@ -4,6 +4,22 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.7.5]
+
+Connect a broker without leaving the app.
+
+### Added
+- **Connect a broker** action on the Connections panel — the single door to
+  broker setup. Opens the connection page in the in-app window and, on an
+  on-box install, **already signed in** (a one-time local login handoff), so
+  there's no key to copy and no login wall. Falls back to the plain page when
+  there's no on-box handoff.
+
+### Changed
+- The connection-setup link now opens the in-app window (which carries the
+  session) instead of the external browser, and the footnote no longer implies
+  API-key/wallet brokers are unavailable — they're set up via **Connect a broker**.
+
 ## [0.7.4]
 
 A more layered, legible Settings & Connections screen.
