@@ -369,6 +369,62 @@ async fn provision_ide_config() -> Result<bool, String> {
     Ok(true)
 }
 
+/// Engine on-box session-handoff endpoint (see
+/// connect_agent.ide_session_handoff). Mints a single-use login nonce so
+/// an in-app webview can open a /ui/* page already signed in.
+const SESSION_HANDOFF_URL: &str = "http://127.0.0.1:1969/ui/api/ide/session-handoff";
+
+#[derive(serde::Deserialize)]
+struct SessionHandoffResponse {
+    #[serde(default)]
+    login_url: Option<String>,
+}
+
+/// Mint a one-time login URL (`/ui/ide-login?nonce=...&next=<next>`) so an
+/// in-app webview can open a /ui/* page ALREADY signed in — no login wall.
+///
+/// Returns `Ok(None)` when we can't prove we're local (no handoff secret
+/// readable) or the engine has no owner yet (HTTP 409); the caller then
+/// falls back to opening the page directly (which may prompt a login).
+/// Same on-box auth as provisioning: the handoff secret header, no Origin
+/// (reqwest adds none). The nonce is single-use + 60s, so it is safe to
+/// carry in the returned URL.
+#[tauri::command]
+pub async fn mint_connect_login_url(next: Option<String>) -> Result<Option<String>, String> {
+    let secret = match read_handoff_secret() {
+        Some(token) => token,
+        None => return Ok(None),
+    };
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(to_error_string)?;
+    let resp = client
+        .post(SESSION_HANDOFF_URL)
+        .header("X-Auracle-Handoff-Token", secret)
+        .send()
+        .await
+        .map_err(to_error_string)?;
+    if resp.status().as_u16() == 409 {
+        return Ok(None);
+    }
+    if !resp.status().is_success() {
+        return Err(format!(
+            "engine returned {} when minting a connect login",
+            resp.status()
+        ));
+    }
+    let body: SessionHandoffResponse = resp.json().await.map_err(to_error_string)?;
+    let login_url = match body.login_url {
+        Some(url) if !url.is_empty() => url,
+        _ => return Ok(None),
+    };
+    let next_path = next
+        .filter(|n| n.starts_with('/'))
+        .unwrap_or_else(|| "/ui/connections".to_string());
+    Ok(Some(format!("{login_url}&next={next_path}")))
+}
+
 /// Write `{engine_url, api_key}` to the IDE's config file
 /// (`~/.config/zed/auracle.json`), creating the directory if needed.
 /// Mirrors exactly what the IDE's own Connect modal would save, so the
