@@ -35,6 +35,7 @@ import ibkrLogo from "@/assets/brokers/ibkr.svg";
 import {
   cmd,
   openInBrowser,
+  openWebConsole,
   type BrokerState,
   type BrokerStatus,
 } from "@/lib/tauri";
@@ -111,9 +112,22 @@ export default function BrokerConnectionsCard() {
           {refreshing ? "Checking…" : "Refresh"}
         </button>
       </div>
-      <p className="muted fs-sm m-0 mb-3">
+      <p className="muted fs-sm m-0 mb-2">
         Connect once — used everywhere in Auracle.
       </p>
+      {/* The single canonical door to broker setup. IBKR connects in-app
+          below; every API-key / wallet broker (Alpaca, ClearStreet,
+          Hyperliquid, …) is set up on the engine's connections page, which
+          this opens. Routes through openWebConsole so it honors the
+          embedded-vs-browser preference. Opens a real credential form —
+          never implies a connection that isn't there. */}
+      <button
+        type="button"
+        className="primary btn-sm mb-3"
+        onClick={() => openWebConsole("/ui/connections")}
+      >
+        Connect a broker
+      </button>
       {houstonConflict && (
         <HoustonConflictBanner
           containerName={houstonConflict}
@@ -254,10 +268,10 @@ function BrokerDirectory({
         <span className="cap-badge"><TradeIcon />Trade</span> = can place orders ·{" "}
         <span className="method-tag method-tag--portal">Portal</span> = sign in
         through the broker&apos;s own secure login, opened right here —
-        Interactive Brokers is the only broker you can connect today.{" "}
+        Interactive Brokers connects this way in-app.{" "}
         <span className="method-tag">API key</span> and{" "}
-        <span className="method-tag">Wallet</span> connections aren&apos;t
-        available yet.
+        <span className="method-tag">Wallet</span> brokers (Alpaca, ClearStreet,
+        Hyperliquid) are set up with <strong>Connect a broker</strong> above.
       </p>
     </>
   );
