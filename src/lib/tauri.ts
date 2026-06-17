@@ -655,16 +655,32 @@ export async function openInBrowser(url: string): Promise<void> {
  *
  * @param path same-origin path under the web console, e.g. "/ui/blotter".
  */
-export async function openWebConsole(path = "/ui"): Promise<void> {
-  let mode: ViewMode = "browser";
-  try {
-    mode = await cmd.getViewMode();
-  } catch {
-    mode = "browser";
+export async function openWebConsole(
+  path = "/ui",
+  opts?: { prefer?: ViewMode },
+): Promise<void> {
+  // A caller can FORCE a mode (opts.prefer) instead of the stored
+  // preference. The connect flow uses prefer:"embedded" because the
+  // in-app window loads Caddy https://localhost and carries the persisted
+  // Houston session, so the page authenticates in place — the system
+  // browser is a different origin + cookie store and would land on a
+  // login wall.
+  let mode: ViewMode = opts?.prefer ?? "browser";
+  if (!opts?.prefer) {
+    try {
+      mode = await cmd.getViewMode();
+    } catch {
+      mode = "browser";
+    }
   }
   if (mode === "embedded") {
-    await cmd.openEmbeddedAuracle(path);
-    return;
+    try {
+      await cmd.openEmbeddedAuracle(path);
+      return;
+    } catch {
+      // Embedded window couldn't be created (e.g. dev preview outside
+      // Tauri) — never a silent no-op; fall through to the browser.
+    }
   }
   await openInBrowser(`http://localhost:1969${path}`);
 }

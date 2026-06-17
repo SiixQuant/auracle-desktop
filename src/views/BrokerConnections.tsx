@@ -124,7 +124,7 @@ export default function BrokerConnectionsCard() {
       <button
         type="button"
         className="primary btn-sm mb-3"
-        onClick={() => openWebConsole("/ui/connections")}
+        onClick={() => openWebConsole("/ui/connections", { prefer: "embedded" })}
       >
         Connect a broker
       </button>
