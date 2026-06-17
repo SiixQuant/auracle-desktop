@@ -34,8 +34,8 @@ import alpacaLogo from "@/assets/brokers/alpaca.svg";
 import ibkrLogo from "@/assets/brokers/ibkr.svg";
 import {
   cmd,
+  openConnectSetup,
   openInBrowser,
-  openWebConsole,
   type BrokerState,
   type BrokerStatus,
 } from "@/lib/tauri";
@@ -117,14 +117,14 @@ export default function BrokerConnectionsCard() {
       </p>
       {/* The single canonical door to broker setup. IBKR connects in-app
           below; every API-key / wallet broker (Alpaca, ClearStreet,
-          Hyperliquid, …) is set up on the engine's connections page, which
-          this opens. Routes through openWebConsole so it honors the
-          embedded-vs-browser preference. Opens a real credential form —
-          never implies a connection that isn't there. */}
+          Hyperliquid, …) is set up on the engine's connections page.
+          openConnectSetup mints a one-time on-box login so that page opens
+          ALREADY signed in (no login wall), in the in-app window. Opens a
+          real credential form — never implies a connection that isn't there. */}
       <button
         type="button"
         className="primary btn-sm mb-3"
-        onClick={() => openWebConsole("/ui/connections", { prefer: "embedded" })}
+        onClick={() => openConnectSetup()}
       >
         Connect a broker
       </button>

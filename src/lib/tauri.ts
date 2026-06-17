@@ -147,6 +147,11 @@ export const cmd = {
   setViewMode: (mode: ViewMode) => invoke<void>("set_view_mode", { mode }),
   openEmbeddedAuracle: (path?: string) =>
     invoke<void>("open_embedded_auracle", { path }),
+  // Mint a one-time login URL so an in-app webview opens a /ui/* page
+  // already signed in. Returns null when there's no on-box handoff (the
+  // caller falls back to the plain page). See connect_agent.ide_session_handoff.
+  mintConnectLoginUrl: (next: string) =>
+    invoke<string | null>("mint_connect_login_url", { next }),
   // Launch the native Auracle IDE — the primary workspace app the
   // launcher now hands the user into. Rejects with a plain message
   // when the IDE isn't installed on this machine.
@@ -683,6 +688,26 @@ export async function openWebConsole(
     }
   }
   await openInBrowser(`http://localhost:1969${path}`);
+}
+
+/**
+ * Open the broker connection setup page, signed in. Mints a one-time
+ * login URL on-box (so the page authenticates in place — no login wall),
+ * and falls back to the plain page if the handoff isn't available (engine
+ * not local, no owner yet, dev preview). Always opens the in-app window.
+ */
+export async function openConnectSetup(): Promise<void> {
+  try {
+    const loginUrl = await cmd.mintConnectLoginUrl("/ui/connections");
+    if (loginUrl) {
+      await openWebConsole(loginUrl, { prefer: "embedded" });
+      return;
+    }
+  } catch {
+    // No on-box handoff (or outside Tauri) — fall back to the plain page,
+    // which will prompt a login if there's no session yet.
+  }
+  await openWebConsole("/ui/connections", { prefer: "embedded" });
 }
 
 /**
