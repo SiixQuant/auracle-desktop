@@ -65,11 +65,11 @@ use tauri::Builder;
 
 use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
-    broker_stream as broker_stream_cmd, docker as docker_cmd, github_auth as github_auth_cmd,
-    healthcheck as health_cmd, ibeam as ibeam_cmd, ibkr_login as ibkr_login_cmd,
-    installer as installer_cmd, keychain as keychain_cmd, mcp_sidecar as mcp_cmd,
-    preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, tray as tray_cmd,
-    update as update_cmd, view as view_cmd,
+    broker_stream as broker_stream_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
+    github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
+    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
+    mcp_sidecar as mcp_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
+    tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -317,6 +317,13 @@ pub fn run() {
             // Settings Broker Connections card.
             broker_conn_cmd::forge_broker_status,
             broker_conn_cmd::forge_broker_test,
+            // Data-provider API keys (Polygon, EODHD, ...). Native
+            // replacement for the retired Houston Key Master page —
+            // saves + tests data-source keys over loopback (owner key
+            // handoff + double-submit CSRF). Powers the Settings Data
+            // sources card.
+            data_keys_cmd::data_key_save,
+            data_keys_cmd::data_key_test,
             // Broker data — first-class Tauri commands so any view
             // in the app (launcher Dashboard, Forge widgets, tray
             // menu, anything we build next) can pull live broker

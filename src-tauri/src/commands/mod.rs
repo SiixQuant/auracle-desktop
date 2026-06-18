@@ -13,6 +13,7 @@
 pub mod broker_bridge;
 pub mod broker_connections;
 pub mod broker_stream;
+pub mod data_keys;
 pub mod docker;
 pub mod github_auth;
 pub mod healthcheck;
