@@ -111,8 +111,20 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
     }
     try {
       await cmd.licenseSet(v);
-      setStatus("Saved.");
-      setTimeout(onSaved, 600);
+      // Flip the running engine's tier now (best-effort). The web License
+      // page used to do this; the portal is gone, so the launcher owns it.
+      // The key is already in the vault, so engine-unreachable is not fatal.
+      try {
+        const tier = await cmd.licenseActivateEngine(v);
+        setStatus(
+          tier
+            ? `Activated — ${tier} tier.`
+            : "Saved. The engine will apply it on next start.",
+        );
+      } catch (err) {
+        setStatus("Saved to the vault, but the engine couldn't activate it: " + err);
+      }
+      setTimeout(onSaved, 800);
     } catch (err) {
       setStatus("Could not save: " + err);
     }

@@ -297,6 +297,7 @@ pub fn run() {
             update_cmd::current_version,
             // View mode (browser vs embedded)
             view_cmd::open_auracle_ide,
+            view_cmd::license_activate_engine,
             // IBKR Client Portal embedded login window
             ibkr_login_cmd::open_ibkr_login,
             ibkr_login_cmd::close_ibkr_login,
