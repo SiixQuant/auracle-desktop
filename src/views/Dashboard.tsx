@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Flame from "@/components/Flame";
 import {
   cmd,
-  openWebConsole as openWebUi,
+  openIdePanel,
   type BrokerAccountSummary,
   type BrokerDataQuality,
   type BrokerMarketDataStatus,
@@ -177,15 +177,8 @@ export default function Dashboard({
     }
   };
 
-  const openWebConsole = () => {
-    // Honors the Settings "Web console" preference (browser vs embedded
-    // app window). Houston routes to login/dashboard as appropriate; if
-    // the engine is down the page fails honestly rather than us guessing.
-    void openWebUi("/ui/dashboard");
-  };
-
   const openTrade = () => {
-    void openWebUi("/ui/blotter");
+    void openIdePanel("blotter");
   };
 
   const engineStarting = starting || health?.state === "starting";
@@ -262,17 +255,8 @@ export default function Dashboard({
             {ideError && (
               <div className="mt-2">
                 <div className="err-text fs-xs">{ideError}</div>
-                <button type="button" className="hlink" onClick={openWebConsole}>
-                  Open the web console instead ↗
-                </button>
               </div>
             )}
-
-            <div className="hero__links">
-              <button type="button" className="hlink" onClick={openWebConsole}>
-                Open web console ↗
-              </button>
-            </div>
           </div>
           <div className="hero__bg" aria-hidden="true">
             <Flame animated fill />

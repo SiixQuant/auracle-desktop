@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 
 import Flame from "@/components/Flame";
 import Tutorial from "@/components/Tutorial";
-import { cmd, openWebConsole, type HealthSnapshot } from "@/lib/tauri";
+import { cmd, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
 import Onboarding from "@/views/Onboarding";
 import Settings from "@/views/Settings";
@@ -182,36 +182,6 @@ function Help({ onOpenTutorial }: { onOpenTutorial: () => void }) {
           </div>
           <button type="button" className="ghost" onClick={onOpenTutorial}>
             Open tour
-          </button>
-        </div>
-        <div className="row">
-          <div>
-            <div>Documentation &amp; glossary</div>
-            <div className="muted fs-sm mt-1">Every metric and term the UI uses.</div>
-          </div>
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => {
-              void openWebConsole("/ui/help");
-            }}
-          >
-            Open ↗
-          </button>
-        </div>
-        <div className="row">
-          <div>
-            <div>Web console</div>
-            <div className="muted fs-sm mt-1">The full operational web product.</div>
-          </div>
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => {
-              void openWebConsole("/ui");
-            }}
-          >
-            Open ↗
           </button>
         </div>
       </div>

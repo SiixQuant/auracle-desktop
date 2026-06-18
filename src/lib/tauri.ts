@@ -90,8 +90,6 @@ export interface PreflightReport {
   checks: PreflightCheck[];
 }
 
-export type ViewMode = "browser" | "embedded";
-
 // ── GitHub device-flow sign-in ──────────────────────────────────
 //
 // Mirrors commands/github_auth.rs. This is the user's OWN GitHub,
@@ -180,30 +178,10 @@ export const cmd = {
   installUpdate: () => invoke<void>("install_update"),
   currentVersion: () => invoke<string>("current_version"),
 
-  // View mode
-  getViewMode: () => invoke<ViewMode>("get_view_mode"),
-  setViewMode: (mode: ViewMode) => invoke<void>("set_view_mode", { mode }),
-  openEmbeddedAuracle: (path?: string) =>
-    invoke<void>("open_embedded_auracle", { path }),
-  // Mint a one-time login URL so an in-app webview opens a /ui/* page
-  // already signed in. Returns null when there's no on-box handoff (the
-  // caller falls back to the plain page). See connect_agent.ide_session_handoff.
-  mintConnectLoginUrl: (next: string) =>
-    invoke<string | null>("mint_connect_login_url", { next }),
   // Launch the native Auracle IDE — the primary workspace app the
   // launcher now hands the user into. Rejects with a plain message
   // when the IDE isn't installed on this machine.
   openAuracleIDE: () => invoke<void>("open_auracle_ide"),
-  // Open JupyterLab in its own top-level window (the inline iframe panel
-  // doesn't render in WKWebView; a top-level window does).
-  openJupyter: () => invoke<void>("open_jupyter"),
-
-  // Local-CA trust (macOS) — trusting Caddy's per-install root lets the
-  // embedded webview load https://localhost (the workspace + same-origin
-  // Jupyter panel). open_embedded_auracle calls these automatically on
-  // first open; exposed here for a Settings "trust certificate" action.
-  caddyCaTrusted: () => invoke<boolean>("caddy_ca_trusted"),
-  trustCaddyCa: () => invoke<void>("trust_caddy_ca"),
 
   // IBKR Client Portal login (embedded webview)
   openIbkrLogin: (url: string) => invoke<void>("open_ibkr_login", { url }),
@@ -675,14 +653,11 @@ export interface BrokerOptionsChain {
 
 // ── Misc helpers ────────────────────────────────────────────────
 //
-// The desktop opens the unified web product through ONE door: the
-// Home view's "Open Auracle" action (embedded WebviewWindow via
-// `open_embedded_auracle`, which loads https://localhost/ui through
-// Caddy, or the browser fallback). There is deliberately no second
-// "open the workspace" helper here — a parallel openWorkspace()/
-// WORKSPACE_URL pair used to exist for a top-bar shortcut and was
-// removed when the launcher collapsed to a single canonical door, so
-// the two implementations can't drift apart again.
+// The launcher no longer opens any Houston HTML page. Workspace
+// surfaces (blotter, strategies, schedules, incidents, runway, runs,
+// validation, connections) are reached by deep-linking into the native
+// Auracle IDE via `openIdePanel`; the only browser link that remains is
+// the first-run /ui/setup bootstrap (Onboarding) and external docs.
 
 /**
  * Open a URL in the user's default browser via the opener plugin.
@@ -697,68 +672,19 @@ export async function openInBrowser(url: string): Promise<void> {
 }
 
 /**
- * Open a Houston web-console page, honoring the Settings "Web console"
- * preference: "App window" (embedded) opens the page in the embedded
- * WebviewWindow via `open_embedded_auracle`; "browser" hands the URL to
- * the system browser. This is the single door every web-console link
- * goes through, so the toggle actually governs where they open.
- *
- * Defaults to the browser when the preference can't be read or we're
- * running outside Tauri (the dev preview) — never a silent no-op.
- *
- * @param path same-origin path under the web console, e.g. "/ui/blotter".
+ * Open the Auracle IDE focused on a native panel via the `auracle://`
+ * deep-link scheme. The OS routes the URL to the IDE app, launching it if
+ * needed. Replaces the old web-portal links now that the IDE is the home.
+ * Valid panels: blotter, strategies, schedules, incidents, runway, runs,
+ * validation, connections.
  */
-export async function openWebConsole(
-  path = "/ui",
-  opts?: { prefer?: ViewMode },
-): Promise<void> {
-  // A caller can FORCE a mode (opts.prefer) instead of the stored
-  // preference. The connect flow uses prefer:"embedded" because the
-  // in-app window loads Caddy https://localhost and carries the persisted
-  // Houston session, so the page authenticates in place — the system
-  // browser is a different origin + cookie store and would land on a
-  // login wall.
-  let mode: ViewMode = opts?.prefer ?? "browser";
-  if (!opts?.prefer) {
-    try {
-      mode = await cmd.getViewMode();
-    } catch {
-      mode = "browser";
-    }
+export async function openIdePanel(panel: string): Promise<void> {
+  const url = `auracle://panel/${panel}`;
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    return openUrl(url);
   }
-  if (mode === "embedded") {
-    try {
-      await cmd.openEmbeddedAuracle(path);
-      return;
-    } catch {
-      // Embedded window couldn't be created (e.g. dev preview outside
-      // Tauri) — never a silent no-op; fall through to the browser.
-    }
-  }
-  await openInBrowser(`http://localhost:1969${path}`);
-}
-
-/**
- * Open the broker connection setup page, signed in. Mints a one-time
- * login URL on-box (so the page authenticates in place — no login wall),
- * and falls back to the plain page if the handoff isn't available (engine
- * not local, no owner yet, dev preview). Always opens the in-app window.
- */
-export async function openConnectSetup(): Promise<void> {
-  // ?embed=1 renders the engine's connections page chrome-less (no Houston
-  // rail/top-nav) so it sits in the launcher's in-app window as a clean,
-  // themed broker portal instead of a full Houston page.
-  try {
-    const loginUrl = await cmd.mintConnectLoginUrl("/ui/connections?embed=1");
-    if (loginUrl) {
-      await openWebConsole(loginUrl, { prefer: "embedded" });
-      return;
-    }
-  } catch {
-    // No on-box handoff (or outside Tauri) — fall back to the plain page,
-    // which will prompt a login if there's no session yet.
-  }
-  await openWebConsole("/ui/connections?embed=1", { prefer: "embedded" });
+  window.open(url, "_blank", "noopener");
 }
 
 /**
