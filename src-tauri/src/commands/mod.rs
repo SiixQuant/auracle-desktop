@@ -15,6 +15,7 @@ pub mod broker_connections;
 pub mod broker_stream;
 pub mod cert_trust;
 pub mod docker;
+pub mod github_auth;
 pub mod healthcheck;
 pub mod ibeam;
 pub mod ibkr_login;
