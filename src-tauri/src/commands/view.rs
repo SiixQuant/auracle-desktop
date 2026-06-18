@@ -129,6 +129,9 @@ fn launch_path(path: &str) -> Result<(), String> {
 /// connect_agent.ide_provision_local on the engine side).
 const PROVISION_URL: &str = "http://127.0.0.1:1969/ui/api/ide/provision-local";
 
+/// Engine JSON license-activation endpoint (owner X-API-Key; CSRF-exempt).
+const LICENSE_ACTIVATE_URL: &str = "http://127.0.0.1:1969/api/license/activate";
+
 #[derive(serde::Deserialize)]
 struct ProvisionResponse {
     #[serde(default)]
@@ -166,13 +169,13 @@ fn read_handoff_secret() -> Option<String> {
 /// Authenticates by presenting the on-box handoff secret as
 /// `X-Auracle-Handoff-Token`, and sends no `Origin` header (reqwest adds
 /// none) so the engine's gates accept it.
-async fn provision_ide_config() -> Result<bool, String> {
+async fn fetch_provision() -> Result<Option<ProvisionResponse>, String> {
     // No on-box secret readable → we can't prove we're local; don't try.
     // (Engine not installed here, older engine without the secret, or a
     // permissions quirk — all honestly "can't provision", not an error.)
     let secret = match read_handoff_secret() {
         Some(token) => token,
-        None => return Ok(false),
+        None => return Ok(None),
     };
 
     let client = reqwest::Client::builder()
@@ -189,16 +192,24 @@ async fn provision_ide_config() -> Result<bool, String> {
     // 409 = engine healthy but no owner account yet. Not an error — the
     // user finishes first-run setup; there's simply no key to hand off.
     if resp.status().as_u16() == 409 {
-        return Ok(false);
+        return Ok(None);
     }
     if !resp.status().is_success() {
         return Err(format!(
-            "engine returned {} when provisioning the IDE key",
+            "engine returned {} when handing off the owner key",
             resp.status()
         ));
     }
 
     let body: ProvisionResponse = resp.json().await.map_err(to_error_string)?;
+    Ok(Some(body))
+}
+
+async fn provision_ide_config() -> Result<bool, String> {
+    let body = match fetch_provision().await? {
+        Some(body) => body,
+        None => return Ok(false),
+    };
     let api_key = match body.api_key {
         Some(key) if !key.is_empty() => key,
         _ => return Ok(false),
@@ -210,6 +221,50 @@ async fn provision_ide_config() -> Result<bool, String> {
 
     write_ide_config(&engine_url, &api_key)?;
     Ok(true)
+}
+
+/// Flip the running engine's license tier to match a freshly-saved key.
+///
+/// Best-effort companion to `license_set` (which stores the key in the
+/// launcher vault): asks the local engine — authenticated as the owner via
+/// the on-box handoff key — to activate the license NOW, so the tier updates
+/// without a container restart, exactly as the old web License page did.
+/// Returns the new tier on success; `Ok(None)` when the engine isn't
+/// reachable or has no owner yet (the key still persists in the vault and
+/// applies once the engine is up). The token value is never logged.
+#[tauri::command]
+pub async fn license_activate_engine(value: String) -> Result<Option<String>, String> {
+    let api_key = match fetch_provision().await? {
+        Some(body) => match body.api_key {
+            Some(key) if !key.is_empty() => key,
+            _ => return Ok(None),
+        },
+        None => return Ok(None),
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(to_error_string)?;
+    let resp = client
+        .post(LICENSE_ACTIVATE_URL)
+        .header("X-API-Key", api_key)
+        .json(&serde_json::json!({ "token": value.trim() }))
+        .send()
+        .await
+        .map_err(to_error_string)?;
+
+    if !resp.status().is_success() {
+        return Err(format!("engine rejected the license ({})", resp.status()));
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ActivateResponse {
+        #[serde(default)]
+        tier: Option<String>,
+    }
+    let body: ActivateResponse = resp.json().await.map_err(to_error_string)?;
+    Ok(body.tier)
 }
 
 /// Write `{engine_url, api_key}` to the IDE's config file

@@ -172,6 +172,11 @@ export const cmd = {
   licenseGet: () => invoke<string | null>("license_get"),
   licenseSet: (value: string) => invoke<void>("license_set", { value }),
   licenseClear: () => invoke<void>("license_clear"),
+  /** Best-effort: ask the running engine to activate the key now so the
+   *  tier updates without a restart. Returns the new tier, or null if the
+   *  engine isn't reachable yet (the key still persists in the vault). */
+  licenseActivateEngine: (value: string) =>
+    invoke<string | null>("license_activate_engine", { value }),
 
   // Updates
   checkForUpdate: () => invoke<UpdateInfo>("check_for_update"),
