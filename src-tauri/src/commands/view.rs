@@ -275,7 +275,7 @@ fn launch_path(path: &str) -> Result<(), String> {
 
 // ── IDE connection auto-provisioning (onboarding slice c) ───────────────
 //
-// The IDE reads `~/.config/zed/auracle.json` ({engine_url, api_key}) and
+// The IDE reads `~/.config/auracle/auracle.json` ({engine_url, api_key}) and
 // auto-connects on launch when a key is present. The launcher is the only
 // component positioned to hand it that key without the user pasting it:
 // it talks to the local engine over loopback, asks for the owner's
@@ -432,22 +432,46 @@ pub async fn mint_connect_login_url(next: Option<String>) -> Result<Option<Strin
 }
 
 /// Write `{engine_url, api_key}` to the IDE's config file
-/// (`~/.config/zed/auracle.json`), creating the directory if needed.
+/// (`~/.config/auracle/auracle.json`), creating the directory if needed.
 /// Mirrors exactly what the IDE's own Connect modal would save, so the
 /// IDE's startup auto-connect picks it up. The file is chmod 0600 — it
 /// carries the per-user API key.
+///
+/// Transition note (Zed→Auracle config-dir rename): if a pre-rename IDE's
+/// `~/.config/zed` directory still exists, the handoff is mirrored there
+/// too so that build keeps auto-connecting until it is updated. The legacy
+/// dir is never created — once the IDE is on the renamed build it no longer
+/// exists and the mirror is a no-op. This makes the launcher robust to any
+/// launcher/IDE update order; it can be dropped once every install is
+/// updated.
 fn write_ide_config(engine_url: &str, api_key: &str) -> Result<(), String> {
-    use std::fs;
     let home = std::env::var_os("HOME")
         .ok_or_else(|| "HOME not set; can't locate the IDE config dir".to_string())?;
-    let dir = std::path::Path::new(&home).join(".config").join("zed");
-    fs::create_dir_all(&dir).map_err(to_error_string)?;
-    let path = dir.join("auracle.json");
     let text = serde_json::to_string_pretty(&serde_json::json!({
         "engine_url": engine_url,
         "api_key": api_key,
     }))
     .map_err(to_error_string)?;
+
+    let config = std::path::Path::new(&home).join(".config");
+    // Primary: the renamed Auracle config dir the current IDE reads from.
+    write_ide_handoff(&config.join("auracle"), &text)?;
+    // Transitional mirror for a not-yet-updated IDE; never created fresh.
+    let legacy = config.join("zed");
+    if legacy.exists() {
+        if let Err(error) = write_ide_handoff(&legacy, &text) {
+            eprintln!("auracle launcher: legacy IDE handoff write skipped: {error}");
+        }
+    }
+    Ok(())
+}
+
+/// Write the handoff JSON to `<dir>/auracle.json` (chmod 0600), creating
+/// `dir` if needed.
+fn write_ide_handoff(dir: &std::path::Path, text: &str) -> Result<(), String> {
+    use std::fs;
+    fs::create_dir_all(dir).map_err(to_error_string)?;
+    let path = dir.join("auracle.json");
     fs::write(&path, text).map_err(to_error_string)?;
     #[cfg(unix)]
     {
