@@ -222,9 +222,8 @@ async fn store_github_credential(login: &str, token: &str) -> Result<(), String>
         // blank line. `password` carries the token — this is the only
         // place it is ever materialized outside memory, and it goes
         // straight into the helper's stdin.
-        let blob = format!(
-            "protocol=https\nhost=github.com\nusername={login}\npassword={token}\n\n"
-        );
+        let blob =
+            format!("protocol=https\nhost=github.com\nusername={login}\npassword={token}\n\n");
         stdin
             .write_all(blob.as_bytes())
             .await
