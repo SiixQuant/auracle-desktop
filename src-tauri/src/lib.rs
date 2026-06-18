@@ -66,10 +66,10 @@ use tauri::Builder;
 use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
     broker_stream as broker_stream_cmd, cert_trust as cert_cmd, docker as docker_cmd,
-    healthcheck as health_cmd, ibeam as ibeam_cmd, ibkr_login as ibkr_login_cmd,
-    installer as installer_cmd, keychain as keychain_cmd, mcp_sidecar as mcp_cmd,
-    preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, tray as tray_cmd,
-    update as update_cmd, view as view_cmd,
+    github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
+    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
+    mcp_sidecar as mcp_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
+    tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -307,6 +307,14 @@ pub fn run() {
             // IBKR Client Portal embedded login window
             ibkr_login_cmd::open_ibkr_login,
             ibkr_login_cmd::close_ibkr_login,
+            // "Sign in with GitHub" via the OAuth device flow — the
+            // user's own GitHub for git push/pull, stored in the system
+            // git credential helper. See commands/github_auth.rs. The
+            // client_id is compiled in from AURACLE_GITHUB_CLIENT_ID;
+            // empty → the commands degrade honestly ("not configured").
+            github_auth_cmd::github_auth_status,
+            github_auth_cmd::github_device_start,
+            github_auth_cmd::github_device_poll,
             // MCP sidecar supervisor (Phase 4c foundation; the
             // actual chat tool-use loop lands in Phase 4d)
             mcp_cmd::mcp_sidecar_status,

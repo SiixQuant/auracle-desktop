@@ -92,6 +92,44 @@ export interface PreflightReport {
 
 export type ViewMode = "browser" | "embedded";
 
+// ── GitHub device-flow sign-in ──────────────────────────────────
+//
+// Mirrors commands/github_auth.rs. This is the user's OWN GitHub,
+// used purely so git push/pull is authenticated everywhere — it is
+// unrelated to (and never touches) the IDE's account/collab sign-in.
+// The access token is stored in the system git credential helper by
+// the Rust side and NEVER crosses this boundary.
+
+export interface GithubAuthStatus {
+  /** A non-empty client_id is compiled into this build. */
+  configured: boolean;
+  /** A github.com https git credential already exists. */
+  connected: boolean;
+  /** The stored git username for github.com, when known. */
+  login?: string | null;
+}
+
+export interface GithubDeviceStart {
+  /** Short code the user types on the verification page (e.g. ABCD-1234). */
+  user_code: string;
+  /** Page the user opens to enter the code (github.com/login/device). */
+  verification_uri: string;
+  /** Opaque code passed back to githubDevicePoll. Treat as a secret —
+   *  never render it. */
+  device_code: string;
+  /** Minimum seconds to wait between polls. */
+  interval: number;
+  /** Seconds until the code pair expires. */
+  expires_in: number;
+}
+
+export interface GithubDevicePoll {
+  /** "pending" (keep polling), "authorized" (done), or "error" (retry). */
+  status: "pending" | "authorized" | "error";
+  /** The signed-in GitHub login, present only on "authorized". */
+  login?: string | null;
+}
+
 // ── Command bindings ────────────────────────────────────────────
 
 export const cmd = {
@@ -170,6 +208,16 @@ export const cmd = {
   // IBKR Client Portal login (embedded webview)
   openIbkrLogin: (url: string) => invoke<void>("open_ibkr_login", { url }),
   closeIbkrLogin: () => invoke<void>("close_ibkr_login"),
+
+  // ── GitHub device-flow sign-in ────────────────────────────────
+  //
+  // The user's own GitHub for git push/pull. The Rust side stores the
+  // access token in the system git credential helper; it never crosses
+  // this boundary. See commands/github_auth.rs.
+  githubAuthStatus: () => invoke<GithubAuthStatus>("github_auth_status"),
+  githubDeviceStart: () => invoke<GithubDeviceStart>("github_device_start"),
+  githubDevicePoll: (deviceCode: string) =>
+    invoke<GithubDevicePoll>("github_device_poll", { deviceCode }),
 
   // ── Broker connections ───────────────────────────────────────
   forgeBrokerStatus: () => invoke<BrokerStatus[]>("forge_broker_status"),
