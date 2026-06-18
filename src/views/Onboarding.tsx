@@ -413,6 +413,9 @@ function Step3({
       }));
       window.setTimeout(async () => {
         try {
+          // Retained first-run bootstrap: /ui/setup is allowlisted under
+          // the engine's headless profile — this is the only Houston page
+          // the launcher still opens.
           await openInBrowser("http://localhost:1969/ui/setup");
         } catch {
           // ignore

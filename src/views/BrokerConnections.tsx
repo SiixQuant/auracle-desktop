@@ -34,7 +34,7 @@ import alpacaLogo from "@/assets/brokers/alpaca.svg";
 import ibkrLogo from "@/assets/brokers/ibkr.svg";
 import {
   cmd,
-  openConnectSetup,
+  openIdePanel,
   openInBrowser,
   type BrokerState,
   type BrokerStatus,
@@ -117,14 +117,14 @@ export default function BrokerConnectionsCard() {
       </p>
       {/* The single canonical door to broker setup. IBKR connects in-app
           below; every API-key / wallet broker (Alpaca, ClearStreet,
-          Hyperliquid, …) is set up on the engine's connections page.
-          openConnectSetup mints a one-time on-box login so that page opens
-          ALREADY signed in (no login wall), in the in-app window. Opens a
-          real credential form — never implies a connection that isn't there. */}
+          Hyperliquid, …) is set up via the IDE's native broker-connect
+          wizard, reached by deep-linking into the IDE's connections panel.
+          Opens a real credential form — never implies a connection that
+          isn't there. */}
       <button
         type="button"
         className="primary btn-sm mb-3"
-        onClick={() => openConnectSetup()}
+        onClick={() => openIdePanel("connections")}
       >
         Connect a broker
       </button>

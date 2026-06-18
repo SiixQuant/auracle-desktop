@@ -16,12 +16,6 @@ use tauri::{
 };
 
 pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
-    let open_dashboard = MenuItemBuilder::new("Open Dashboard")
-        .id("open-dashboard")
-        .build(app)?;
-    let open_jupyter = MenuItemBuilder::new("Open JupyterLab")
-        .id("open-jupyter")
-        .build(app)?;
     let open_launcher = MenuItemBuilder::new("Show Auracle Desktop")
         .id("open-launcher")
         .build(app)?;
@@ -34,15 +28,7 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
     let separator = PredefinedMenuItem::separator(app)?;
 
     let menu = MenuBuilder::new(app)
-        .items(&[
-            &open_dashboard,
-            &open_jupyter,
-            &separator,
-            &open_launcher,
-            &restart,
-            &separator,
-            &quit,
-        ])
+        .items(&[&open_launcher, &restart, &separator, &quit])
         .build()?;
 
     let _tray = TrayIconBuilder::new()
@@ -50,12 +36,6 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
         .show_menu_on_left_click(true)
         .tooltip("Auracle Desktop — checking…")
         .on_menu_event(move |app, event| match event.id().as_ref() {
-            "open-dashboard" => {
-                let _ = open_url(app, "http://localhost:1969/ui/dashboard");
-            }
-            "open-jupyter" => {
-                let _ = open_url(app, "http://localhost:1969/jupyter");
-            }
             "open-launcher" => {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
@@ -91,13 +71,5 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
         })
         .build(app)?;
 
-    Ok(())
-}
-
-fn open_url(app: &tauri::AppHandle, url: &str) -> tauri::Result<()> {
-    use tauri_plugin_opener::OpenerExt;
-    app.opener()
-        .open_url(url, None::<&str>)
-        .map_err(|e| tauri::Error::Anyhow(anyhow::anyhow!("{e}")))?;
     Ok(())
 }

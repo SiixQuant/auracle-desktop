@@ -1,4 +1,4 @@
-// Settings — view-mode toggle, install + Docker state, launcher updates.
+// Settings — install + Docker state, launcher updates, broker connections.
 //
 // License management lives on the Dashboard so customers see it on
 // first launch. Keeping it out of Settings avoids two places to
@@ -14,7 +14,6 @@ import {
   openInBrowser,
   type DockerStatus,
   type UpdateInfo,
-  type ViewMode,
 } from "@/lib/tauri";
 
 export default function Settings() {
@@ -23,7 +22,6 @@ export default function Settings() {
       <h1>Settings</h1>
       <div className="settings-grid">
         <div className="sgcell"><LicenseCard /></div>
-        <div className="sgcell"><WorkspaceCard /></div>
         <div className="sgcell"><SystemCard /></div>
         <div className="sgcell full"><BrokerConnectionsCard /></div>
       </div>
@@ -152,67 +150,6 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
         </span>
       </div>
     </>
-  );
-}
-
-// ── Workspace ───────────────────────────────────────────────────
-//
-// How the one platform door ("Open Auracle") opens. A binary choice
-// — rendered as a compact segmented toggle (same control language as
-// Forge's Agent|Code switch) instead of a two-radio block, with a
-// one-line caption describing the active choice.
-
-function WorkspaceCard() {
-  const [mode, setMode] = useState<ViewMode>("browser");
-
-  useEffect(() => {
-    cmd.getViewMode().then(setMode).catch(() => setMode("browser"));
-  }, []);
-
-  const change = async (next: ViewMode) => {
-    setMode(next);
-    try {
-      await cmd.setViewMode(next);
-    } catch (err) {
-      // Persistence failed — log + leave the UI showing the
-      // intent. The next reload will reconcile from disk.
-      console.warn("set_view_mode failed:", err);
-    }
-  };
-
-  return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">Web console</span>
-      </div>
-      <div className="row" style={{ alignItems: "center" }}>
-          <div className="muted fs-sm">
-            {mode === "embedded"
-              ? "Opens in its own app window."
-              : "Opens in your browser (lighter)."}
-          </div>
-          <div className="seg-toggle" role="tablist" aria-label="Where the web console opens">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "browser"}
-              className={`seg-tab ${mode === "browser" ? "active" : ""}`}
-              onClick={() => change("browser")}
-            >
-              Browser
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "embedded"}
-              className={`seg-tab ${mode === "embedded" ? "active" : ""}`}
-              onClick={() => change("embedded")}
-            >
-              App window
-            </button>
-          </div>
-        </div>
-      </div>
   );
 }
 
