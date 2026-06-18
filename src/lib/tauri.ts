@@ -697,8 +697,11 @@ export async function openWebConsole(
  * not local, no owner yet, dev preview). Always opens the in-app window.
  */
 export async function openConnectSetup(): Promise<void> {
+  // ?embed=1 renders the engine's connections page chrome-less (no Houston
+  // rail/top-nav) so it sits in the launcher's in-app window as a clean,
+  // themed broker portal instead of a full Houston page.
   try {
-    const loginUrl = await cmd.mintConnectLoginUrl("/ui/connections");
+    const loginUrl = await cmd.mintConnectLoginUrl("/ui/connections?embed=1");
     if (loginUrl) {
       await openWebConsole(loginUrl, { prefer: "embedded" });
       return;
@@ -707,7 +710,7 @@ export async function openConnectSetup(): Promise<void> {
     // No on-box handoff (or outside Tauri) — fall back to the plain page,
     // which will prompt a login if there's no session yet.
   }
-  await openWebConsole("/ui/connections", { prefer: "embedded" });
+  await openWebConsole("/ui/connections?embed=1", { prefer: "embedded" });
 }
 
 /**
