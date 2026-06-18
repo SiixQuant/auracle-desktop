@@ -23,6 +23,7 @@ export default function Settings() {
       <div className="settings-grid">
         <div className="sgcell"><LicenseCard /></div>
         <div className="sgcell"><SystemCard /></div>
+        <div className="sgcell"><DataSourcesCard /></div>
         <div className="sgcell full"><BrokerConnectionsCard /></div>
       </div>
     </div>
@@ -150,6 +151,138 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
         </span>
       </div>
     </>
+  );
+}
+
+// ── Data sources (third-party data-provider API keys) ───────────
+//
+// Native replacement for the retired Houston "Key Master" web page,
+// scoped to DATA providers (broker credentials live in the Broker
+// Connections card below). Each row saves through the engine's
+// /ui/api/keys surface over loopback (owner key handoff + CSRF).
+//
+// Honesty law: a row is only marked "verified" after a Test actually
+// passes. Saving a key never implies it works — Save shows "Saved",
+// not "connected".
+
+// The provider list is the engine's `market_data` category from
+// auracle/keys.py (PROVIDER_CATEGORIES["market_data"].members) — the
+// data-provider keys Key Master manages. Kept in sync with the engine;
+// an unknown provider would be rejected with a 404 by /ui/api/keys.
+const DATA_PROVIDERS: { id: string; label: string; hint: string }[] = [
+  { id: "polygon", label: "Polygon.io", hint: "polygon api key" },
+  { id: "eodhd", label: "EOD Historical Data", hint: "eodhd api token" },
+  { id: "nasdaq_data_link", label: "Nasdaq Data Link (Sharadar)", hint: "ndl key" },
+  { id: "brain", label: "Brain Company (BSI / BLMCF)", hint: "Brain subscription key" },
+  { id: "coingecko", label: "CoinGecko Pro", hint: "CG-… (Pro key — free tier needs none)" },
+];
+
+function DataSourcesCard() {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Data sources</span>
+      </div>
+      <p className="muted fs-sm m-0 mb-3 lh-relaxed">
+        Add API keys for third-party market-data providers so non-IBKR
+        data works. Keys are saved to your local engine, encrypted at rest.
+      </p>
+      {DATA_PROVIDERS.map((p) => (
+        <DataProviderRow key={p.id} provider={p} />
+      ))}
+    </div>
+  );
+}
+
+function DataProviderRow({
+  provider,
+}: {
+  provider: { id: string; label: string; hint: string };
+}) {
+  const [value, setValue] = useState("");
+  const [status, setStatus] = useState("");
+  // "verified" only after a Test passes. Never inferred from a Save.
+  const [verified, setVerified] = useState(false);
+  const [busy, setBusy] = useState<"save" | "test" | null>(null);
+
+  const save = async () => {
+    const v = value.trim();
+    if (!v) {
+      setStatus("Paste a key first.");
+      return;
+    }
+    setBusy("save");
+    setStatus("");
+    setVerified(false);
+    try {
+      await cmd.dataKeySave(provider.id, v);
+      setStatus("Saved.");
+    } catch (err) {
+      setStatus("Could not save: " + String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const test = async () => {
+    setBusy("test");
+    setStatus("");
+    try {
+      const ok = await cmd.dataKeyTest(provider.id);
+      setVerified(ok);
+      setStatus(ok ? "Test passed." : "Test failed — the provider rejected the key.");
+    } catch (err) {
+      setVerified(false);
+      setStatus("Could not test: " + String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isError = /^(Could not|Paste|Test failed)/.test(status);
+
+  return (
+    <div className="mt-3">
+      <div className="hstack mb-2">
+        <span className="fs-sm" style={{ flex: 1 }}>{provider.label}</span>
+        {verified && <span className="badge ok">verified</span>}
+      </div>
+      <form
+        className="hstack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <input
+          type="password"
+          placeholder={provider.hint}
+          autoComplete="off"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            // Editing the key invalidates a prior Test verdict.
+            if (verified) setVerified(false);
+          }}
+        />
+        <button type="submit" className="primary btn-sm" disabled={busy !== null}>
+          {busy === "save" ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          className="ghost btn-sm"
+          disabled={busy !== null}
+          onClick={() => void test()}
+        >
+          {busy === "test" ? "Testing…" : "Test"}
+        </button>
+      </form>
+      {status && (
+        <div className={isError ? "err-text fs-xs mt-2" : "muted mono fs-xs mt-2"}>
+          {status}
+        </div>
+      )}
+    </div>
   );
 }
 
