@@ -28,12 +28,7 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
     let separator = PredefinedMenuItem::separator(app)?;
 
     let menu = MenuBuilder::new(app)
-        .items(&[
-            &open_launcher,
-            &restart,
-            &separator,
-            &quit,
-        ])
+        .items(&[&open_launcher, &restart, &separator, &quit])
         .build()?;
 
     let _tray = TrayIconBuilder::new()
