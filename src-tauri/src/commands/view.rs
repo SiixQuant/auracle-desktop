@@ -422,7 +422,13 @@ pub async fn mint_connect_login_url(next: Option<String>) -> Result<Option<Strin
     let next_path = next
         .filter(|n| n.starts_with('/'))
         .unwrap_or_else(|| "/ui/connections".to_string());
-    Ok(Some(format!("{login_url}&next={next_path}")))
+    // URL-encode the next path so a query string (e.g. ?embed=1 for the
+    // chrome-less themed connections portal) survives as a single `next`
+    // value instead of colliding with the login URL's own query.
+    Ok(Some(format!(
+        "{login_url}&next={}",
+        urlencoding::encode(&next_path)
+    )))
 }
 
 /// Write `{engine_url, api_key}` to the IDE's config file
