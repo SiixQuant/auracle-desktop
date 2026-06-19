@@ -16,6 +16,8 @@
 //!     run before `installer::run_first_install`
 //!   - `commands::tray`        — system tray icon + menu
 //!   - `commands::update`      — GitHub Releases update checker
+//!   - `commands::ide_update`  — launcher-managed Auracle IDE updates
+//!     (check GitHub Releases + download/install the .dmg)
 //!
 //! All commands return `Result<T, String>` — Tauri serializes the
 //! `Err` arm to the frontend's `.catch()` block. Internal anyhow
@@ -67,9 +69,10 @@ use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
     broker_stream as broker_stream_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
     github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
-    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
-    mcp_sidecar as mcp_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
-    settings as settings_cmd, tray as tray_cmd, update as update_cmd, view as view_cmd,
+    ibkr_login as ibkr_login_cmd, ide_update as ide_update_cmd, installer as installer_cmd,
+    keychain as keychain_cmd, mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
+    scheduled_update as scheduled_update_cmd, settings as settings_cmd, tray as tray_cmd,
+    update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -298,6 +301,14 @@ pub fn run() {
             // View mode (browser vs embedded)
             view_cmd::open_auracle_ide,
             view_cmd::license_activate_engine,
+            // Launcher-managed Auracle IDE updates — the launcher is the
+            // single update conduit (the IDE no longer self-updates). The
+            // check is an unauthenticated GitHub Releases query; the install
+            // streams the .dmg, mounts it, and swaps the .app into
+            // /Applications. macOS aarch64 only; other platforms report
+            // honestly. See commands/ide_update.rs.
+            ide_update_cmd::ide_check_update,
+            ide_update_cmd::ide_download_and_install,
             // IBKR Client Portal embedded login window — IBKR connects
             // in-app; its login opens inside the launcher, never bounced out.
             ibkr_login_cmd::open_ibkr_login,
