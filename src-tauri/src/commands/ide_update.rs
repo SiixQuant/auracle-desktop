@@ -8,11 +8,12 @@
 //!
 //! The IDE ships as GitHub Releases on the public `SiixQuant/auracle-ide`
 //! repo. Each release tag is `auracle-v<semver>` and carries a macOS
-//! aarch64 disk image asset (`*.dmg`) plus a published SHA-256 checksum
-//! (a `<dmg>.sha256` sidecar, with a `checksums.txt` fallback). The check
-//! is unauthenticated — these are public releases, so no token is involved
-//! and none is ever logged. (We reuse the reqwest patterns from
-//! `github_auth.rs`.)
+//! aarch64 disk image asset (`*.dmg`) plus a published SHA-256 checksum:
+//! the `<dmg>.sha256` sidecar the build emits, and the launcher
+//! additionally tolerates a combined `checksums.txt` should one ever be
+//! published. The check is unauthenticated — these are public releases,
+//! so no token is involved and none is ever logged. (We reuse the reqwest
+//! patterns from `github_auth.rs`.)
 //!
 //! INSTALL FLOW (macOS aarch64 only for now):
 //!   1. Stream the `.dmg` to a temp file, verifying the byte count
@@ -76,6 +77,11 @@ const HTTP_TIMEOUT_SECS: u64 = 20;
 /// Generous ceiling for the streamed download — the asset is ~90 MB;
 /// allow slow connections without hanging forever.
 const DOWNLOAD_TIMEOUT_SECS: u64 = 600;
+/// Hard ceiling on a fetched checksum body. A `<dmg>.sha256` sidecar is
+/// ~85 bytes; even a large combined `checksums.txt` is a few KB. The cap
+/// stops a misbehaving or hostile host (one that omits Content-Length and
+/// streams chunked) from making us buffer megabytes for a tiny file.
+const MAX_CHECKSUM_BYTES: usize = 1 << 20; // 1 MiB
 
 // ── Returned shapes ─────────────────────────────────────────────────
 
@@ -568,12 +574,13 @@ async fn download_dmg(
 
 /// Verify the freshly-downloaded `.dmg` against the release's PUBLISHED
 /// SHA-256 before anything mounts it. We fetch the checksum that ships
-/// alongside the asset — first the `<dmg>.sha256` sidecar, then a
-/// `checksums.txt` fallback in the same release directory — parse the
-/// expected digest, hash the file on disk, and compare. Any failure
-/// (missing checksum, malformed file, or mismatch) aborts the install:
-/// we never mount an image we can't prove. This runs AFTER the byte-count
-/// check in `download_dmg`, so it's the binding integrity gate.
+/// alongside the asset — the `<dmg>.sha256` sidecar the build emits, and
+/// (if ever published) a combined `checksums.txt` in the same release
+/// directory — parse the expected digest, hash the file on disk, and
+/// compare. Any failure (missing checksum, malformed file, or mismatch)
+/// aborts the install: we never mount an image we can't prove. This runs
+/// AFTER the byte-count check in `download_dmg`, so it's the binding
+/// integrity gate.
 async fn verify_checksum(app: &AppHandle, asset_url: &str, dmg_path: &Path) -> Result<(), String> {
     emit(app, "downloading", "Verifying the download…", 91);
 
@@ -590,21 +597,21 @@ async fn verify_checksum(app: &AppHandle, asset_url: &str, dmg_path: &Path) -> R
             .map(|(base, _)| format!("{base}/checksums.txt")),
     );
 
-    let mut expected: Option<String> = None;
+    // Fetch each candidate's body (`None` = untrusted host or fetch
+    // failure), then pick the first that yields a digest for our dmg.
+    let mut bodies: Vec<Option<String>> = Vec::with_capacity(candidates.len());
     for url in candidates {
         // Never fetch a checksum from an unexpected host. The derived URLs
         // share the asset's host, so this only ever rejects a malformed URL.
-        if !is_trusted_asset_url(&url) {
-            continue;
-        }
-        if let Some(body) = fetch_checksum_body(&url).await {
-            if let Some(digest) = parse_sha256(&body, dmg_filename) {
-                expected = Some(digest);
-                break;
-            }
+        if is_trusted_asset_url(&url) {
+            bodies.push(fetch_checksum_body(&url).await);
+        } else {
+            bodies.push(None);
         }
     }
-    let expected = expected.ok_or_else(|| {
+    // A `None` here means NO candidate published a usable checksum — fail
+    // closed: we never install something we can't verify.
+    let expected = select_expected_digest(&bodies, dmg_filename).ok_or_else(|| {
         "Couldn't verify the IDE download: the release didn't publish a \
          usable SHA-256 checksum. Refusing to install an unverified build."
             .to_string()
@@ -644,7 +651,29 @@ async fn fetch_checksum_body(url: &str) -> Option<String> {
     if !resp.status().is_success() {
         return None;
     }
-    resp.text().await.ok()
+    // Read with a hard ceiling so a host that omits Content-Length and
+    // streams chunked can't make us buffer unbounded data. Mirrors the
+    // chunked streaming used for the .dmg download.
+    let mut resp = resp;
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if buf.len() + chunk.len() > MAX_CHECKSUM_BYTES {
+                    log::warn!("ide checksum body exceeded {MAX_CHECKSUM_BYTES} bytes; refusing");
+                    return None;
+                }
+                buf.extend_from_slice(&chunk);
+            }
+            Ok(None) => break,
+            Err(e) => {
+                log::warn!("ide checksum body read error: {e:?}");
+                return None;
+            }
+        }
+    }
+    // A checksum file is ASCII; non-UTF-8 → treat as no checksum (fail closed).
+    String::from_utf8(buf).ok()
 }
 
 /// Pull a lowercase 64-char hex SHA-256 digest out of a published checksum
@@ -656,22 +685,49 @@ fn parse_sha256(contents: &str, dmg_filename: &str) -> Option<String> {
     let is_hex64 = |s: &str| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit());
 
     // Prefer a line naming our dmg (handles a combined checksums.txt that
-    // lists several assets).
+    // lists several assets). Match the filename as a WHOLE whitespace-
+    // delimited token, never a substring, so a sibling whose name merely
+    // starts with ours — `Auracle-aarch64.dmg.blockmap`, `…dmg.sig`, or even
+    // the `…dmg.sha256` sidecar itself — can't shadow the real `.dmg` line.
+    // The leading `*` is the GNU coreutils binary-mode marker (`*<file>`).
     if !dmg_filename.is_empty() {
+        let mut saw_named_line = false;
         for line in contents.lines() {
-            if line.contains(dmg_filename) {
+            if line
+                .split_whitespace()
+                .any(|t| t.trim_start_matches('*') == dmg_filename)
+            {
+                saw_named_line = true;
                 if let Some(tok) = line.split_whitespace().find(|t| is_hex64(t)) {
                     return Some(tok.to_ascii_lowercase());
                 }
             }
         }
+        // A line named our dmg but carried no valid digest (a malformed or
+        // truncated entry): fail closed rather than borrowing some other
+        // asset's digest from the bare-token scan below.
+        if saw_named_line {
+            return None;
+        }
     }
-    // Fallback: the first 64-hex token anywhere (a bare digest or a
-    // single-entry sidecar like `<digest>  <file>`).
+    // Fallback: the first 64-hex token anywhere (a bare digest, or a
+    // single-entry sidecar like `<digest>  <file>` where no line names us).
     contents
         .split_whitespace()
         .find(|t| is_hex64(t))
         .map(|t| t.to_ascii_lowercase())
+}
+
+/// Pick the expected digest from candidate checksum bodies in preference
+/// order. Each entry is `None` when that candidate failed to fetch (or came
+/// from an untrusted host). Returns the first body that yields a digest for
+/// `dmg_filename`, or `None` when NO candidate does — callers MUST treat
+/// `None` as fail-closed (abort the install; never verify against nothing).
+fn select_expected_digest(bodies: &[Option<String>], dmg_filename: &str) -> Option<String> {
+    bodies
+        .iter()
+        .filter_map(|b| b.as_deref())
+        .find_map(|b| parse_sha256(b, dmg_filename))
 }
 
 /// Compare a published digest against a computed one, case-insensitively.
@@ -1161,6 +1217,62 @@ mod tests {
     }
 
     #[test]
+    fn parse_sha256_ignores_dmg_prefixed_siblings() {
+        // Siblings whose names START WITH the dmg name (the `.sha256` sidecar
+        // itself, a `.blockmap`, a detached `.sig`) must NOT shadow the real
+        // `.dmg` line — even when listed first. A substring match would have
+        // latched onto the sibling's digest.
+        let sib = "1111111111111111111111111111111111111111111111111111111111111111";
+        let body = format!(
+            "{sib}  Auracle-aarch64.dmg.sha256\n\
+             {sib}  Auracle-aarch64.dmg.blockmap\n\
+             {SHA256_ABC}  Auracle-aarch64.dmg\n"
+        );
+        assert_eq!(
+            parse_sha256(&body, "Auracle-aarch64.dmg").as_deref(),
+            Some(SHA256_ABC)
+        );
+    }
+
+    #[test]
+    fn parse_sha256_tolerates_binary_mode_marker() {
+        // GNU coreutils binary mode prints `<digest> *<file>`.
+        let body = format!("{SHA256_ABC} *Auracle-aarch64.dmg\n");
+        assert_eq!(
+            parse_sha256(&body, "Auracle-aarch64.dmg").as_deref(),
+            Some(SHA256_ABC)
+        );
+    }
+
+    #[test]
+    fn parse_sha256_fails_closed_on_malformed_named_line() {
+        // Our dmg's line exists but carries no valid digest; another asset's
+        // line does. We must NOT borrow that unrelated digest — return None
+        // so verification fails closed rather than against the wrong file.
+        let other = "1111111111111111111111111111111111111111111111111111111111111111";
+        let body = format!("notahexdigest  Auracle-aarch64.dmg\n{other}  other.zip\n");
+        assert_eq!(parse_sha256(&body, "Auracle-aarch64.dmg"), None);
+    }
+
+    #[test]
+    fn select_expected_digest_fails_closed_without_a_usable_body() {
+        let dmg = "Auracle-aarch64.dmg";
+        // No candidate fetched (all None) → None → caller aborts.
+        assert_eq!(select_expected_digest(&[None, None], dmg), None);
+        // Candidates fetched but empty / garbage → None → caller aborts.
+        assert_eq!(
+            select_expected_digest(&[Some(String::new()), Some("not a checksum".into())], dmg),
+            None
+        );
+        // First usable body wins, skipping earlier failed fetches.
+        let good = format!("{SHA256_ABC}  {dmg}\n");
+        assert_eq!(
+            select_expected_digest(&[None, Some(good)], dmg).as_deref(),
+            Some(SHA256_ABC)
+        );
+    }
+
+    #[test]
     fn parse_sha256_normalizes_uppercase() {
         let upper = SHA256_ABC.to_ascii_uppercase();
         assert_eq!(parse_sha256(&upper, "").as_deref(), Some(SHA256_ABC));
@@ -1186,16 +1298,25 @@ mod tests {
         assert!(!checksums_match(SHA256_ABC, &wrong));
     }
 
+    // Per-process-unique temp path so concurrent `cargo test` runs (or a
+    // leftover file from a crashed run) can't collide.
+    fn temp_path(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "auracle-ide-checksum-{}-{tag}.bin",
+            std::process::id()
+        ))
+    }
+
     #[test]
     fn compute_file_sha256_matches_known_vectors() {
         // SHA-256("abc") and SHA-256("") — known NIST vectors.
-        let abc = std::env::temp_dir().join("auracle-ide-checksum-abc.bin");
+        let abc = temp_path("abc");
         std::fs::write(&abc, b"abc").expect("write temp");
         let got = compute_file_sha256(&abc).expect("hash");
         let _ = std::fs::remove_file(&abc);
         assert_eq!(got, SHA256_ABC);
 
-        let empty = std::env::temp_dir().join("auracle-ide-checksum-empty.bin");
+        let empty = temp_path("empty");
         std::fs::write(&empty, b"").expect("write temp");
         let got_empty = compute_file_sha256(&empty).expect("hash");
         let _ = std::fs::remove_file(&empty);
@@ -1206,11 +1327,13 @@ mod tests {
     }
 
     #[test]
-    fn verify_compare_path_accepts_match_rejects_tamper() {
-        // The exact compare chain verify_checksum runs: parse a published
-        // checksum, hash the on-disk file, compare. A matching image passes;
-        // any different bytes against the same published digest are rejected.
-        let good = std::env::temp_dir().join("auracle-ide-checksum-good.bin");
+    fn checksum_primitives_accept_match_reject_tamper() {
+        // Composition smoke check of the checksum building blocks
+        // (parse_sha256 + compute_file_sha256 + checksums_match). This does
+        // NOT drive verify_checksum itself (which is async/network-bound);
+        // it pins that a matching image passes the compare and tampered
+        // bytes against the same published digest are rejected.
+        let good = temp_path("good");
         std::fs::write(&good, b"abc").expect("write temp");
         let actual = compute_file_sha256(&good).expect("hash");
         let _ = std::fs::remove_file(&good);
@@ -1220,7 +1343,7 @@ mod tests {
         assert!(checksums_match(&expected, &actual));
 
         // Tampered: same published digest, different bytes on disk.
-        let bad = std::env::temp_dir().join("auracle-ide-checksum-bad.bin");
+        let bad = temp_path("bad");
         std::fs::write(&bad, b"abcd").expect("write temp");
         let actual_bad = compute_file_sha256(&bad).expect("hash");
         let _ = std::fs::remove_file(&bad);
