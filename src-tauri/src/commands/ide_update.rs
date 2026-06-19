@@ -30,7 +30,11 @@
 //! WE NEVER AUTO-LAUNCH THE IDE from here. Installing is the whole job;
 //! opening the IDE stays an explicit user action (see `view.rs`).
 
-use std::path::{Path, PathBuf};
+// `Path` is used on every platform (the download dest + the non-macOS
+// install stub); `PathBuf` is only needed in the macOS install path, so
+// it's imported inside those functions to keep non-macOS clippy clean
+// (`-D unused-imports`).
+use std::path::Path;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -54,7 +58,10 @@ const USER_AGENT: &str = "Auracle-Desktop-Launcher";
 const TAG_PREFIX: &str = "auracle-v";
 
 /// Where the installed IDE lives on macOS. Matches `view.rs`'s
-/// resolution of the installed bundle.
+/// resolution of the installed bundle. macOS-only — referenced solely
+/// by the macOS probe + install path, so it's gated to avoid a
+/// dead-code warning on other targets.
+#[cfg(target_os = "macos")]
 const INSTALLED_APP: &str = "/Applications/Auracle IDE.app";
 
 const HTTP_TIMEOUT_SECS: u64 = 20;
@@ -602,6 +609,7 @@ async fn install_dmg(app: &AppHandle, dmg_path: &Path) -> Result<String, String>
 /// fully in place.
 #[cfg(target_os = "macos")]
 fn copy_app_from_mount(app: &AppHandle, mount_point: &Path) -> Result<String, String> {
+    use std::path::PathBuf;
     use std::process::Command;
 
     emit(app, "installing", "Locating the IDE in the image…", 94);
@@ -691,7 +699,7 @@ fn copy_app_from_mount(app: &AppHandle, mount_point: &Path) -> Result<String, St
 
 /// Find the single `.app` bundle at the top level of a mounted image.
 #[cfg(target_os = "macos")]
-fn find_app_bundle(mount_point: &Path) -> Option<PathBuf> {
+fn find_app_bundle(mount_point: &Path) -> Option<std::path::PathBuf> {
     let entries = std::fs::read_dir(mount_point).ok()?;
     for entry in entries.flatten() {
         let path = entry.path();
