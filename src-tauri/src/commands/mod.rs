@@ -20,6 +20,7 @@ pub mod github_auth;
 pub mod healthcheck;
 pub mod ibeam;
 pub mod ibkr_login;
+pub mod ide_update;
 pub mod installer;
 pub mod keychain;
 pub mod mcp_sidecar;

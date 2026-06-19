@@ -12,8 +12,11 @@ import BrokerConnectionsCard from "@/views/BrokerConnections";
 import { useSettings } from "@/lib/settings";
 import {
   cmd,
+  onEvent,
   openInBrowser,
   type DockerStatus,
+  type IdeUpdateInfo,
+  type IdeUpdateProgressEvent,
   type UpdateInfo,
 } from "@/lib/tauri";
 
@@ -24,6 +27,7 @@ export default function Settings() {
       <div className="settings-grid">
         <div className="sgcell"><LicenseCard /></div>
         <div className="sgcell"><SystemCard /></div>
+        <div className="sgcell"><IdeUpdateCard /></div>
         <div className="sgcell"><DataSourcesCard /></div>
         <div className="sgcell"><AiModelCard /></div>
         <div className="sgcell"><GithubCard /></div>
@@ -430,6 +434,238 @@ function DockerIncident({
     );
   }
   return null;
+}
+
+// ── Auracle IDE (launcher-managed updates) ──────────────────────
+//
+// The launcher is the single update conduit on a customer's machine:
+// it auto-updates itself (System card above) AND the native IDE. The
+// IDE no longer self-updates — this card checks GitHub Releases for a
+// newer build, then downloads + installs the .dmg into /Applications
+// with progress.
+//
+// Honesty law: every state is real. "checking" while the network call
+// is in flight, "up to date" only after a successful compare, "update
+// available" with the concrete version + download size shown BEFORE
+// the user commits, "installing" with live progress, and a plain
+// failure reason on error (incl. a drag-install hint on permission
+// denial). Never a fake success. The passive check on mount flags an
+// available update without the user clicking anything; the install is
+// always an explicit click (downloading + writing /Applications is a
+// real action).
+
+type IdeInstallPhase =
+  | { kind: "idle" }
+  | { kind: "downloading"; percent: number; message: string }
+  | { kind: "installing"; percent: number; message: string }
+  | { kind: "failed"; reason: string };
+
+/** Format a byte count as a compact human size (e.g. "92.4 MB"). */
+function formatSize(bytes: number): string {
+  if (bytes <= 0) return "";
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  return `${mb.toFixed(1)} MB`;
+}
+
+function IdeUpdateCard() {
+  const [info, setInfo] = useState<IdeUpdateInfo | null>(null);
+  // null = first load; "error" = the check itself failed.
+  const [checkState, setCheckState] = useState<"loading" | "ok" | "error">(
+    "loading",
+  );
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [install, setInstall] = useState<IdeInstallPhase>({ kind: "idle" });
+  const mountedRef = useRef(true);
+
+  const check = useCallback(async () => {
+    setChecking(true);
+    setCheckError(null);
+    try {
+      const got = await cmd.ideCheckUpdate();
+      if (!mountedRef.current) return;
+      setInfo(got);
+      setCheckState("ok");
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setCheckState("error");
+      setCheckError(String(err));
+    } finally {
+      if (mountedRef.current) setChecking(false);
+    }
+  }, []);
+
+  // Passive check on mount — flags an available update without a click.
+  useEffect(() => {
+    mountedRef.current = true;
+    void check();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [check]);
+
+  // Subscribe to backend progress events for the duration of an install.
+  const runInstall = useCallback(async () => {
+    if (!info?.asset_url) return;
+    setInstall({ kind: "downloading", percent: 0, message: "Starting…" });
+    const unlisten = await onEvent<IdeUpdateProgressEvent>(
+      "ide-update-progress",
+      (p) => {
+        if (!mountedRef.current) return;
+        if (p.phase === "downloading") {
+          setInstall({ kind: "downloading", percent: p.percent, message: p.message });
+        } else if (p.phase === "installing") {
+          setInstall({ kind: "installing", percent: p.percent, message: p.message });
+        }
+        // "done" / "error" are handled by the resolve/reject below so the
+        // final state is driven by the command's return, not a stray event.
+      },
+    );
+    try {
+      const version = await cmd.ideDownloadAndInstall(
+        info.asset_url,
+        info.asset_size ?? null,
+      );
+      if (!mountedRef.current) return;
+      setInstall({ kind: "idle" });
+      // Re-check so the card reflects the freshly-installed version.
+      setInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              installed: true,
+              installed_version: version,
+              update_available: false,
+            }
+          : prev,
+      );
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setInstall({ kind: "failed", reason: String(err) });
+    } finally {
+      unlisten();
+    }
+  }, [info]);
+
+  const installed = info?.installed ?? false;
+  const installedVersion = info?.installed_version ?? null;
+  const latestVersion = info?.latest_version ?? null;
+  const updateAvailable = info?.update_available ?? false;
+  const unsupported = info?.unsupported_platform ?? false;
+  const busy = install.kind === "downloading" || install.kind === "installing";
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Auracle IDE</span>
+        {checkState === "ok" && installed && !updateAvailable && (
+          <span className="chip ok">up to date</span>
+        )}
+        {updateAvailable && (
+          <span className="chip warn">
+            {installed ? `v${latestVersion} available` : "install available"}
+          </span>
+        )}
+        {checkState === "ok" && !installed && !updateAvailable && (
+          <span className="chip neutral">not installed</span>
+        )}
+      </div>
+
+      <div className="row">
+        <div className="hstack">
+          <span>Installed</span>
+          <span className="muted mono fs-xs">
+            {checkState === "loading"
+              ? "checking…"
+              : installed
+                ? `v${installedVersion ?? "?"}`
+                : "not installed"}
+          </span>
+        </div>
+        {!updateAvailable && !busy && (
+          <button
+            type="button"
+            className="ghost btn-sm"
+            disabled={checking}
+            onClick={() => void check()}
+          >
+            {checking ? "Checking…" : "Check for update"}
+          </button>
+        )}
+      </div>
+
+      {latestVersion && (
+        <div className="row">
+          <div className="hstack">
+            <span>Latest</span>
+            <span className="muted mono fs-xs">v{latestVersion}</span>
+            {info?.asset_size ? (
+              <span className="muted fs-2xs">({formatSize(info.asset_size)})</span>
+            ) : null}
+          </div>
+          {updateAvailable && !busy && install.kind !== "failed" && (
+            <button
+              type="button"
+              className="primary btn-sm"
+              onClick={() => void runInstall()}
+            >
+              {installed ? "Update IDE" : "Install IDE"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Honest progress — real percent while downloading + installing. */}
+      {busy && (
+        <div className="banner info mt-2 m-0 lh-relaxed">
+          {install.message} ({install.percent}%) — the launcher is
+          {install.kind === "downloading"
+            ? " downloading the IDE"
+            : " installing the IDE"}
+          . Don&apos;t quit the launcher until it finishes.
+        </div>
+      )}
+
+      {install.kind === "failed" && (
+        <div className="mt-2">
+          <div className="err-text fs-xs lh-relaxed">{install.reason}</div>
+          <button
+            type="button"
+            className="ghost btn-sm mt-2"
+            onClick={() => void runInstall()}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {checkState === "error" && (
+        <div className="err-text fs-xs mt-2 lh-relaxed">
+          {checkError ?? "Couldn't check for an IDE update."}
+        </div>
+      )}
+
+      {unsupported && checkState === "ok" && (
+        <p className="muted fs-xs mt-2 m-0 lh-relaxed">
+          Automatic IDE install isn&apos;t supported on this platform yet —
+          download and install the IDE manually from the Auracle releases page.
+        </p>
+      )}
+
+      {updateAvailable && info?.notes && !busy && (
+        <div className="mt-2">
+          <div className="muted fs-2xs mb-2">Release notes</div>
+          <div
+            className="muted fs-xs lh-relaxed"
+            style={{ maxHeight: 66, overflow: "hidden", whiteSpace: "pre-line" }}
+          >
+            {info.notes}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Data sources (third-party data-provider API keys) ───────────

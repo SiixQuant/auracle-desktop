@@ -77,6 +77,45 @@ export interface UpdateInfo {
   notes?: string | null;
 }
 
+// ── Launcher-managed Auracle IDE updates ────────────────────────
+//
+// Mirrors commands/ide_update.rs. The launcher is the single update
+// conduit for the native IDE (the IDE no longer self-updates): it
+// checks GitHub Releases, then downloads + installs the .dmg into
+// /Applications. macOS aarch64 only for now — `unsupported_platform`
+// flags everything else so the UI degrades honestly.
+
+export interface IdeUpdateInfo {
+  /** Installed IDE version (CFBundleShortVersionString), or null when
+   *  the IDE isn't installed on this machine. */
+  installed_version?: string | null;
+  /** Newest published IDE version, or null when nothing matching is
+   *  published yet. */
+  latest_version?: string | null;
+  /** True iff latest is strictly newer than installed (or the IDE
+   *  isn't installed) AND the platform is supported AND a .dmg exists. */
+  update_available: boolean;
+  /** True iff the IDE is installed here (drives "update" vs "install"). */
+  installed: boolean;
+  /** Browser-download URL of the .dmg, when present. Pass to install. */
+  asset_url?: string | null;
+  /** Declared byte size of the .dmg (for a size display + integrity check). */
+  asset_size?: number | null;
+  /** Release notes — render as PLAIN TEXT only, never HTML. */
+  notes?: string | null;
+  /** True on platforms we can't auto-install on yet (non-macOS-aarch64). */
+  unsupported_platform: boolean;
+}
+
+/** Payload for the `ide-update-progress` event during download/install. */
+export interface IdeUpdateProgressEvent {
+  /** "downloading" | "installing" | "done" | "error" */
+  phase: string;
+  message: string;
+  /** 0-100 best-effort. */
+  percent: number;
+}
+
 export interface PreflightCheck {
   name: string;
   passed: boolean;
@@ -187,6 +226,25 @@ export const cmd = {
   // launcher now hands the user into. Rejects with a plain message
   // when the IDE isn't installed on this machine.
   openAuracleIDE: () => invoke<void>("open_auracle_ide"),
+
+  // ── Launcher-managed IDE updates ──────────────────────────────
+  //
+  // The launcher detects + installs Auracle IDE updates (the IDE no
+  // longer self-updates). `ideCheckUpdate` is an unauthenticated
+  // GitHub Releases query; `ideDownloadAndInstall` streams the .dmg
+  // and swaps the .app into /Applications, emitting 'ide-update-progress'
+  // events. See commands/ide_update.rs.
+  /** Check whether a newer IDE is published vs the installed one. */
+  ideCheckUpdate: () => invoke<IdeUpdateInfo>("ide_check_update"),
+  /** Download + install the IDE .dmg (macOS aarch64). Returns the
+   *  installed version on success; rejects with a plain message
+   *  (incl. a drag-install hint on permission-denied). Subscribe to
+   *  'ide-update-progress' for progress while this runs. */
+  ideDownloadAndInstall: (assetUrl: string, expectedSize?: number | null) =>
+    invoke<string>("ide_download_and_install", {
+      assetUrl,
+      expectedSize: expectedSize ?? null,
+    }),
 
   // IBKR Client Portal login (embedded webview). IBKR connects in-app
   // — its login window opens inside the launcher, never bouncing out.
