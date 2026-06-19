@@ -154,10 +154,7 @@ export default function App() {
 
       <div className="content">
         {view === "dashboard" && (
-          <Dashboard
-            onOpenTutorial={() => setShowTutorial(true)}
-            onGotoSettings={() => setView("settings")}
-          />
+          <Dashboard onOpenTutorial={() => setShowTutorial(true)} />
         )}
         {view === "settings" && <Settings />}
         {view === "help" && <Help onOpenTutorial={() => setShowTutorial(true)} />}

@@ -32,10 +32,8 @@ import {
 
 export default function Dashboard({
   onOpenTutorial,
-  onGotoSettings,
 }: {
   onOpenTutorial?: () => void;
-  onGotoSettings?: () => void;
 }) {
   const [health, setHealth] = useState<HealthSnapshot | null>(null);
   const [ideError, setIdeError] = useState<string | null>(null);
@@ -317,8 +315,9 @@ export default function Dashboard({
               <div>
                 <div>Connect your broker</div>
                 <div className="muted fs-sm mt-1">
-                  Link IBKR to see your account, P&amp;L, and feed here. You'll enter
-                  your IBKR login and approve a sign-in on the IBKR Mobile app.
+                  Link a broker to see your account, P&amp;L, and feed here.
+                  Brokers are connected in the Auracle IDE — this view shows the
+                  result.
                 </div>
                 {brokerErr && (
                   <details className="mt-2">
@@ -329,8 +328,8 @@ export default function Dashboard({
                   </details>
                 )}
               </div>
-              <button type="button" className="ghost" onClick={() => onGotoSettings?.()}>
-                Open Settings
+              <button type="button" className="ghost" onClick={() => void openIdePanel("connections")}>
+                Connect in the IDE
               </button>
             </div>
           </div>
