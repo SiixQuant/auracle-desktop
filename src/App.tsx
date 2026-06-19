@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import Flame from "@/components/Flame";
 import Tutorial from "@/components/Tutorial";
+import { SettingsProvider } from "@/lib/settings";
 import { cmd, type HealthSnapshot } from "@/lib/tauri";
 import Dashboard from "@/views/Dashboard";
 import Onboarding from "@/views/Onboarding";
@@ -113,6 +114,7 @@ export default function App() {
   }
 
   return (
+    <SettingsProvider>
     <div className="shell">
       <nav className="rail">
         <div className="rail__brand">
@@ -154,7 +156,10 @@ export default function App() {
 
       <div className="content">
         {view === "dashboard" && (
-          <Dashboard onOpenTutorial={() => setShowTutorial(true)} />
+          <Dashboard
+            onOpenTutorial={() => setShowTutorial(true)}
+            onGotoSettings={() => setView("settings")}
+          />
         )}
         {view === "settings" && <Settings />}
         {view === "help" && <Help onOpenTutorial={() => setShowTutorial(true)} />}
@@ -162,6 +167,7 @@ export default function App() {
 
       {showTutorial && <Tutorial onClose={closeTutorial} />}
     </div>
+    </SettingsProvider>
   );
 }
 

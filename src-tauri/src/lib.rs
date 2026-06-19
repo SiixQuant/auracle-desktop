@@ -65,11 +65,11 @@ use tauri::Builder;
 
 use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
-    broker_stream as broker_stream_cmd, docker as docker_cmd, github_auth as github_auth_cmd,
-    healthcheck as health_cmd, ibeam as ibeam_cmd, installer as installer_cmd,
-    keychain as keychain_cmd, mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
-    scheduled_update as scheduled_update_cmd, tray as tray_cmd, update as update_cmd,
-    view as view_cmd,
+    broker_stream as broker_stream_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
+    github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
+    ibkr_login as ibkr_login_cmd, installer as installer_cmd, keychain as keychain_cmd,
+    mcp_sidecar as mcp_cmd, preflight as preflight_cmd, scheduled_update as scheduled_update_cmd,
+    settings as settings_cmd, tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -298,6 +298,10 @@ pub fn run() {
             // View mode (browser vs embedded)
             view_cmd::open_auracle_ide,
             view_cmd::license_activate_engine,
+            // IBKR Client Portal embedded login window — IBKR connects
+            // in-app; its login opens inside the launcher, never bounced out.
+            ibkr_login_cmd::open_ibkr_login,
+            ibkr_login_cmd::close_ibkr_login,
             // "Sign in with GitHub" via the OAuth device flow — the
             // user's own GitHub for git push/pull, stored in the system
             // git credential helper. See commands/github_auth.rs. The
@@ -311,11 +315,21 @@ pub fn run() {
             mcp_cmd::mcp_sidecar_status,
             mcp_cmd::mcp_sidecar_start,
             mcp_cmd::mcp_sidecar_stop,
-            // Broker connection status + test surface. Connection
-            // setup itself now lives in the IDE; these expose the
-            // resulting status for read-only display.
+            // Broker connection status + test surface. Powers the
+            // Settings Connections card (IBKR connects in-app below it).
             broker_conn_cmd::forge_broker_status,
             broker_conn_cmd::forge_broker_test,
+            // Data-provider API keys (Polygon, EODHD, ...). Native
+            // door for saving + testing data-source keys over loopback
+            // (owner key handoff + double-submit CSRF). Powers the
+            // Settings Data sources card.
+            data_keys_cmd::data_key_save,
+            data_keys_cmd::data_key_test,
+            // Shared global settings — one coherent read/write of the
+            // engine's owner-gated aggregate (AI model, prefs, tier,
+            // configured flags). Keeps the launcher + IDE in sync.
+            settings_cmd::settings_get,
+            settings_cmd::settings_put,
             // Broker data — first-class Tauri commands so any view
             // in the app (launcher Dashboard, Forge widgets, tray
             // menu, anything we build next) can pull live broker
