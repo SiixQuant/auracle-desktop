@@ -188,10 +188,6 @@ export const cmd = {
   // when the IDE isn't installed on this machine.
   openAuracleIDE: () => invoke<void>("open_auracle_ide"),
 
-  // IBKR Client Portal login (embedded webview)
-  openIbkrLogin: (url: string) => invoke<void>("open_ibkr_login", { url }),
-  closeIbkrLogin: () => invoke<void>("close_ibkr_login"),
-
   // ── GitHub device-flow sign-in ────────────────────────────────
   //
   // The user's own GitHub for git push/pull. The Rust side stores the
@@ -206,22 +202,6 @@ export const cmd = {
   forgeBrokerStatus: () => invoke<BrokerStatus[]>("forge_broker_status"),
   forgeBrokerTest: (brokerId: string) =>
     invoke<string>("forge_broker_test", { brokerId }),
-
-  // ── Data-provider API keys ───────────────────────────────────
-  //
-  // Native replacement for the retired Houston Key Master page for
-  // entering third-party DATA keys (Polygon, EODHD, ...). Both call
-  // the engine's /ui/api/keys surface over loopback with the owner
-  // key (on-box handoff) + double-submit CSRF. The key value rides
-  // in the request body only — never a URL, never a log line.
-  /** Save a data-provider key. Rejects with a plain message when the
-   *  engine isn't connected, or when a paid install needs a vault key. */
-  dataKeySave: (provider: string, key: string) =>
-    invoke<void>("data_key_save", { provider, key }),
-  /** Best-effort test of the saved key against the provider's real API.
-   *  Resolves true only when the engine's test actually passed. */
-  dataKeyTest: (provider: string) =>
-    invoke<boolean>("data_key_test", { provider }),
 
   // ── Broker data (launcher-global, callable from any view) ────
   //
