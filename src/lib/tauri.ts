@@ -188,6 +188,11 @@ export const cmd = {
   // when the IDE isn't installed on this machine.
   openAuracleIDE: () => invoke<void>("open_auracle_ide"),
 
+  // IBKR Client Portal login (embedded webview). IBKR connects in-app
+  // — its login window opens inside the launcher, never bouncing out.
+  openIbkrLogin: (url: string) => invoke<void>("open_ibkr_login", { url }),
+  closeIbkrLogin: () => invoke<void>("close_ibkr_login"),
+
   // ── GitHub device-flow sign-in ────────────────────────────────
   //
   // The user's own GitHub for git push/pull. The Rust side stores the
@@ -202,6 +207,36 @@ export const cmd = {
   forgeBrokerStatus: () => invoke<BrokerStatus[]>("forge_broker_status"),
   forgeBrokerTest: (brokerId: string) =>
     invoke<string>("forge_broker_test", { brokerId }),
+
+  // ── Data-provider API keys ───────────────────────────────────
+  //
+  // Native door for entering third-party DATA keys (Polygon, EODHD,
+  // ...). Both call the engine's keys surface over loopback with the
+  // owner key (on-box handoff) + double-submit CSRF. The key value
+  // rides in the request body only — never a URL, never a log line.
+  /** Save a data-provider key. Rejects with a plain message when the
+   *  engine isn't connected, or when a paid install needs a vault key. */
+  dataKeySave: (provider: string, key: string) =>
+    invoke<void>("data_key_save", { provider, key }),
+  /** Best-effort test of the saved key against the provider's real API.
+   *  Resolves true only when the engine's test actually passed. */
+  dataKeyTest: (provider: string) =>
+    invoke<boolean>("data_key_test", { provider }),
+
+  // ── Shared global settings ───────────────────────────────────
+  //
+  // One coherent read of the engine's owner-gated settings aggregate
+  // (broker/data-key configured flags, the AI model, prefs, tier).
+  // No key VALUES ever cross this boundary — only "configured" flags.
+  settingsGet: () => invoke<SettingsAggregate>("settings_get"),
+  /** Persist an AI-model or prefs change. A key in `ai_model.key` rides
+   *  to the engine vault and never comes back. Pass the last-seen `etag`
+   *  so a stale write is rejected (the engine sends If-Match → 409)
+   *  instead of clobbering a change made in another surface. Rejects with
+   *  a plain remediation message when the vault is unavailable (paid
+   *  tier) or when the settings changed elsewhere. */
+  settingsPut: (patch: SettingsPatch, etag?: string) =>
+    invoke<SettingsAggregate>("settings_put", { patch, etag }),
 
   // ── Broker data (launcher-global, callable from any view) ────
   //
@@ -487,6 +522,47 @@ export interface BrokerStatus {
    *  "none" = data-only provider. Only "gateway" implies a portal. */
   connect_method: "gateway" | "api_key" | "wallet" | "none";
   state: BrokerState;
+}
+
+// ── Shared global settings ──────────────────────────────────────
+//
+// Mirrors the engine's owner-gated settings aggregate. The launcher and
+// the IDE both read this so their views stay in sync. CONTRACT: this
+// payload carries NO secret values — only "configured" flags for keys.
+
+/** Whether a key/secret is on file for one provider (never the value). */
+export interface ConfiguredFlag {
+  configured: boolean;
+}
+
+export interface AiModelState {
+  provider: string;
+  model_id: string;
+  /** True when an API key is on file in the engine vault. */
+  configured: boolean;
+}
+
+export interface SettingsAggregate {
+  /** Per-broker connection summary the engine reports. Opaque here —
+   *  the launcher's own probes drive the Connections card; this is the
+   *  shared cross-surface view. */
+  brokers: Record<string, unknown>;
+  /** Per data-provider: is a key on file? Keyed by provider id. */
+  data_keys: Record<string, ConfiguredFlag>;
+  ai_model: AiModelState;
+  /** Free-form user preferences shared across surfaces. */
+  prefs: Record<string, unknown>;
+  /** Engine license tier (e.g. "community", "pro"). */
+  tier: string;
+  /** Opaque concurrency token — pass back via If-Match on writes. */
+  etag: string;
+}
+
+/** A settings write. Send exactly one of the supported sub-objects. A
+ *  key in `ai_model.key` rides to the engine vault and never returns. */
+export interface SettingsPatch {
+  ai_model?: { provider: string; model_id: string; key?: string };
+  prefs?: Record<string, unknown>;
 }
 
 // ── Broker data payloads ────────────────────────────────────────

@@ -140,24 +140,6 @@ struct ProvisionResponse {
     engine_url: Option<String>,
 }
 
-/// Read the per-install IDE-handoff secret the engine wrote to the
-/// bind-mounted keys dir (`<install>/data/keys/.ide-handoff-secret`).
-/// Only an on-box process can read it; presenting it proves to the
-/// engine that this caller runs on the same machine (a remote attacker,
-/// even one forging Host / X-Forwarded-*, cannot). Returns None if the
-/// file is absent/unreadable — the caller then skips provisioning.
-fn read_handoff_secret() -> Option<String> {
-    let install = super::installer::resolve_install_path().ok()?;
-    let path = install
-        .join("data")
-        .join("keys")
-        .join(".ide-handoff-secret");
-    std::fs::read_to_string(path)
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-}
-
 /// Ask the local engine for the owner's API key and write the IDE config.
 ///
 /// Returns `Ok(true)` when the config was written (IDE will auto-connect),
@@ -173,7 +155,7 @@ async fn fetch_provision() -> Result<Option<ProvisionResponse>, String> {
     // No on-box secret readable → we can't prove we're local; don't try.
     // (Engine not installed here, older engine without the secret, or a
     // permissions quirk — all honestly "can't provision", not an error.)
-    let secret = match read_handoff_secret() {
+    let secret = match super::engine_auth::read_handoff_secret() {
         Some(token) => token,
         None => return Ok(None),
     };
