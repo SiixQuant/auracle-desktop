@@ -236,10 +236,12 @@ export const cmd = {
   // events. See commands/ide_update.rs.
   /** Check whether a newer IDE is published vs the installed one. */
   ideCheckUpdate: () => invoke<IdeUpdateInfo>("ide_check_update"),
-  /** Download + install the IDE .dmg (macOS aarch64). Returns the
-   *  installed version on success; rejects with a plain message
-   *  (incl. a drag-install hint on permission-denied). Subscribe to
-   *  'ide-update-progress' for progress while this runs. */
+  /** Download + install the IDE .dmg (macOS aarch64). Verifies the
+   *  download against the release's published SHA-256 before installing
+   *  and rejects on a mismatch. Returns the installed version on success;
+   *  rejects with a plain message (incl. a drag-install hint on
+   *  permission-denied). Subscribe to 'ide-update-progress' for progress
+   *  while this runs. */
   ideDownloadAndInstall: (assetUrl: string, expectedSize?: number | null) =>
     invoke<string>("ide_download_and_install", {
       assetUrl,
