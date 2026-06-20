@@ -12,10 +12,10 @@
 import { useEffect, useState } from "react";
 
 import Flame from "@/components/Flame";
+import StandbyHome from "@/components/StandbyHome";
 import Tutorial from "@/components/Tutorial";
 import { SettingsProvider } from "@/lib/settings";
 import { cmd, type HealthSnapshot } from "@/lib/tauri";
-import Dashboard from "@/views/Dashboard";
 import Onboarding from "@/views/Onboarding";
 import Settings from "@/views/Settings";
 
@@ -156,10 +156,7 @@ export default function App() {
 
       <div className="content">
         {view === "dashboard" && (
-          <Dashboard
-            onOpenTutorial={() => setShowTutorial(true)}
-            onGotoSettings={() => setView("settings")}
-          />
+          <StandbyHome onDoor={() => setView("settings")} />
         )}
         {view === "settings" && <Settings />}
         {view === "help" && <Help onOpenTutorial={() => setShowTutorial(true)} />}

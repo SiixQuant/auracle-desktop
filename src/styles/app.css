@@ -1468,3 +1468,159 @@ table.data-table {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── The Standby home ──────────────────────────────────────────────
+ * The calm panel of an already-running machine: one status lamp, one
+ * System Line, one adaptive verb, and a quiet vitals row. Emptiness is
+ * the success state — generous negative space, charcoal floor, the lamp
+ * the only color when all-green. Everything derives from deriveBoard(). */
+.standby {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+}
+
+/* Lamp — the aggregate status light (brand mark). Ring + core, both
+ * tinted by tone; pulses only while in-flight (checking / starting). */
+.standby__lamp {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1.5px solid var(--lamp-ring, var(--line-strong));
+  cursor: pointer;
+  margin-bottom: 30px;
+  transition: border-color 0.18s ease-out;
+}
+.standby__lamp-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lamp-color, var(--fg-faint));
+  transition: background-color 0.18s ease-out;
+}
+.standby__lamp.tone-ok       { --lamp-ring: var(--ok-dim);      --lamp-color: var(--ok); }
+.standby__lamp.tone-warn     { --lamp-ring: var(--warn-dim);    --lamp-color: var(--warn); }
+.standby__lamp.tone-err      { --lamp-ring: var(--err-dim);     --lamp-color: var(--err); }
+.standby__lamp.tone-accent   { --lamp-ring: var(--accent-dim);  --lamp-color: var(--accent); }
+.standby__lamp.tone-checking { --lamp-ring: var(--line-strong); --lamp-color: var(--fg-faint); }
+.standby__lamp.is-pulsing .standby__lamp-core {
+  animation: standby-pulse 2.4s ease-in-out infinite;
+}
+.standby__lamp:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.standby__line {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--fg);
+  margin: 0;
+  max-width: 24ch;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.standby__stamp {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-top: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.standby__actuator-wrap {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.standby__actuator {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 22px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, transform 0.1s ease-out;
+}
+.standby__actuator:hover:not(:disabled) { background: var(--accent-2); }
+.standby__actuator:active:not(:disabled) { transform: scale(0.98); }
+.standby__actuator:disabled {
+  background: var(--surface-2);
+  color: var(--fg-muted);
+  cursor: default;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.standby__badge {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.standby__badge.is-live { background: rgba(255, 255, 255, 0.28); }
+.standby__act-reason { font-size: 12px; color: var(--fg-muted); max-width: 38ch; }
+.standby__err { margin-top: 14px; color: var(--err); font-size: 12.5px; max-width: 46ch; }
+
+/* Quiet vitals row — each item is a door (status-is-the-door). */
+.standby__vitals {
+  display: flex;
+  gap: 8px;
+  margin-top: 42px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.vital {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 7px 11px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, border-color 0.15s ease-out;
+}
+.vital:hover { background: var(--surface); border-color: var(--line); }
+.vital:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vital__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); flex: none; }
+.vital__dot.ok { background: var(--ok); }
+.vital__dot.warn { background: var(--warn); }
+.vital__dot.err { background: var(--err); }
+.vital__dot.accent { background: var(--accent); }
+.vital__label {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.vital__value {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.vital__value.is-live { color: var(--accent-text); font-weight: 600; }
+.vital.is-stale .vital__value { color: var(--warn); }
+
+@keyframes standby-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
