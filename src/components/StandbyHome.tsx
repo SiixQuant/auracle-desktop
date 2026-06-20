@@ -18,35 +18,20 @@ import type { EngineStateHook } from "@/lib/useEngineState";
 
 export default function StandbyHome({
   eng,
+  onActuator,
   onDoor,
 }: {
   /** Shared live engine read (owned by the Shell, so the home keeps
    *  polling behind an open inspector). */
   eng: EngineStateHook;
+  /** Run the home's one verb — owned by the Shell so the palette and the
+   *  button trigger the same action. */
+  onActuator: () => void;
   /** Open an inspector for a pressed status (status-is-the-door). */
   onDoor?: (door: Exclude<Door, null>) => void;
 }) {
   const board = deriveBoard(eng.state);
   const { actuator } = board;
-
-  const act = () => {
-    switch (actuator.action) {
-      case "launch":
-        void eng.launch();
-        break;
-      case "start":
-        void eng.startEngine();
-        break;
-      case "connect":
-        onDoor?.("connections");
-        break;
-      case "degraded":
-        onDoor?.("supervision");
-        break;
-      default:
-        break; // checking / starting — disabled
-    }
-  };
 
   const asOf = stamp(eng.lastOkAt, eng.now, eng.state.brokerStale ?? false);
 
@@ -57,7 +42,7 @@ export default function StandbyHome({
       <h1 className="standby__line">{board.systemLine}</h1>
       {asOf && <div className="standby__stamp">{asOf}</div>}
 
-      <Actuator actuator={actuator} onClick={act} />
+      <Actuator actuator={actuator} onClick={onActuator} />
 
       {(eng.engineErr || eng.ideError) && (
         <div className="standby__err">{eng.engineErr || eng.ideError}</div>

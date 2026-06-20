@@ -1750,3 +1750,115 @@ table.data-table {
   from { transform: translateX(24px); opacity: 0.5; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+.kbd-hint {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+/* Transient command echo (echo-to-teach) — names the verb you just ran. */
+.echo-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  text-align: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--fg-faint);
+  pointer-events: none;
+  animation: insp-fade 0.15s ease-out;
+}
+.echo-line .mono { color: var(--accent-text); }
+
+/* ── ⌘K command palette ────────────────────────────────────────────── */
+.cmdk-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 14vh;
+  animation: insp-fade 0.15s ease-out;
+}
+.cmdk {
+  width: min(560px, 92vw);
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: cmdk-pop 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cmdk__input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-muted);
+}
+.cmdk__input input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--fg);
+  font-size: 14px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.cmdk__tag {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.cmdk__list { max-height: 46vh; overflow-y: auto; padding: 6px; }
+.cmdk__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 11px;
+  cursor: pointer;
+  text-align: left;
+}
+.cmdk__item.sel { background: var(--accent-soft); }
+.cmdk__title { font-size: 13px; color: var(--fg); display: flex; align-items: center; gap: 8px; }
+.cmdk__item.sel .cmdk__title { color: var(--accent-text); }
+.cmdk__danger {
+  font: 500 9px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--err);
+  border: 1px solid var(--err-dim);
+  border-radius: 4px;
+  padding: 3px 5px;
+}
+.cmdk__group {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+}
+.cmdk__empty { padding: 18px; text-align: center; color: var(--fg-muted); font-size: 13px; }
+.cmdk__foot {
+  padding: 9px 15px;
+  border-top: 1px solid var(--line);
+  font: 400 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--fg-faint);
+}
+@keyframes cmdk-pop {
+  from { transform: scale(0.97); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
+}
