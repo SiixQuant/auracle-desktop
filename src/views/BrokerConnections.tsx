@@ -189,9 +189,11 @@ export default function ConnectionsCard() {
   }, [statuses, refresh]);
 
   return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">Connections</span>
+    <div className="card directory-well">
+      {/* The section's mono-label already says "Connections" — drop the
+          redundant card-title here, but keep the Refresh action,
+          right-aligned. */}
+      <div className="card-head card-head--action-only">
         <button
           type="button"
           className="ghost btn-sm"
@@ -202,9 +204,8 @@ export default function ConnectionsCard() {
         </button>
       </div>
       <p className="muted fs-sm m-0 mb-3">
-        Connect once — used everywhere in Auracle. Brokers, crypto venues,
-        and market-data providers in one place: IBKR signs in right here
-        in-app; data providers take an API key, also right here.
+        One place for brokers, crypto venues, and market data — IBKR signs in
+        in-app, providers take an API key, all right here.
       </p>
       {houstonConflict && (
         <HoustonConflictBanner
