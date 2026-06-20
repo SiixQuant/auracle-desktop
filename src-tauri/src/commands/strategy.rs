@@ -48,7 +48,9 @@ pub async fn strategy_states() -> Result<Value, String> {
 
     let status = resp.status();
     if !status.is_success() {
-        return Err(format!("the engine couldn't return strategy states ({status})"));
+        return Err(format!(
+            "the engine couldn't return strategy states ({status})"
+        ));
     }
     resp.json::<Value>().await.map_err(to_error_string)
 }
