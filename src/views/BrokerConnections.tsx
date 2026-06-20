@@ -39,7 +39,7 @@
 //     working.
 //   * A key VALUE is never logged, never placed in a URL, never displayed.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import IncidentCard from "@/components/IncidentCard";
 import { useSettings } from "@/lib/settings";
@@ -248,6 +248,21 @@ function ConnectionsDirectory({
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  // Accordion: one connectable row's connect form open at a time. Each
+  // connectable broker is click-to-expand so the connect controls aren't
+  // buried below the fold in the docked inspector. IBKR (the one broker
+  // that connects in-app) opens by default so its form is never hidden.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [defaulted, setDefaulted] = useState(false);
+  useEffect(() => {
+    if (defaulted) return;
+    const connectables = statuses.filter(connectable);
+    if (connectables.length === 0) return;
+    const ibkr = connectables.find((b) => b.id.toLowerCase() === "ibkr");
+    setOpenId((ibkr ?? connectables[0]).id);
+    setDefaulted(true);
+  }, [statuses, defaulted]);
+  const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
 
   const q = query.trim().toLowerCase();
   const matchesSearch = (b: BrokerStatus) =>
@@ -325,7 +340,13 @@ function ConnectionsDirectory({
             <span className="dir-section__count">{connected.length}</span>
           </div>
           {connected.map((b) => (
-            <DirectoryRow key={b.id} broker={b} onRefresh={onRefresh} />
+            <DirectoryRow
+              key={b.id}
+              broker={b}
+              onRefresh={onRefresh}
+              expanded={openId === b.id}
+              onToggle={() => toggle(b.id)}
+            />
           ))}
         </section>
       )}
@@ -340,7 +361,13 @@ function ConnectionsDirectory({
               <span className="dir-section__count">{rows.length}</span>
             </div>
             {rows.map((b) => (
-              <DirectoryRow key={b.id} broker={b} onRefresh={onRefresh} />
+              <DirectoryRow
+                key={b.id}
+                broker={b}
+                onRefresh={onRefresh}
+                expanded={openId === b.id}
+                onToggle={() => toggle(b.id)}
+              />
             ))}
           </section>
         );
@@ -368,22 +395,59 @@ function ConnectionsDirectory({
 function DirectoryRow({
   broker,
   onRefresh,
+  expanded,
+  onToggle,
 }: {
   broker: BrokerStatus;
   onRefresh: () => void;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
-  const isIbkr = broker.id === "ibkr";
+  // Match defensively on casing — the engine-truth overlay can echo an
+  // uppercase "IBKR" id, and a strict === "ibkr" would silently suppress
+  // the entire connect form (the bug behind "clicking IBKR does nothing").
+  const isIbkr = broker.id.toLowerCase() === "ibkr";
   const isDataKey = isDataKeyProvider(broker.id);
   // A row is "coming soon" only when it has NO real launcher flow — a
   // wired adapter that's not_implemented AND not a data-key provider.
   const soon = broker.state.state === "not_implemented" && !isDataKey;
+  // A connectable row carries an inline connect form, so it's a
+  // click-to-expand accordion header (the form would otherwise sit below
+  // the fold in the docked inspector with no cue that it's there).
+  const canExpand = (isIbkr || isDataKey) && !soon;
+  const expandRef = useRef<HTMLDivElement>(null);
+
+  // Bring the connect form into view when it opens.
+  useEffect(() => {
+    if (expanded && expandRef.current) {
+      expandRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [expanded]);
 
   return (
     <div
-      className={`dir-row ${soon ? "is-soon" : ""}`}
+      className={`dir-row ${soon ? "is-soon" : ""} ${canExpand ? "is-expandable" : ""} ${
+        expanded ? "is-open" : ""
+      }`}
       aria-disabled={soon || undefined}
     >
-      <div className="dir-row__top">
+      <div
+        className="dir-row__top"
+        role={canExpand ? "button" : undefined}
+        tabIndex={canExpand ? 0 : undefined}
+        aria-expanded={canExpand ? expanded : undefined}
+        onClick={canExpand ? onToggle : undefined}
+        onKeyDown={
+          canExpand
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onToggle();
+                }
+              }
+            : undefined
+        }
+      >
         <BrokerIcon id={broker.id} label={broker.label} />
         <div className="dir-row__meta">
           <div className="dir-name">
@@ -403,18 +467,18 @@ function DirectoryRow({
           </div>
         </div>
         <StatePill state={broker.state} isDataKey={isDataKey} />
-        <div className="dir-row__action">
+        {/* Inner actions must not toggle the accordion. */}
+        <div className="dir-row__action" onClick={(e) => e.stopPropagation()}>
           <RowAction broker={broker} onRefresh={onRefresh} />
         </div>
+        <span className="dir-row__chev" aria-hidden="true">
+          {canExpand ? "›" : ""}
+        </span>
       </div>
-      {isIbkr && !soon && (
-        <div className="dir-row__expand">
-          <IbeamSetup onStateChange={onRefresh} />
-        </div>
-      )}
-      {isDataKey && (
-        <div className="dir-row__expand">
-          <DataKeyForm providerId={broker.id} />
+      {canExpand && expanded && (
+        <div className="dir-row__expand" ref={expandRef}>
+          {isIbkr && <IbeamSetup onStateChange={onRefresh} />}
+          {isDataKey && <DataKeyForm providerId={broker.id} />}
         </div>
       )}
     </div>
