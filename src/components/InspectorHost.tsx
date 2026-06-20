@@ -9,10 +9,16 @@
 // inspector open at a time (no stacking). The inspectors RE-HOST the
 // existing control-plane cards verbatim — a re-host, not a rewrite.
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { accountMode } from "@/lib/aggregator";
-import { openIdePanel, type BrokerPosition } from "@/lib/tauri";
+import { accountMode, dataQualityView } from "@/lib/aggregator";
+import {
+  cmd,
+  onEvent,
+  openIdePanel,
+  type BrokerPosition,
+  type BrokerTickEvent,
+} from "@/lib/tauri";
 import type { EngineStateHook } from "@/lib/useEngineState";
 import ConnectionsCard from "@/views/BrokerConnections";
 import {
@@ -134,6 +140,7 @@ function AccountInspector({
   const s = eng.state.summary;
   const positions = eng.positions;
   const mode = accountMode(s);
+  const ticks = usePositionTicks();
 
   if (!s) {
     return (
@@ -147,6 +154,11 @@ function AccountInspector({
 
   const ccy = s.currency || "USD";
   const pnl = s.unrealized_pnl ?? null;
+  const top = positions
+    ? [...positions]
+        .sort((a, b) => Math.abs(b.market_value ?? 0) - Math.abs(a.market_value ?? 0))
+        .slice(0, 8)
+    : [];
 
   return (
     <div className="card">
@@ -172,6 +184,48 @@ function AccountInspector({
         <div className="mono fs-sm">{positions ? `${positions.length}` : "—"}</div>
       </div>
       <ExposureBars positions={positions} />
+
+      {top.length > 0 && (
+        <div className="mt-3">
+          <div className="muted fs-2xs mb-2">
+            Positions — watch for a live last price
+          </div>
+          {top.map((p, i) => {
+            const t = ticks.ticks[p.symbol];
+            const watching = ticks.isWatched(p.symbol);
+            const dq = t ? dataQualityView(t.data_quality) : null;
+            return (
+              <div className="row" key={p.symbol + i}>
+                <div className="hstack">
+                  <span className="mono fs-sm">{p.symbol}</span>
+                  <span className="muted fs-2xs">{fmtNum(p.quantity)}</span>
+                </div>
+                <div className="hstack">
+                  {watching && t?.last != null && (
+                    <>
+                      <span className="mono fs-sm">{t.last.toFixed(2)}</span>
+                      {dq && (
+                        <span className={`chip ${dq.tone || "neutral"}`}>{dq.label}</span>
+                      )}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="ghost btn-sm"
+                    aria-pressed={watching}
+                    onClick={() =>
+                      watching ? ticks.unwatch(p.symbol) : ticks.watch(p.symbol)
+                    }
+                  >
+                    {watching ? "Unwatch" : "Watch"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="mt-3">
         <button
           type="button"
@@ -186,6 +240,74 @@ function AccountInspector({
       </div>
     </div>
   );
+}
+
+// ── Opt-in real-time ticks ──────────────────────────────────────────
+//
+// Subscribe a symbol to the engine's refcounted quote stream and surface
+// the live last price + its data_quality. Strict cleanup: unsubscribe on
+// unwatch and on inspector close (unmount), and pause the whole set while
+// the launcher is backgrounded (document.hidden) so we never leak a
+// subscription or hammer the IBKR gateway from a hidden window.
+
+function usePositionTicks() {
+  const [ticks, setTicks] = useState<Record<string, BrokerTickEvent>>({});
+  const watched = useRef<Set<string>>(new Set());
+  const [, bump] = useState(0);
+
+  // One listener for the whole stream; each tick updates its symbol.
+  useEffect(() => {
+    let alive = true;
+    let un: () => void = () => {};
+    void onEvent<BrokerTickEvent>("broker-tick", (t) => {
+      if (alive) setTicks((prev) => ({ ...prev, [t.symbol]: t }));
+    }).then((u) => {
+      if (alive) un = u;
+      else u();
+    });
+    return () => {
+      alive = false;
+      un();
+    };
+  }, []);
+
+  // Pause/resume on visibility; unsubscribe everything on unmount.
+  useEffect(() => {
+    const onVis = () => {
+      if (typeof document === "undefined") return;
+      const op = document.hidden ? cmd.brokerStreamUnsubscribe : cmd.brokerStreamSubscribe;
+      watched.current.forEach((s) => void op(s).catch(() => {}));
+    };
+    document.addEventListener("visibilitychange", onVis);
+    const subs = watched.current;
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      subs.forEach((s) => void cmd.brokerStreamUnsubscribe(s).catch(() => {}));
+      subs.clear();
+    };
+  }, []);
+
+  const isWatched = useCallback((sym: string) => watched.current.has(sym), []);
+
+  const watch = useCallback((sym: string) => {
+    if (watched.current.has(sym)) return;
+    watched.current.add(sym);
+    bump((v) => v + 1);
+    void cmd.brokerStreamSubscribe(sym).catch(() => {});
+  }, []);
+
+  const unwatch = useCallback((sym: string) => {
+    if (!watched.current.delete(sym)) return;
+    bump((v) => v + 1);
+    void cmd.brokerStreamUnsubscribe(sym).catch(() => {});
+    setTicks((prev) => {
+      const next = { ...prev };
+      delete next[sym];
+      return next;
+    });
+  }, []);
+
+  return { ticks, isWatched, watch, unwatch };
 }
 
 /** Snapshot bar chart of current position sizes — honest current state,
@@ -237,4 +359,9 @@ function fmtSigned(v: number | null, ccy: string): string {
   if (v === null || v === undefined) return "—";
   const body = fmt(v, ccy);
   return v >= 0 ? `+${body}` : body;
+}
+
+function fmtNum(v: number | null): string {
+  if (v === null || v === undefined) return "—";
+  return `${v} sh`;
 }

@@ -1575,6 +1575,23 @@ table.data-table {
   color: #fff;
 }
 .standby__badge.is-live { background: rgba(255, 255, 255, 0.28); }
+/* In-button progress sweep while the engine is coming up — honest
+ * "working" motion (compose-up reports no percent), not a fake bar. */
+.standby__actuator.is-progress { position: relative; overflow: hidden; }
+.standby__actuator.is-progress::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: -40%;
+  height: 2px;
+  width: 40%;
+  background: var(--accent);
+  animation: act-progress 1.1s ease-in-out infinite;
+}
+@keyframes act-progress {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
 .standby__act-reason { font-size: 12px; color: var(--fg-muted); max-width: 38ch; }
 .standby__err { margin-top: 14px; color: var(--err); font-size: 12.5px; max-width: 46ch; }
 

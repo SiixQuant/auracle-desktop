@@ -108,7 +108,7 @@ function Actuator({
     <div className="standby__actuator-wrap">
       <button
         type="button"
-        className="standby__actuator"
+        className={`standby__actuator${actuator.action === "starting" ? " is-progress" : ""}`}
         onClick={onClick}
         disabled={actuator.disabled}
         title={actuator.reason}

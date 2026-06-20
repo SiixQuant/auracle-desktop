@@ -107,23 +107,26 @@ function effectiveState(s: EngineState): HealthSnapshot["state"] | null {
   return s.health?.state ?? null;
 }
 
-function feedLabel(q: BrokerDataQuality | undefined): {
-  value: string;
-  dot: DotTone;
+/** Render any market-data quality as a label + tone — used for the feed
+ *  vital and for the `data_quality` pill beside a streamed price, so a
+ *  "live" number is never shown as real-time when the feed is delayed. */
+export function dataQualityView(q: BrokerDataQuality | undefined): {
+  label: string;
+  tone: DotTone;
 } {
   switch (q) {
     case "realtime":
-      return { value: "real-time", dot: "ok" };
+      return { label: "real-time", tone: "ok" };
     case "delayed":
-      return { value: "delayed", dot: "warn" };
+      return { label: "delayed", tone: "warn" };
     case "frozen":
-      return { value: "frozen", dot: "warn" };
+      return { label: "frozen", tone: "warn" };
     case "closed":
-      return { value: "market closed", dot: "" };
+      return { label: "market closed", tone: "" };
     case "halted":
-      return { value: "halted", dot: "err" };
+      return { label: "halted", tone: "err" };
     default:
-      return { value: "—", dot: "" };
+      return { label: "—", tone: "" };
   }
 }
 
@@ -203,7 +206,7 @@ export function deriveBoard(s: EngineState): BoardState {
   const brokerFresh: Freshness = s.brokerStale ? "stale" : "fresh";
 
   const ew = engineWord(state);
-  const fw = feedLabel(feedQ);
+  const fw = dataQualityView(feedQ);
 
   const vitals: Vital[] = [
     {
@@ -233,8 +236,8 @@ export function deriveBoard(s: EngineState): BoardState {
     {
       key: "feed",
       label: "feed",
-      value: fw.value,
-      dot: fw.dot,
+      value: fw.label,
+      dot: fw.tone,
       freshness: brokerFresh,
       door: "connections",
       provenance: s.marketData

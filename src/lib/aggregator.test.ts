@@ -8,7 +8,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { accountMode, deriveBoard, type EngineState } from "./aggregator.ts";
+import {
+  accountMode,
+  dataQualityView,
+  deriveBoard,
+  type EngineState,
+} from "./aggregator.ts";
 
 // Minimal fixtures — only the fields the aggregator reads.
 const acct = (account_id: string): EngineState["summary"] =>
@@ -136,6 +141,16 @@ test("brokerStale flips broker/feed/mode vitals to stale, never last-good-as-liv
   assert.equal(vital(b, "mode").freshness, "stale");
   // engine has its own probe — not stale just because the broker fetch failed
   assert.equal(vital(b, "engine").freshness, "fresh");
+});
+
+// ── data_quality pill — a streamed price is never mislabeled ───────
+
+test("dataQualityView maps each tier to an honest label + tone", () => {
+  assert.deepEqual(dataQualityView("realtime"), { label: "real-time", tone: "ok" });
+  assert.deepEqual(dataQualityView("delayed"), { label: "delayed", tone: "warn" });
+  assert.deepEqual(dataQualityView("halted"), { label: "halted", tone: "err" });
+  assert.deepEqual(dataQualityView("closed"), { label: "market closed", tone: "" });
+  assert.deepEqual(dataQualityView(undefined), { label: "—", tone: "" });
 });
 
 // ── Status-is-the-door wiring is present on every vital ────────────
