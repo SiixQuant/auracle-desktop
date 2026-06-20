@@ -28,6 +28,7 @@ pub mod preflight;
 pub mod scheduled_update;
 pub mod secret_store;
 pub mod settings;
+pub mod strategy;
 pub mod tray;
 pub mod update;
 pub mod view;

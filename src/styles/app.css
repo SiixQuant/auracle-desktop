@@ -1468,3 +1468,551 @@ table.data-table {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── The Standby home ──────────────────────────────────────────────
+ * The calm panel of an already-running machine: one status lamp, one
+ * System Line, one adaptive verb, and a quiet vitals row. Emptiness is
+ * the success state — generous negative space, charcoal floor, the lamp
+ * the only color when all-green. Everything derives from deriveBoard(). */
+.standby {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+}
+
+/* Lamp — the aggregate status light (brand mark). Ring + core, both
+ * tinted by tone; pulses only while in-flight (checking / starting). */
+.standby__lamp {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1.5px solid var(--lamp-ring, var(--line-strong));
+  cursor: pointer;
+  margin-bottom: 30px;
+  transition: border-color 0.18s ease-out;
+}
+.standby__lamp-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lamp-color, var(--fg-faint));
+  transition: background-color 0.18s ease-out;
+}
+.standby__lamp.tone-ok       { --lamp-ring: var(--ok-dim);      --lamp-color: var(--ok); }
+.standby__lamp.tone-warn     { --lamp-ring: var(--warn-dim);    --lamp-color: var(--warn); }
+.standby__lamp.tone-err      { --lamp-ring: var(--err-dim);     --lamp-color: var(--err); }
+.standby__lamp.tone-accent   { --lamp-ring: var(--accent-dim);  --lamp-color: var(--accent); }
+.standby__lamp.tone-checking { --lamp-ring: var(--line-strong); --lamp-color: var(--fg-faint); }
+.standby__lamp.is-pulsing .standby__lamp-core {
+  animation: standby-pulse 2.4s ease-in-out infinite;
+}
+.standby__lamp:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.standby__line {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--fg);
+  margin: 0;
+  max-width: 24ch;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.standby__stamp {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-top: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.standby__actuator-wrap {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.standby__actuator {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 22px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, transform 0.1s ease-out;
+}
+.standby__actuator:hover:not(:disabled) { background: var(--accent-2); }
+.standby__actuator:active:not(:disabled) { transform: scale(0.98); }
+.standby__actuator:disabled {
+  background: var(--surface-2);
+  color: var(--fg-muted);
+  cursor: default;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.standby__badge {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.standby__badge.is-live { background: rgba(255, 255, 255, 0.28); }
+/* In-button progress sweep while the engine is coming up — honest
+ * "working" motion (compose-up reports no percent), not a fake bar. */
+.standby__actuator.is-progress { position: relative; overflow: hidden; }
+.standby__actuator.is-progress::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: -40%;
+  height: 2px;
+  width: 40%;
+  background: var(--accent);
+  animation: act-progress 1.1s ease-in-out infinite;
+}
+@keyframes act-progress {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+.standby__act-reason { font-size: 12px; color: var(--fg-muted); max-width: 38ch; }
+.standby__err { margin-top: 14px; color: var(--err); font-size: 12.5px; max-width: 46ch; }
+
+/* Quiet vitals row — each item is a door (status-is-the-door). */
+.standby__vitals {
+  display: flex;
+  gap: 8px;
+  margin-top: 42px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.vital {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 7px 11px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, border-color 0.15s ease-out;
+}
+.vital:hover { background: var(--surface); border-color: var(--line); }
+.vital:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vital__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); flex: none; }
+.vital__dot.ok { background: var(--ok); }
+.vital__dot.warn { background: var(--warn); }
+.vital__dot.err { background: var(--err); }
+.vital__dot.accent { background: var(--accent); }
+.vital__label {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.vital__value {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.vital__value.is-live { color: var(--accent-text); font-weight: 600; }
+.vital.is-stale .vital__value { color: var(--warn); }
+
+@keyframes standby-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── Single-surface shell (replaces the rail) ──────────────────────
+ * A thin top bar + the Standby stage. No left rail: Connections /
+ * Supervision / Account are reached by pressing a vital (status-is-the-
+ * door); Intelligence + System live in the top bar. */
+.shell-standby {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 46px;
+  padding: 0 14px;
+  background: var(--bg-rail);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-dim);
+}
+.topbar__brand strong {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.topbar__actions { display: flex; align-items: center; gap: 4px; }
+.topbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+.topbar__btn:hover { background: var(--surface); color: var(--fg); }
+.topbar__btn.icon-only { padding: 7px; }
+
+.standby-stage {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+.standby-stage .standby { min-height: 100%; }
+
+/* Right-docked inspector — slides OVER a dimmed-but-still-live home. */
+.insp-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  animation: insp-fade 0.18s ease-out;
+}
+.insp {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 92vw);
+  z-index: 41;
+  background: var(--bg-elev);
+  border-left: 1px solid var(--line-strong);
+  display: flex;
+  flex-direction: column;
+  animation: insp-slide 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.insp__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.insp__title { font-size: 16px; font-weight: 500; margin: 0; color: var(--fg); }
+.insp__close {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.insp__close:hover { color: var(--fg); background: var(--surface); }
+.insp__body {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@keyframes insp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes insp-slide {
+  from { transform: translateX(24px); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.kbd-hint {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+/* Transient command echo (echo-to-teach) — names the verb you just ran. */
+.echo-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  text-align: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--fg-faint);
+  pointer-events: none;
+  animation: insp-fade 0.15s ease-out;
+}
+.echo-line .mono { color: var(--accent-text); }
+
+/* ── ⌘K command palette ────────────────────────────────────────────── */
+.cmdk-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 14vh;
+  animation: insp-fade 0.15s ease-out;
+}
+.cmdk {
+  width: min(560px, 92vw);
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: cmdk-pop 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cmdk__input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-muted);
+}
+.cmdk__input input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--fg);
+  font-size: 14px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.cmdk__tag {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.cmdk__list { max-height: 46vh; overflow-y: auto; padding: 6px; }
+.cmdk__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 11px;
+  cursor: pointer;
+  text-align: left;
+}
+.cmdk__item.sel { background: var(--accent-soft); }
+.cmdk__title { font-size: 13px; color: var(--fg); display: flex; align-items: center; gap: 8px; }
+.cmdk__item.sel .cmdk__title { color: var(--accent-text); }
+.cmdk__danger {
+  font: 500 9px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--err);
+  border: 1px solid var(--err-dim);
+  border-radius: 4px;
+  padding: 3px 5px;
+}
+.cmdk__group {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+}
+.cmdk__empty { padding: 18px; text-align: center; color: var(--fg-muted); font-size: 13px; }
+.cmdk__foot {
+  padding: 9px 15px;
+  border-top: 1px solid var(--line);
+  font: 400 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--fg-faint);
+}
+@keyframes cmdk-pop {
+  from { transform: scale(0.97); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Streamed container/gateway logs. */
+.term-block {
+  background: #08090b;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font: 400 11px/1.55 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+
+/* Interrogable provenance — hover/focus a vital to audit the green dot. */
+.vital { position: relative; }
+.vital__prov {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  width: max-content;
+  max-width: 240px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font: 400 11px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--fg-dim);
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+  z-index: 30;
+}
+.vital:hover .vital__prov,
+.vital:focus-visible .vital__prov {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Agent on-ramp chip — the brain the workspace uses, beside the actuator. */
+.standby__agent {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+.standby__agent:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.standby__agent-label {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.standby__agent-name { font-size: 13px; color: var(--fg); }
+
+/* Inline incident on the home (progressive escalation). */
+.standby__incident { margin-top: 18px; width: min(440px, 92vw); text-align: left; }
+
+/* Connections "what this unblocks" legend. */
+.unblockers {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.unblockers__title {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.unblockers__row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-dim); }
+
+/* Strategy lifecycle belt — read-only six-stage spine of work. */
+.belt {
+  display: flex;
+  margin-top: 4px;
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+}
+.belt__seg {
+  flex: 1;
+  text-align: center;
+  padding: 9px 2px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out;
+}
+.belt__seg:last-child { border-right: 0; }
+.belt__seg:hover { background: var(--surface-2); }
+.belt__seg b {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fg-dim);
+  margin-bottom: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.belt__seg.live { color: var(--accent-text); background: var(--accent-soft); border-radius: 6px; }
+.belt__seg.live b { color: var(--accent-text); }
+
+/* First-home coachmark — learn the anatomy once. */
+.coach-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: insp-fade 0.18s ease-out;
+}
+.coach {
+  width: min(420px, 92vw);
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 20px 22px;
+  text-align: left;
+}
+.coach h3 { font-size: 16px; font-weight: 500; margin: 0 0 12px; color: var(--fg); }
+.coach__beat { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.coach__beat:last-of-type { border-bottom: 0; }
+.coach__n {
+  flex: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 500 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.coach__beat div { font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
+.coach__done {
+  margin-top: 16px;
+  background: var(--accent); color: var(--accent-ink);
+  border: 0; border-radius: 8px; padding: 9px 16px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}

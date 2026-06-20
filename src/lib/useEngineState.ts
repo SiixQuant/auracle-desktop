@@ -1,0 +1,210 @@
+// useEngineState — the launcher's shared live-data layer.
+//
+// One hook that runs the engine probes the whole redesign reads from:
+//   - health poll (30s, visible-only) → the lamp/System Line/Actuator
+//   - broker glance (30s, visible-only) with the all-or-nothing staleness
+//     guard covering summary + positions + feed, so a single failed fetch
+//     flips the glance to "stale" rather than showing last-good as live
+//   - launcher update check (best-effort, once)
+//   - a 15s wall-clock tick so the "as of" stamp ages between polls
+//
+// It exposes the assembled `EngineState` (fed to deriveBoard) plus the
+// two engine-truth actions (start / launch) and their in-flight + error
+// state. Centralizing it here means the home, the inspectors, and the
+// command palette all act on one coherent read instead of drifting.
+
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import type { EngineState } from "@/lib/aggregator";
+import {
+  cmd,
+  type BrokerAccountSummary,
+  type BrokerMarketDataStatus,
+  type BrokerPosition,
+  type HealthSnapshot,
+  type UpdateInfo,
+} from "@/lib/tauri";
+
+export interface EngineStateHook {
+  /** The pure snapshot to feed deriveBoard(). */
+  state: EngineState;
+  /** Live broker positions (for the Account inspector's exposure). */
+  positions: BrokerPosition[] | null;
+  /** Wall clock, ticked every 15s for the relative-age stamp. */
+  now: number;
+  /** Epoch ms of the last fully-successful broker glance. */
+  lastOkAt: number | null;
+  /** Launcher self-update info (for the System inspector / Maintenance). */
+  update: UpdateInfo | null;
+  launching: boolean;
+  ideError: string | null;
+  engineErr: string | null;
+  /** Bring the stack up, then poll to healthy. */
+  startEngine: () => Promise<void>;
+  /** Open the native IDE — refuses unless the engine is confirmed healthy. */
+  launch: () => Promise<void>;
+  /** Force an immediate health + broker refresh. */
+  refresh: () => void;
+}
+
+export function useEngineState(): EngineStateHook {
+  const [health, setHealth] = useState<HealthSnapshot | null>(null);
+  const [summary, setSummary] = useState<BrokerAccountSummary | null>(null);
+  const [positions, setPositions] = useState<BrokerPosition[] | null>(null);
+  const [marketData, setMarketData] = useState<BrokerMarketDataStatus | null>(null);
+  const [brokerStale, setBrokerStale] = useState(false);
+  const [lastOkAt, setLastOkAt] = useState<number | null>(null);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [starting, setStarting] = useState(false);
+  const [launching, setLaunching] = useState(false);
+  const [ideError, setIdeError] = useState<string | null>(null);
+  const [engineErr, setEngineErr] = useState<string | null>(null);
+
+  const hadData = useRef(false);
+  const mounted = useRef(true);
+
+  const pollHealth = useCallback(async () => {
+    try {
+      const h = await cmd.currentHealth();
+      if (mounted.current) setHealth(h);
+      return h;
+    } catch {
+      if (mounted.current) setHealth(null);
+      return null;
+    }
+  }, []);
+
+  const refreshBroker = useCallback(async () => {
+    const [s, p, md] = await Promise.allSettled([
+      cmd.brokerAccountSummary(),
+      cmd.brokerOpenPositions(),
+      cmd.brokerMarketDataStatus(),
+    ]);
+    if (!mounted.current) return;
+    const allOk =
+      s.status === "fulfilled" && p.status === "fulfilled" && md.status === "fulfilled";
+
+    if (s.status === "fulfilled") {
+      setSummary(s.value);
+      hadData.current = true;
+    } else if (!hadData.current) {
+      setSummary(null);
+    }
+    if (p.status === "fulfilled") setPositions(p.value.rows);
+    if (md.status === "fulfilled") setMarketData(md.value);
+
+    if (allOk) {
+      setLastOkAt(Date.now());
+      setBrokerStale(false);
+    } else if (hadData.current) {
+      // Any of the three failing means the glance is no longer fully
+      // current — mark stale rather than letting it sit at full confidence.
+      setBrokerStale(true);
+    }
+  }, []);
+
+  // Health poll — 30s, visible-only.
+  useEffect(() => {
+    mounted.current = true;
+    void pollHealth();
+    const id = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void pollHealth();
+    }, 30_000);
+    return () => {
+      mounted.current = false;
+      window.clearInterval(id);
+    };
+  }, [pollHealth]);
+
+  // Broker glance — 30s, visible-only.
+  useEffect(() => {
+    void refreshBroker();
+    const id = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void refreshBroker();
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [refreshBroker]);
+
+  // Immediate refresh when the window regains focus.
+  useEffect(() => {
+    const onFocus = () => {
+      void pollHealth();
+      void refreshBroker();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [pollHealth, refreshBroker]);
+
+  // Update check (best-effort, once).
+  useEffect(() => {
+    cmd.checkForUpdate().then(setUpdate).catch(() => setUpdate(null));
+  }, []);
+
+  // Relative-age clock for the "as of" stamp.
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const startEngine = useCallback(async () => {
+    setEngineErr(null);
+    setStarting(true);
+    try {
+      await cmd.stackStart();
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => window.setTimeout(r, 2_000));
+        const h = await pollHealth();
+        if (h?.state === "healthy") break;
+      }
+    } catch (err) {
+      if (mounted.current) setEngineErr(String(err));
+    } finally {
+      if (mounted.current) setStarting(false);
+    }
+  }, [pollHealth]);
+
+  const launch = useCallback(async () => {
+    setIdeError(null);
+    // Re-confirm health here — cached health can be a poll-interval stale,
+    // and the Rust side re-confirms with a fresh /healthz poll as well.
+    if (health?.state !== "healthy") {
+      setIdeError(
+        `The engine isn't ready (${health?.state ?? "checking"}). ` +
+          `Start it and wait for "ready" before opening the workspace.`,
+      );
+      return;
+    }
+    setLaunching(true);
+    try {
+      await cmd.openAuracleIDE();
+    } catch (err) {
+      setIdeError(String(err));
+    } finally {
+      window.setTimeout(() => mounted.current && setLaunching(false), 1200);
+    }
+  }, [health]);
+
+  const refresh = useCallback(() => {
+    void pollHealth();
+    void refreshBroker();
+  }, [pollHealth, refreshBroker]);
+
+  const state: EngineState = { health, starting, summary, marketData, brokerStale };
+
+  return {
+    state,
+    positions,
+    now,
+    lastOkAt,
+    update,
+    launching,
+    ideError,
+    engineErr,
+    startEngine,
+    launch,
+    refresh,
+  };
+}

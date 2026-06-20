@@ -1,20 +1,11 @@
-// Settings — the launcher's Global Control Plane.
+// Settings cards — the launcher's control-plane controls.
 //
-// The single home for every decision shared across this install. Cards
-// are ordered by how the product is actually set up, not by component
-// age:
-//
-//   1. Connections — brokers + data-provider keys + GitHub, the one
-//      "things I connect to" category.
-//   2. Intelligence — the agent the IDE uses (Auracle Agent default;
-//      frontier models as BYO-key alternatives).
-//   3. License — paste / activate / clear; live tier from engine truth.
-//   4. General — engine preferences that used to be engine-only.
-//   5. System — a slim maintenance strip (install, Docker, updates).
-//
-// Everything diagnostic or first-run folds into the Advanced /
-// Diagnostics drawer at the bottom, collapsed by default each session,
-// so the everyday view stays calm.
+// "The Standby" home dissolves the old Settings PAGE into right-docked
+// inspectors reached by pressing the status they govern (status-is-the-
+// door) or the top-bar gear/agent. This module is now the shared library
+// of those cards; the InspectorHost composes them into inspectors. There
+// is no Settings page anymore — you fix a thing by pressing the thing
+// that told you it's wrong.
 //
 // HONESTY laws (carried over verbatim): configured-flags come from the
 // engine; saving a key shows "Saved", never "connected"; a Test gates
@@ -34,7 +25,6 @@ import {
   buildAiModelPatch,
 } from "@/lib/intelligence";
 import { useSettings } from "@/lib/settings";
-import ConnectionsCard from "@/views/BrokerConnections";
 import {
   cmd,
   onEvent,
@@ -47,78 +37,6 @@ import {
   type UpdateInfo,
 } from "@/lib/tauri";
 
-export default function Settings() {
-  return (
-    <div className="settings">
-      <h1>Settings</h1>
-
-      {/* 1 — Connections (brokers + data providers + GitHub). One
-          unified list of everything this install connects to: the
-          ConnectionsCard merges the old Brokers + Data Sources cards
-          (every connector carries provides_data / provides_execution,
-          so a "data source" is just a connection with data-only
-          capability — no reason for two cards). */}
-      <SettingsSection title="Connections">
-        <div className="sgcell full">
-          <ConnectionsCard />
-        </div>
-        <div className="sgcell">
-          <GithubCard />
-        </div>
-      </SettingsSection>
-
-      {/* 2 — Intelligence (the agent the IDE uses). */}
-      <SettingsSection title="Intelligence">
-        <div className="sgcell full">
-          <IntelligenceCard />
-        </div>
-      </SettingsSection>
-
-      {/* 3 — License · 4 — General. */}
-      <SettingsSection title="Account">
-        <div className="sgcell">
-          <LicenseCard />
-        </div>
-        <div className="sgcell">
-          <GeneralCard />
-        </div>
-      </SettingsSection>
-
-      {/* 5 — System (slim maintenance strip). */}
-      <SettingsSection title="System">
-        <div className="sgcell">
-          <SystemCard />
-        </div>
-        <div className="sgcell">
-          <IdeUpdateCard />
-        </div>
-      </SettingsSection>
-
-      {/* Advanced / Diagnostics — collapsed by default each session. */}
-      <AdvancedDrawer />
-    </div>
-  );
-}
-
-/** One titled group of cards. The mono-label heading recedes; the cards
- *  do the talking (Percept). */
-function SettingsSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <div className="section-head">
-        <h2>{title}</h2>
-      </div>
-      <div className="settings-grid">{children}</div>
-    </section>
-  );
-}
-
 // ── License ──────────────────────────────────────────────────────
 //
 // License is a one-time global setup. The rail shows the tier; full
@@ -126,7 +44,7 @@ function SettingsSection({
 // aggregate, so the card reflects what the engine actually applied (not
 // just what's in the vault).
 
-function LicenseCard() {
+export function LicenseCard() {
   const { settings, refresh: refreshShared } = useSettings();
   const [stored, setStored] = useState<string | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
@@ -288,7 +206,7 @@ function humanizePrefKey(key: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function GeneralCard() {
+export function GeneralCard() {
   const { settings, loading, error, refresh } = useSettings();
   const prefs = settings?.prefs;
 
@@ -396,7 +314,7 @@ function PrefToggle({
 // preflight live in the Advanced / Diagnostics drawer — System keeps the
 // glance, the drawer keeps the deep detail.
 
-function SystemCard() {
+export function SystemCard() {
   // Install + Docker
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [installing, setInstalling] = useState(false);
@@ -653,7 +571,7 @@ function formatSize(bytes: number): string {
   return `${mb.toFixed(1)} MB`;
 }
 
-function IdeUpdateCard() {
+export function IdeUpdateCard() {
   const [info, setInfo] = useState<IdeUpdateInfo | null>(null);
   const [checkState, setCheckState] = useState<"loading" | "ok" | "error">(
     "loading",
@@ -866,7 +784,7 @@ function IdeUpdateCard() {
 // selection + the key. See src/lib/intelligence.ts for the engine vs
 // IDE identity mapping.
 
-function IntelligenceCard() {
+export function IntelligenceCard() {
   const { settings, refresh } = useSettings();
   const current = settings?.ai_model;
 
@@ -1017,7 +935,7 @@ type GithubPhase =
   | { kind: "awaiting"; userCode: string; uri: string }
   | { kind: "error"; message: string };
 
-function GithubCard() {
+export function GithubCard() {
   const [phase, setPhase] = useState<GithubPhase>({ kind: "loading" });
   const mountedRef = useRef(true);
   const pollRef = useRef<number | null>(null);
@@ -1150,7 +1068,7 @@ function GithubCard() {
 type LaunchTarget = "ide" | "browser";
 const LAUNCH_TARGET_KEY = "auracle_launch_target";
 
-function AdvancedDrawer() {
+export function AdvancedDrawer() {
   const [open, setOpen] = useState(false);
 
   return (
