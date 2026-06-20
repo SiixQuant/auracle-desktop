@@ -33,6 +33,43 @@ use super::to_error_string;
 const SETTINGS_PATH: &str = "/ui/api/settings";
 const TIMEOUT_SECS: u64 = 8;
 
+/// The native IDE's Auracle-Agent provider id. The IDE's language-model
+/// provider declares this (see the IDE's
+/// `crates/language_models/src/provider/auracle.rs`), and the launcher's
+/// Intelligence card uses it as the selector identity for the default
+/// agent. The engine, however, validates `ai_model.provider` against its
+/// `_AI_PROVIDERS` whitelist — which does NOT contain `auracle-agent`.
+const IDE_AGENT_PROVIDER: &str = "auracle-agent";
+
+/// The engine-valid provider the Auracle Agent's DeepSeek key vaults
+/// under. A member of the engine's `_AI_PROVIDERS` whitelist, so the key
+/// resolves and `configured` reports honest engine truth.
+const ENGINE_DEEPSEEK_PROVIDER: &str = "deepseek_api_key";
+
+/// Normalize an AI-model patch at the launcher↔engine boundary.
+///
+/// The Intelligence card persists the engine-valid provider directly, but
+/// a defensive map here means the engine never 400s even if a caller (the
+/// card today, or a future IDE-side caller) sends the IDE-facing
+/// `auracle-agent` selection identity: it is rewritten to the whitelisted
+/// `deepseek_api_key` so the vaulted DeepSeek key resolves and the
+/// `configured` flag stays truthful. Any other provider passes through
+/// unchanged — the engine remains the authority on what it accepts.
+///
+/// Mutates only `ai_model.provider`; the model id and key ride untouched.
+/// A key value is never read or logged here.
+fn normalize_ai_provider(patch: &mut Value) {
+    let Some(ai) = patch.get_mut("ai_model").and_then(Value::as_object_mut) else {
+        return;
+    };
+    if ai.get("provider").and_then(Value::as_str) == Some(IDE_AGENT_PROVIDER) {
+        ai.insert(
+            "provider".to_string(),
+            Value::String(ENGINE_DEEPSEEK_PROVIDER.to_string()),
+        );
+    }
+}
+
 /// Shared client: short timeout, no proxy. reqwest sends no `Origin`
 /// header, which keeps the engine's CSRF/origin gates happy for an
 /// on-box caller.
@@ -78,7 +115,13 @@ pub async fn settings_get() -> Result<Value, String> {
 /// success the fresh aggregate is returned so the caller can refresh
 /// without a second round-trip.
 #[tauri::command]
-pub async fn settings_put(patch: Value, etag: Option<String>) -> Result<Value, String> {
+pub async fn settings_put(mut patch: Value, etag: Option<String>) -> Result<Value, String> {
+    // Defensive boundary map: the IDE-facing `auracle-agent` selection
+    // identity becomes the engine-valid `deepseek_api_key` so the engine
+    // never 400s and the vaulted DeepSeek key resolves. No-op for every
+    // other provider (and when there's no ai_model section).
+    normalize_ai_provider(&mut patch);
+
     let client = client()?;
     let owner_key = fetch_owner_api_key(&client).await?.ok_or_else(|| {
         "connect/sign in to the engine first — no on-box owner account was found".to_string()
@@ -129,4 +172,73 @@ pub async fn settings_put(patch: Value, etag: Option<String>) -> Result<Value, S
         );
     }
     Err(format!("the engine rejected the change ({status})"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// The Auracle Agent's IDE-facing selection identity (`auracle-agent`)
+    /// must be rewritten to the engine-valid `deepseek_api_key` so the
+    /// engine accepts it and the vaulted DeepSeek key resolves. This is the
+    /// load-bearing contract at the launcher↔engine seam.
+    #[test]
+    fn normalizes_auracle_agent_to_deepseek_provider() {
+        let mut patch = json!({
+            "ai_model": { "provider": "auracle-agent", "model_id": "deepseek-chat" }
+        });
+        normalize_ai_provider(&mut patch);
+        assert_eq!(patch["ai_model"]["provider"], json!("deepseek_api_key"));
+        // The model id is the IDE-consumed pair member and must ride
+        // through untouched — and must never be an invented "v4" id.
+        assert_eq!(patch["ai_model"]["model_id"], json!("deepseek-chat"));
+    }
+
+    /// A key value rides through the boundary map untouched and is never
+    /// dropped, mangled, or moved — only the provider tag is rewritten.
+    #[test]
+    fn preserves_key_when_normalizing_provider() {
+        let mut patch = json!({
+            "ai_model": {
+                "provider": "auracle-agent",
+                "model_id": "deepseek-chat",
+                "key": "sk-secret-value"
+            }
+        });
+        normalize_ai_provider(&mut patch);
+        assert_eq!(patch["ai_model"]["provider"], json!("deepseek_api_key"));
+        assert_eq!(patch["ai_model"]["key"], json!("sk-secret-value"));
+    }
+
+    /// Frontier BYO providers are already engine-valid and must pass
+    /// through unchanged — the map is DeepSeek-alias-only, not a rewrite
+    /// of every provider.
+    #[test]
+    fn leaves_frontier_providers_unchanged() {
+        for provider in [
+            "deepseek_api_key",
+            "anthropic",
+            "openai_api_key",
+            "ollama_host",
+        ] {
+            let mut patch = json!({ "ai_model": { "provider": provider, "model_id": "" } });
+            normalize_ai_provider(&mut patch);
+            assert_eq!(
+                patch["ai_model"]["provider"],
+                json!(provider),
+                "provider {provider} should pass through unchanged",
+            );
+        }
+    }
+
+    /// A prefs-only patch (the General card's path) has no `ai_model`
+    /// section and must be left exactly as-is.
+    #[test]
+    fn leaves_prefs_only_patch_untouched() {
+        let mut patch = json!({ "prefs": { "yfinance_auto_ingest": false } });
+        let before = patch.clone();
+        normalize_ai_provider(&mut patch);
+        assert_eq!(patch, before);
+    }
 }
