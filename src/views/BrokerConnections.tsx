@@ -1,30 +1,48 @@
-// BrokerConnections — a compact, enterprise-grade connections
-// directory for the Settings page.
+// Connections — ONE capability-tagged directory for everything this
+// install connects to: execution brokers, crypto venues, AND market-data
+// providers, in a single list.
 //
-// Layout (per the connections-directory pattern used by Stripe / Datadog
-// / Linear): a search box + category filter, then status-first sections
-// — "Connected" pinned on top, then the catalog grouped by category
-// (Brokers · Crypto exchanges · Market data). Each row is a fixed
-// 4-zone lane: monogram · name + asset chips + capability badges ·
-// status pill · one action.
+// Why one list (not a Brokers card + a Data Sources card): the engine
+// already models every connector by capability — each carries
+// provides_data + provides_execution (broker_connections.rs, sourced
+// from the engine's /ui/api/connectors registry). A "data source" is
+// just a connection with provides_data:true, provides_execution:false;
+// IBKR is data+execution. So two cards were redundant — they're merged
+// here, grouped but never split.
+//
+// Layout (the connections-directory pattern used by Stripe / Datadog /
+// Linear): a search box + category filter, then status-first sections —
+// "Your connections" pinned on top, then the catalog grouped by category
+// (Brokers · Crypto exchanges · Market data). Each row is a fixed 4-zone
+// lane: monogram · name + asset chips + capability badges · status pill ·
+// one action that FITS the connector.
+//
+// The connect action is per-connector, derived from engine truth:
+//   * execution-capable broker (IBKR) → the in-app gateway/portal login
+//     (the IbeamSetup sub-card + a one-click Sign in).
+//   * data-only provider with a key flow (Polygon / EODHD / …) → the
+//     API-key entry/test form (dataKeySave / dataKeyTest → /ui/api/keys),
+//     expanded inline under the row.
+//   * anything with no real launcher flow yet → "coming soon", no action.
 //
 // Honesty contract:
-//   * The Data / Trade capability badges reflect REAL engine + adapter
-//     support (broker_connections.rs sets provides_data /
-//     provides_execution from what actually ships). They are neutral,
-//     hairline chips — never colored — so they describe a source's
-//     capability without implying a live connection.
+//   * Data / Trade capability badges reflect REAL engine + adapter
+//     support (provides_data / provides_execution from the engine
+//     registry). They are neutral, hairline chips — never colored — so
+//     they describe a source's capability without implying a live
+//     connection.
 //   * The colored status pill is the ONLY claim about this launcher's
-//     connection. "Coming soon" rows are dimmed, carry no action
-//     button (structurally — the action switch returns null), and are
-//     aria-disabled, so a non-connectable source can never be misread
-//     as working.
-//   * IBKR is the one source with a one-click connect flow today; its
-//     row hosts the IbeamSetup sub-card.
+//     connection. A data-key provider shows "Saved" (not "connected")
+//     until a Test passes; the "configured"/"verified" badge is engine
+//     truth. "Coming soon" rows are dimmed, carry no action, and are
+//     aria-disabled, so a non-connectable source can never be misread as
+//     working.
+//   * A key VALUE is never logged, never placed in a URL, never displayed.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import IncidentCard from "@/components/IncidentCard";
+import { useSettings } from "@/lib/settings";
 import IbeamSetup from "@/views/IbeamSetup";
 // Official broker marks — used under nominative fair use to identify the
 // connection (full provenance in each SVG's header). ONLY verified,
@@ -39,7 +57,77 @@ import {
   type BrokerStatus,
 } from "@/lib/tauri";
 
-export default function BrokerConnectionsCard() {
+// ── Data-key providers (engine `market_data` key category) ──────────
+//
+// These connect by an API key saved through the engine's /ui/api/keys
+// surface (the door the retired Houston "Key Master" used). The list is
+// the engine's PROVIDER_CATEGORIES["market_data"].members from
+// auracle/keys.py — kept in sync with the engine; an unknown provider is
+// rejected with a 404 by /ui/api/keys.
+//
+// Some of these (polygon, eodhd) also appear in the connector registry
+// with real capability truth; the others (nasdaq_data_link, brain,
+// coingecko) live ONLY in the key category, so we synthesize a data row
+// for any that the registry doesn't already carry — keeping ONE list.
+const DATA_KEY_PROVIDERS: Record<string, { label: string; hint: string }> = {
+  polygon: { label: "Polygon.io", hint: "polygon api key" },
+  eodhd: { label: "EOD Historical Data", hint: "eodhd api token" },
+  nasdaq_data_link: {
+    label: "Nasdaq Data Link (Sharadar)",
+    hint: "ndl key",
+  },
+  brain: {
+    label: "Brain Company (BSI / BLMCF)",
+    hint: "Brain subscription key",
+  },
+  coingecko: {
+    label: "CoinGecko Pro",
+    hint: "CG-… (Pro key — free tier needs none)",
+  },
+};
+
+/** True when a connector connects by a data-provider API key (the
+ *  /ui/api/keys flow), so the row shows the key entry/test form instead
+ *  of a broker login. */
+function isDataKeyProvider(id: string): boolean {
+  return Object.prototype.hasOwnProperty.call(DATA_KEY_PROVIDERS, id);
+}
+
+/** Merge the engine connector catalog with the data-key providers into
+ *  ONE row model. Pure (no IO) so it's unit-testable. Data-key providers
+ *  the registry already carries (polygon, eodhd) are left as-is — they
+ *  keep their engine capability truth and just gain the key action via
+ *  isDataKeyProvider. Data-key providers the registry does NOT carry
+ *  (nasdaq_data_link, brain, coingecko) are appended as synthesized
+ *  data-only rows so they appear in the same list rather than a second
+ *  card. Synthesized rows claim provides_data:true (they exist to feed
+ *  market data) and never claim execution. */
+export function mergeDataKeyProviders(catalog: BrokerStatus[]): BrokerStatus[] {
+  const present = new Set(catalog.map((b) => b.id.toLowerCase()));
+  const synthesized: BrokerStatus[] = [];
+  for (const [id, meta] of Object.entries(DATA_KEY_PROVIDERS)) {
+    if (present.has(id.toLowerCase())) continue;
+    synthesized.push({
+      id,
+      label: meta.label,
+      description: "Market-data provider — connects with an API key.",
+      capabilities: [],
+      category: "data",
+      assets: [],
+      provides_data: true,
+      provides_execution: false,
+      connect_method: "none",
+      // A data-key provider isn't a wired adapter, so its base "state"
+      // is not_implemented; the row treats it as connectable purely
+      // because it has the key form (isDataKeyProvider), so it lands in
+      // "Your connections" with the Save/Test action, NOT "coming soon".
+      state: { state: "not_implemented" },
+    });
+  }
+  return [...catalog, ...synthesized];
+}
+
+export default function ConnectionsCard() {
   const [statuses, setStatuses] = useState<BrokerStatus[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +138,9 @@ export default function BrokerConnectionsCard() {
     setError(null);
     try {
       const result = await cmd.forgeBrokerStatus();
-      setStatuses(result);
+      // Fold the data-key providers into the same list — one unified
+      // directory of everything this install connects to.
+      setStatuses(mergeDataKeyProviders(result));
     } catch (err) {
       setError(String(err));
     } finally {
@@ -112,8 +202,9 @@ export default function BrokerConnectionsCard() {
         </button>
       </div>
       <p className="muted fs-sm m-0 mb-3">
-        Connect once — used everywhere in Auracle. IBKR connects right here
-        in-app; data-provider keys are entered in the Data sources card above.
+        Connect once — used everywhere in Auracle. Brokers, crypto venues,
+        and market-data providers in one place: IBKR signs in right here
+        in-app; data providers take an API key, also right here.
       </p>
       {houstonConflict && (
         <HoustonConflictBanner
@@ -125,7 +216,7 @@ export default function BrokerConnectionsCard() {
       {!statuses && !error && (
         <div className="muted fs-xs mt-1">Checking…</div>
       )}
-      {statuses && <BrokerDirectory statuses={statuses} onRefresh={refresh} />}
+      {statuses && <ConnectionsDirectory statuses={statuses} onRefresh={refresh} />}
     </div>
   );
 }
@@ -140,7 +231,14 @@ const CATEGORY_LABEL: Record<BrokerStatus["category"], string> = {
 };
 type Filter = "all" | BrokerStatus["category"];
 
-function BrokerDirectory({
+/** A connection has a real launcher flow when it's a wired adapter (any
+ *  state other than not_implemented) OR it's a data-key provider (it
+ *  takes an API key here). Coming-soon catalog rows are everything else. */
+function connectable(b: BrokerStatus): boolean {
+  return b.state.state !== "not_implemented" || isDataKeyProvider(b.id);
+}
+
+function ConnectionsDirectory({
   statuses,
   onRefresh,
 }: {
@@ -158,12 +256,10 @@ function BrokerDirectory({
     b.description.toLowerCase().includes(q) ||
     b.assets.some((a) => a.toLowerCase().includes(q));
 
-  const connectable = (b: BrokerStatus) => b.state.state !== "not_implemented";
-
-  // "Your connections" = sources with a real connect flow. Shown
-  // status-first and filtered by SEARCH only (never by the category
-  // chip) so a live connection never vanishes when the user filters
-  // to a category it doesn't belong to.
+  // "Your connections" = sources with a real connect flow (a wired
+  // adapter or a data-key provider). Shown status-first and filtered by
+  // SEARCH only (never by the category chip) so a live connection never
+  // vanishes when the user filters to a category it doesn't belong to.
   const connected = useMemo(
     () => statuses.filter((b) => connectable(b) && matchesSearch(b)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -256,10 +352,11 @@ function BrokerDirectory({
         <span className="method-tag method-tag--portal">Portal</span> = sign in
         through the broker&apos;s own secure login, opened right here —
         Interactive Brokers connects this way in-app.{" "}
-        <span className="method-tag">API key</span> and{" "}
-        <span className="method-tag">Wallet</span> brokers (Alpaca, ClearStreet,
-        Hyperliquid) are coming soon to the launcher; data-provider keys are
-        entered in the Data sources card above.
+        <span className="method-tag">API key</span> data providers (Polygon,
+        EODHD, …) take a key right here in the row.{" "}
+        <span className="method-tag">Wallet</span> brokers and the remaining
+        API-key brokers (Alpaca, ClearStreet, Hyperliquid) are coming soon to
+        the launcher.
       </p>
     </>
   );
@@ -275,7 +372,10 @@ function DirectoryRow({
   onRefresh: () => void;
 }) {
   const isIbkr = broker.id === "ibkr";
-  const soon = broker.state.state === "not_implemented";
+  const isDataKey = isDataKeyProvider(broker.id);
+  // A row is "coming soon" only when it has NO real launcher flow — a
+  // wired adapter that's not_implemented AND not a data-key provider.
+  const soon = broker.state.state === "not_implemented" && !isDataKey;
 
   return (
     <div
@@ -295,10 +395,13 @@ function DirectoryRow({
               data={broker.provides_data}
               trade={broker.provides_execution}
             />
-            <ConnectMethodTag method={broker.connect_method} />
+            <ConnectMethodTag
+              method={broker.connect_method}
+              isDataKey={isDataKey}
+            />
           </div>
         </div>
-        <StatePill state={broker.state} />
+        <StatePill state={broker.state} isDataKey={isDataKey} />
         <div className="dir-row__action">
           <RowAction broker={broker} onRefresh={onRefresh} />
         </div>
@@ -308,17 +411,24 @@ function DirectoryRow({
           <IbeamSetup onStateChange={onRefresh} />
         </div>
       )}
+      {isDataKey && (
+        <div className="dir-row__expand">
+          <DataKeyForm providerId={broker.id} />
+        </div>
+      )}
     </div>
   );
 }
 
-/** One primary action per row, mapped 1:1 to state. Coming-soon returns
- *  null — structurally impossible to show a clickable connect on a
- *  non-integrated source (honesty contract). For IBKR, the managed
- *  gateway lifecycle lives in the IbeamSetup sub-card, but when the
- *  gateway is up-and-unauthenticated the row offers a one-click "Sign in"
- *  that opens the broker's own Client Portal login (the portal-open the
- *  earlier wizard had). */
+/** One primary action per row, mapped to what the connector actually
+ *  supports. Coming-soon (wired adapter, not_implemented) returns null —
+ *  structurally impossible to show a clickable connect on a
+ *  non-integrated source (honesty contract). Data-key providers have no
+ *  trailing button (their action is the inline Save/Test form below);
+ *  the column stays empty so every status pill keeps its x-position. For
+ *  IBKR the managed gateway lifecycle lives in the IbeamSetup sub-card,
+ *  but when the gateway is up-and-unauthenticated the row offers a
+ *  one-click "Sign in" that opens the broker's own Client Portal login. */
 function RowAction({
   broker,
   onRefresh,
@@ -326,6 +436,9 @@ function RowAction({
   broker: BrokerStatus;
   onRefresh: () => void;
 }) {
+  // Data-key providers carry their action in the inline form, not a
+  // trailing button.
+  if (isDataKeyProvider(broker.id)) return null;
   if (broker.state.state === "not_implemented") return null;
   if (broker.id === "ibkr") {
     if (broker.state.state === "unauthenticated") {
@@ -346,6 +459,119 @@ function RowAction({
     );
   }
   return null;
+}
+
+/** Inline API-key entry/test for a data-key provider, expanded under the
+ *  row. Saves through the engine's /ui/api/keys surface over loopback.
+ *
+ *  HONESTY: a key is only "verified" after a Test passes — never inferred
+ *  from a Save. Save shows "Saved", not "connected". The "configured"
+ *  badge is read from the shared settings aggregate (engine truth — the
+ *  engine reports whether a key is on file, never the value). A 409 (paid
+ *  tier, vault unavailable) surfaces a plain remediation, never a fake
+ *  success. The key value never leaves the input → IPC body; it is never
+ *  logged or displayed. */
+function DataKeyForm({ providerId }: { providerId: string }) {
+  const { settings, refresh } = useSettings();
+  const meta = DATA_KEY_PROVIDERS[providerId];
+  const configured = settings?.data_keys?.[providerId]?.configured ?? false;
+
+  const [value, setValue] = useState("");
+  const [status, setStatus] = useState("");
+  // "verified" only after a Test passes. Never inferred from a Save.
+  const [verified, setVerified] = useState(false);
+  const [busy, setBusy] = useState<"save" | "test" | null>(null);
+
+  const save = async () => {
+    const v = value.trim();
+    if (!v) {
+      setStatus("Paste a key first.");
+      return;
+    }
+    setBusy("save");
+    setStatus("");
+    setVerified(false);
+    try {
+      await cmd.dataKeySave(providerId, v);
+      setStatus("Saved.");
+      // Refresh the shared aggregate so the "configured" badge updates
+      // from engine truth (the saved key is on file now).
+      refresh();
+    } catch (err) {
+      setStatus("Could not save: " + String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const test = async () => {
+    setBusy("test");
+    setStatus("");
+    try {
+      const ok = await cmd.dataKeyTest(providerId);
+      setVerified(ok);
+      setStatus(ok ? "Test passed." : "Test failed — the provider rejected the key.");
+    } catch (err) {
+      setVerified(false);
+      setStatus("Could not test: " + String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isError = /^(Could not|Paste|Test failed)/.test(status);
+
+  return (
+    <div className="datakey-form">
+      <div className="hstack mb-2">
+        <span className="muted fs-xs" style={{ flex: 1 }}>
+          {configured
+            ? "A key is on file. Paste a new one to replace it."
+            : "Add an API key so this provider's data works."}
+        </span>
+        {verified ? (
+          <span className="badge ok">verified</span>
+        ) : (
+          configured && <span className="badge neutral">configured</span>
+        )}
+      </div>
+      <form
+        className="hstack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <input
+          type="password"
+          placeholder={meta?.hint ?? "api key"}
+          autoComplete="off"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            // Editing the key invalidates a prior Test verdict.
+            if (verified) setVerified(false);
+          }}
+        />
+        <button type="submit" className="primary btn-sm" disabled={busy !== null}>
+          {busy === "save" ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          className="ghost btn-sm"
+          disabled={busy !== null}
+          onClick={() => void test()}
+        >
+          {busy === "test" ? "Testing…" : "Test"}
+        </button>
+      </form>
+      {status && (
+        <div className={isError ? "err-text fs-xs mt-2" : "muted mono fs-xs mt-2"}>
+          {status}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Opens the IBKR Client Portal login in the launcher's embedded webview
@@ -383,7 +609,19 @@ function IbkrSignInButton({
   );
 }
 
-function StatePill({ state }: { state: BrokerState }) {
+function StatePill({
+  state,
+  isDataKey,
+}: {
+  state: BrokerState;
+  isDataKey: boolean;
+}) {
+  // A data-key provider's not_implemented base state is not "coming
+  // soon" — it just means "needs a key". The configured/verified truth
+  // lives in the inline form's badge, so the pill stays quiet here.
+  if (state.state === "not_implemented" && isDataKey) {
+    return <span className="dir-pill soon">add key</span>;
+  }
   const cfg: Record<
     BrokerState["state"],
     { variant: string; label: string }
@@ -451,12 +689,31 @@ function CapabilityBadges({
   );
 }
 
-/** How you connect this broker from the launcher. "Portal" = an
- *  in-launcher gateway login flow exists today (accent); the others are
- *  honest about the real method so a non-portal broker is never mistaken
- *  for one. Data-only providers ("none") show nothing — they aren't a
- *  broker login. */
-function ConnectMethodTag({ method }: { method: BrokerStatus["connect_method"] }) {
+/** How you connect this source from the launcher. "Portal" = an
+ *  in-launcher gateway login flow exists today (accent). A data-key
+ *  provider shows an accented "API key" tag because it IS connectable
+ *  here (the inline form). The other "api_key"/"wallet" brokers are
+ *  neutral — honest that there's no in-launcher flow yet. Data-only
+ *  registry rows that aren't key-enterable ("none") show nothing. */
+function ConnectMethodTag({
+  method,
+  isDataKey,
+}: {
+  method: BrokerStatus["connect_method"];
+  isDataKey: boolean;
+}) {
+  // A connectable data-key provider: accented "API key" — it takes a key
+  // right here, so the tag is live, not the neutral "no flow yet" tone.
+  if (isDataKey) {
+    return (
+      <span
+        className="method-tag method-tag--portal"
+        title="Connects with an API key, entered right here in the row"
+      >
+        API key
+      </span>
+    );
+  }
   if (method === "none") return null;
   const cfg: Record<string, { label: string; cls: string; title: string }> = {
     gateway: {

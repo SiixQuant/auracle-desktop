@@ -34,7 +34,7 @@ import {
   buildAiModelPatch,
 } from "@/lib/intelligence";
 import { useSettings } from "@/lib/settings";
-import BrokerConnectionsCard from "@/views/BrokerConnections";
+import ConnectionsCard from "@/views/BrokerConnections";
 import {
   cmd,
   onEvent,
@@ -52,13 +52,15 @@ export default function Settings() {
     <div className="settings">
       <h1>Settings</h1>
 
-      {/* 1 — Connections (brokers + data keys + GitHub). */}
+      {/* 1 — Connections (brokers + data providers + GitHub). One
+          unified list of everything this install connects to: the
+          ConnectionsCard merges the old Brokers + Data Sources cards
+          (every connector carries provides_data / provides_execution,
+          so a "data source" is just a connection with data-only
+          capability — no reason for two cards). */}
       <SettingsSection title="Connections">
         <div className="sgcell full">
-          <BrokerConnectionsCard />
-        </div>
-        <div className="sgcell">
-          <DataSourcesCard />
+          <ConnectionsCard />
         </div>
         <div className="sgcell">
           <GithubCard />
@@ -839,151 +841,6 @@ function IdeUpdateCard() {
           >
             {info.notes}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Data sources (third-party data-provider API keys) ───────────
-//
-// Native replacement for the retired Houston "Key Master" web page,
-// scoped to DATA providers (broker credentials live in the Broker
-// Connections card). Each row saves through the engine's /ui/api/keys
-// surface over loopback.
-//
-// HONESTY: a row is only "verified" after a Test passes. Saving never
-// implies it works — Save shows "Saved". The "configured" badge reads
-// from the shared aggregate (engine truth, never the value).
-
-const DATA_PROVIDERS: { id: string; label: string; hint: string }[] = [
-  { id: "polygon", label: "Polygon.io", hint: "polygon api key" },
-  { id: "eodhd", label: "EOD Historical Data", hint: "eodhd api token" },
-  { id: "nasdaq_data_link", label: "Nasdaq Data Link (Sharadar)", hint: "ndl key" },
-  { id: "brain", label: "Brain Company (BSI / BLMCF)", hint: "Brain subscription key" },
-  { id: "coingecko", label: "CoinGecko Pro", hint: "CG-… (Pro key — free tier needs none)" },
-];
-
-function DataSourcesCard() {
-  const { settings, refresh } = useSettings();
-  return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">Data sources</span>
-      </div>
-      <p className="muted fs-sm m-0 mb-3 lh-relaxed">
-        Add API keys for third-party market-data providers so non-IBKR
-        data works. Keys are saved to your local engine, encrypted at rest.
-      </p>
-      {DATA_PROVIDERS.map((p) => (
-        <DataProviderRow
-          key={p.id}
-          provider={p}
-          configured={settings?.data_keys?.[p.id]?.configured ?? false}
-          onChanged={refresh}
-        />
-      ))}
-    </div>
-  );
-}
-
-function DataProviderRow({
-  provider,
-  configured,
-  onChanged,
-}: {
-  provider: { id: string; label: string; hint: string };
-  configured: boolean;
-  onChanged: () => void;
-}) {
-  const [value, setValue] = useState("");
-  const [status, setStatus] = useState("");
-  // "verified" only after a Test passes. Never inferred from a Save.
-  const [verified, setVerified] = useState(false);
-  const [busy, setBusy] = useState<"save" | "test" | null>(null);
-
-  const save = async () => {
-    const v = value.trim();
-    if (!v) {
-      setStatus("Paste a key first.");
-      return;
-    }
-    setBusy("save");
-    setStatus("");
-    setVerified(false);
-    try {
-      await cmd.dataKeySave(provider.id, v);
-      setStatus("Saved.");
-      // Refresh the shared aggregate so the "configured" badge updates
-      // from engine truth (the saved key is on file now).
-      onChanged();
-    } catch (err) {
-      setStatus("Could not save: " + String(err));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const test = async () => {
-    setBusy("test");
-    setStatus("");
-    try {
-      const ok = await cmd.dataKeyTest(provider.id);
-      setVerified(ok);
-      setStatus(ok ? "Test passed." : "Test failed — the provider rejected the key.");
-    } catch (err) {
-      setVerified(false);
-      setStatus("Could not test: " + String(err));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const isError = /^(Could not|Paste|Test failed)/.test(status);
-
-  return (
-    <div className="mt-3">
-      <div className="hstack mb-2">
-        <span className="fs-sm" style={{ flex: 1 }}>{provider.label}</span>
-        {verified ? (
-          <span className="badge ok">verified</span>
-        ) : (
-          configured && <span className="badge neutral">configured</span>
-        )}
-      </div>
-      <form
-        className="hstack"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <input
-          type="password"
-          placeholder={provider.hint}
-          autoComplete="off"
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            // Editing the key invalidates a prior Test verdict.
-            if (verified) setVerified(false);
-          }}
-        />
-        <button type="submit" className="primary btn-sm" disabled={busy !== null}>
-          {busy === "save" ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          className="ghost btn-sm"
-          disabled={busy !== null}
-          onClick={() => void test()}
-        >
-          {busy === "test" ? "Testing…" : "Test"}
-        </button>
-      </form>
-      {status && (
-        <div className={isError ? "err-text fs-xs mt-2" : "muted mono fs-xs mt-2"}>
-          {status}
         </div>
       )}
     </div>

@@ -571,6 +571,19 @@ h2 {
 .dir-row__action { justify-self: end; min-width: 0; }
 .dir-row__expand { padding: 0 0 10px; }
 
+/* Inline API-key form for a data-key provider, nested under its row.
+ * A quiet inset panel (one surface step in, hairline border) so the key
+ * entry reads as "part of this row" rather than a second card — the
+ * unified Connections list stays one list. Indented to clear the row's
+ * 32px monogram column so the form aligns with the connector's name. */
+.datakey-form {
+  margin-left: calc(32px + var(--s-3));
+  padding: var(--s-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
 .dir-legend {
   margin: var(--s-4) 0 0;
   padding-top: var(--s-3);
