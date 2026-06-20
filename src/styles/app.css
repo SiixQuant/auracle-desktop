@@ -912,6 +912,15 @@ pre.logs.logs-compact { max-height: 200px; }
   gap: var(--s-3);
   margin: var(--s-5) 0 var(--s-2);
 }
+/* Editorial band: the mono-label sits on a hairline rule so each section
+ * reads as a ruled band, and generous top whitespace separates bands. The
+ * Settings page (de-boxed cards) leans on this rule for structure since the
+ * blocks below no longer carry their own borders. */
+.settings .section-head {
+  margin: var(--s-6) 0 var(--s-3);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line);
+}
 /* Section head label = mono-label (Percept): SF Mono, tracked, uppercase,
  * tertiary ink — over a hairline divider. The data does the talking. */
 .section-head h2 {
@@ -1103,12 +1112,45 @@ table.data-table {
 }
 .sgcell { min-width: 0; }
 .sgcell.full { grid-column: 1 / -1; }
-/* The primary Connections panel sits on its OWN deeper plane (one step
-   below the small action cards) with a crisper edge — a directory "well"
-   that rows lift out of on hover. Differentiates the primary container
-   from the 3 small cards by tone, not by another shadow (in-language). */
-.sgcell.full > .card { background: var(--hero-bg); border-color: var(--line-strong); }
 .sgcell > .card { margin-bottom: 0; }
+
+/* Editorial-hairline Settings ─────────────────────────────────────
+ * On the Settings page the cards DROP their box: no fill, no border, no
+ * radius, no shadow. Each becomes a hairline-ruled block sitting under the
+ * section's mono-label, with whitespace (not a frame) doing the separating.
+ * Specificity is handled by the `.settings` scope — no !important. */
+.settings .card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--s-3) 0 var(--s-4);
+  margin-bottom: 0;
+}
+.settings .card:hover {
+  border: 0;
+  box-shadow: none;
+}
+/* Two de-boxed blocks share a grid track and read as one band — a hairline
+ * rule between stacked blocks keeps them legible without reintroducing the
+ * box. (Grid siblings sit side-by-side, so this only rules vertical stacks
+ * within a single column on a narrow window.) */
+
+/* EXCEPTION — the primary Connections directory keeps a subtle contained
+ * well: rows lift out of a deeper plane (one step below the canvas) with a
+ * crisper edge + the restrained card elevation. The `directory-well`
+ * modifier opts this one card back in. */
+.settings .card.directory-well {
+  background: var(--hero-bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-card), var(--hairline-top);
+  padding: var(--s-4);
+}
+.settings .card.directory-well:hover {
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--elev-card), var(--hairline-top);
+}
 
 /* In-card header — title (and optional action) live inside the card,
  * so a setting is one self-contained box instead of a floating
@@ -1122,6 +1164,10 @@ table.data-table {
   padding-bottom: var(--s-2);
   border-bottom: 1px solid var(--line);
 }
+/* Action-only header — no card-title (the section's mono-label already
+ * names the block), so the lone action/badge right-aligns instead of
+ * sitting flush-left where the absent title would be. */
+.card-head--action-only { justify-content: flex-end; }
 /* Section header = mono-label (Percept): SF Mono, tracked, uppercase,
  * tertiary ink. The data does the talking; the label recedes. */
 .card-title {
@@ -1272,7 +1318,7 @@ table.data-table {
 .hero__body { position: relative; z-index: 1; padding: 24px 26px; max-width: 440px; min-width: 0; }
 /* Medium weight, tracking-tight — this is product, not brand: no oversized
  * hero (rubric: headings 500, ~-0.02em, no showy display type). */
-.hero__title { font-family: var(--font-display); font-size: 34px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.05; margin: 0; }
+.hero__title { font-family: var(--font-display); font-size: 27px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.1; margin: 0; }
 .hero__sub { color: var(--fg-dim); font-size: 13px; margin: 7px 0 0; line-height: 1.5; }
 
 .btn-launch {

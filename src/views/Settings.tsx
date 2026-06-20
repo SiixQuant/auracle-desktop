@@ -922,10 +922,13 @@ function IntelligenceCard() {
 
   return (
     <div className="card">
-      <div className="card-head">
-        <span className="card-title">Intelligence</span>
-        {keyOnFile && <span className="badge ok">key on file</span>}
-      </div>
+      {/* The section's mono-label already says "Intelligence" — drop the
+          redundant card-title. Keep the "key on file" badge, right-aligned. */}
+      {keyOnFile && (
+        <div className="card-head card-head--action-only">
+          <span className="badge ok">key on file</span>
+        </div>
+      )}
       <p className="muted fs-sm m-0 mb-3 lh-relaxed">
         The agent the IDE uses. The Auracle Agent is the default — it wraps
         DeepSeek over your own engine on <span className="mono">127.0.0.1</span>,
