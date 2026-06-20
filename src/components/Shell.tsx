@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import Coachmark, { coachSeen } from "@/components/Coachmark";
 import CommandPalette from "@/components/CommandPalette";
 import Flame from "@/components/Flame";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
@@ -26,7 +27,9 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [containers, setContainers] = useState<ContainerStatus[]>([]);
   const [echo, setEcho] = useState<string | null>(null);
+  const [showCoach, setShowCoach] = useState(() => !coachSeen());
   const echoTimer = useRef<number | null>(null);
+  const showTips = useCallback(() => setShowCoach(true), []);
 
   // Live container names for the palette's restart commands.
   const loadContainers = useCallback(() => {
@@ -76,8 +79,9 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
         refresh: eng.refresh,
         openIdePanel: (p) => void openIdePanel(p),
         openTutorial: onOpenTutorial,
+        showTips,
       }),
-    [board, containers, runActuator, eng.refresh, onOpenTutorial],
+    [board, containers, runActuator, eng.refresh, onOpenTutorial, showTips],
   );
 
   const runCommand = useCallback(
@@ -187,7 +191,12 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
       </header>
 
       <main className="standby-stage">
-        <StandbyHome eng={eng} onActuator={runActuator} onDoor={(d) => setInspector(d)} />
+        <StandbyHome
+          eng={eng}
+          onActuator={runActuator}
+          onDoor={(d) => setInspector(d)}
+          onAgent={() => setInspector("intelligence")}
+        />
         <InspectorHost open={inspector} onClose={() => setInspector(null)} eng={eng} />
         {echo && (
           <div className="echo-line" role="status" aria-live="polite">
@@ -203,6 +212,8 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
           onRun={runCommand}
         />
       )}
+
+      {showCoach && <Coachmark onClose={() => setShowCoach(false)} />}
     </div>
   );
 }

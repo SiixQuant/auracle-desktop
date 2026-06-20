@@ -17,15 +17,16 @@ import {
   onEvent,
   openIdePanel,
   type BrokerPosition,
+  type BrokerStatus,
   type BrokerTickEvent,
 } from "@/lib/tauri";
 import type { EngineStateHook } from "@/lib/useEngineState";
+import SupervisionInspector from "@/components/SupervisionInspector";
 import ConnectionsCard from "@/views/BrokerConnections";
 import {
   AdvancedDrawer,
   GeneralCard,
   GithubCard,
-  HealthReadoutCard,
   IdeUpdateCard,
   IntelligenceCard,
   LicenseCard,
@@ -99,14 +100,13 @@ function InspectorBody({
     case "connections":
       return (
         <>
+          <UnblockersLegend />
           <ConnectionsCard />
           <GithubCard />
         </>
       );
     case "supervision":
-      // Phase 1: re-host the engine + Docker health readout. Phase 4
-      // replaces this with the per-container Supervision console.
-      return <HealthReadoutCard />;
+      return <SupervisionInspector />;
     case "account":
       return <AccountInspector eng={eng} onClose={onClose} />;
     case "intelligence":
@@ -122,6 +122,69 @@ function InspectorBody({
         </>
       );
   }
+}
+
+// ── Connections: "what this unblocks" ──────────────────────────────
+//
+// Pure derivation of the provides_data / provides_execution flags already
+// on every connector, so a missing key reads as a blocked lane ("Backtest
+// blocked") rather than an abstract unconfigured row. Live needs an
+// execution rail connected; Backtest needs a data rail connected.
+
+function UnblockersLegend() {
+  const [rows, setRows] = useState<BrokerStatus[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    cmd.forgeBrokerStatus().then((r) => alive && setRows(r)).catch(() => alive && setRows([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!rows) return null;
+
+  const connected = (r: BrokerStatus) => r.state.state === "connected";
+  const exec = rows.filter((r) => r.provides_execution);
+  const data = rows.filter((r) => r.provides_data);
+  const liveRail = exec.find(connected);
+  const dataRail = data.find(connected);
+
+  return (
+    <div className="unblockers">
+      <div className="unblockers__title">What this unblocks</div>
+      <Lane label="Live needs execution" rail={liveRail?.label} fallback={exec[0]?.label} />
+      <Lane label="Backtest needs data" rail={dataRail?.label} fallback={data[0]?.label} />
+    </div>
+  );
+}
+
+function Lane({
+  label,
+  rail,
+  fallback,
+}: {
+  label: string;
+  rail?: string;
+  fallback?: string;
+}) {
+  return (
+    <div className="unblockers__row">
+      <span className={`sdot ${rail ? "ok" : ""}`} />
+      <span>
+        {label} —{" "}
+        {rail ? (
+          <>
+            <span style={{ color: "var(--fg)" }}>{rail}</span>{" "}
+            <span style={{ color: "var(--ok)" }}>✓</span>
+          </>
+        ) : (
+          <span className="muted">
+            {fallback ? `connect ${fallback}` : "not connected"}
+          </span>
+        )}
+      </span>
+    </div>
+  );
 }
 
 // ── Account inspector (Phase 1 — current snapshot) ──────────────────

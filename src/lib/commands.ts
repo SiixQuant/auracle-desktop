@@ -36,6 +36,7 @@ export interface CommandContext {
   refresh: () => void;
   openIdePanel: (panel: string) => void;
   openTutorial: () => void;
+  showTips: () => void;
 }
 
 /** Build the full command list for the current state. The actuator command
@@ -121,6 +122,15 @@ export function buildCommands(ctx: CommandContext): Command[] {
     keywords: "reload poll update",
     relevance: 8,
     run: ctx.refresh,
+  });
+  cmds.push({
+    id: "tips",
+    title: "Show home tips",
+    verb: "tips",
+    group: "Help",
+    keywords: "coachmark anatomy lamp vitals learn",
+    relevance: 4,
+    run: ctx.showTips,
   });
   cmds.push({
     id: "tutorial",

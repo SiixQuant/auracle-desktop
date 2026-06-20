@@ -1862,3 +1862,125 @@ table.data-table {
   from { transform: scale(0.97); opacity: 0.4; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Streamed container/gateway logs. */
+.term-block {
+  background: #08090b;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font: 400 11px/1.55 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+
+/* Interrogable provenance — hover/focus a vital to audit the green dot. */
+.vital { position: relative; }
+.vital__prov {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  width: max-content;
+  max-width: 240px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font: 400 11px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--fg-dim);
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+  z-index: 30;
+}
+.vital:hover .vital__prov,
+.vital:focus-visible .vital__prov {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Agent on-ramp chip — the brain the workspace uses, beside the actuator. */
+.standby__agent {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+.standby__agent:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.standby__agent-label {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.standby__agent-name { font-size: 13px; color: var(--fg); }
+
+/* Inline incident on the home (progressive escalation). */
+.standby__incident { margin-top: 18px; width: min(440px, 92vw); text-align: left; }
+
+/* Connections "what this unblocks" legend. */
+.unblockers {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.unblockers__title {
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.unblockers__row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-dim); }
+
+/* First-home coachmark — learn the anatomy once. */
+.coach-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: insp-fade 0.18s ease-out;
+}
+.coach {
+  width: min(420px, 92vw);
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 20px 22px;
+  text-align: left;
+}
+.coach h3 { font-size: 16px; font-weight: 500; margin: 0 0 12px; color: var(--fg); }
+.coach__beat { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.coach__beat:last-of-type { border-bottom: 0; }
+.coach__n {
+  flex: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 500 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.coach__beat div { font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
+.coach__done {
+  margin-top: 16px;
+  background: var(--accent); color: var(--accent-ink);
+  border: 0; border-radius: 8px; padding: 9px 16px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}

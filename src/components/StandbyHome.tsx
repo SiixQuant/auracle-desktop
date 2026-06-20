@@ -7,6 +7,7 @@
 // derivations of one engine snapshot (deriveBoard), so what the home says
 // is, by construction, what the engine reports.
 
+import IncidentCard from "@/components/IncidentCard";
 import {
   deriveBoard,
   type ActuatorState,
@@ -14,12 +15,15 @@ import {
   type LampTone,
   type Vital,
 } from "@/lib/aggregator";
+import { agentById, agentIdFromEngineProvider } from "@/lib/intelligence";
+import { useSettings } from "@/lib/settings";
 import type { EngineStateHook } from "@/lib/useEngineState";
 
 export default function StandbyHome({
   eng,
   onActuator,
   onDoor,
+  onAgent,
 }: {
   /** Shared live engine read (owned by the Shell, so the home keeps
    *  polling behind an open inspector). */
@@ -29,9 +33,18 @@ export default function StandbyHome({
   onActuator: () => void;
   /** Open an inspector for a pressed status (status-is-the-door). */
   onDoor?: (door: Exclude<Door, null>) => void;
+  /** Open the Intelligence inspector (the agent on-ramp). */
+  onAgent?: () => void;
 }) {
+  const { settings } = useSettings();
   const board = deriveBoard(eng.state);
   const { actuator } = board;
+
+  const ai = settings?.ai_model;
+  const agentName = ai
+    ? agentById(agentIdFromEngineProvider(ai.provider))?.label ?? "Agent"
+    : "Auracle Agent";
+  const keyOnFile = ai?.configured ?? false;
 
   const asOf = stamp(eng.lastOkAt, eng.now, eng.state.brokerStale ?? false);
 
@@ -44,8 +57,25 @@ export default function StandbyHome({
 
       <Actuator actuator={actuator} onClick={onActuator} />
 
+      <button type="button" className="standby__agent" onClick={onAgent}>
+        <span className="standby__agent-label">agent</span>
+        <span className="standby__agent-name">{agentName}</span>
+        <span className={`vital__dot ${keyOnFile ? "ok" : ""}`} />
+      </button>
+
       {(eng.engineErr || eng.ideError) && (
         <div className="standby__err">{eng.engineErr || eng.ideError}</div>
+      )}
+
+      {board.lamp === "err" && (
+        <div className="standby__incident">
+          <IncidentCard
+            severity="err"
+            cause="The local engine isn't running."
+            detail="Start it to continue, or open Supervision to see the stack."
+            action={{ label: "Open Supervision", onClick: () => onDoor?.("supervision") }}
+          />
+        </div>
       )}
 
       <div className="standby__vitals" role="group" aria-label="System vitals">
@@ -127,6 +157,7 @@ function VitalButton({ v, onClick }: { v: Vital; onClick: () => void }) {
       <span className={`vital__value${v.key === "mode" && v.value === "LIVE" ? " is-live" : ""}`}>
         {v.freshness === "stale" ? "stale" : v.value}
       </span>
+      {v.provenance && <span className="vital__prov">{v.provenance}</span>}
     </button>
   );
 }

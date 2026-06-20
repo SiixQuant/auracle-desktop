@@ -1158,7 +1158,7 @@ function PreflightDrawerCard() {
 
 /** The detailed Docker/health readout — the full incident detail + retry
  *  that the slim System card deliberately omits. */
-export function HealthReadoutCard() {
+function HealthReadoutCard() {
   const [docker, setDocker] = useState<DockerStatus | null | "error">(null);
   const [dockerError, setDockerError] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthSnapshot | null | "error">(null);
