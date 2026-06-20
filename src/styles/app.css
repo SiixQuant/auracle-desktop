@@ -1624,3 +1624,112 @@ table.data-table {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
+
+/* ── Single-surface shell (replaces the rail) ──────────────────────
+ * A thin top bar + the Standby stage. No left rail: Connections /
+ * Supervision / Account are reached by pressing a vital (status-is-the-
+ * door); Intelligence + System live in the top bar. */
+.shell-standby {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 46px;
+  padding: 0 14px;
+  background: var(--bg-rail);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-dim);
+}
+.topbar__brand strong {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.topbar__actions { display: flex; align-items: center; gap: 4px; }
+.topbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+.topbar__btn:hover { background: var(--surface); color: var(--fg); }
+.topbar__btn.icon-only { padding: 7px; }
+
+.standby-stage {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+.standby-stage .standby { min-height: 100%; }
+
+/* Right-docked inspector — slides OVER a dimmed-but-still-live home. */
+.insp-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  animation: insp-fade 0.18s ease-out;
+}
+.insp {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 92vw);
+  z-index: 41;
+  background: var(--bg-elev);
+  border-left: 1px solid var(--line-strong);
+  display: flex;
+  flex-direction: column;
+  animation: insp-slide 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.insp__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.insp__title { font-size: 16px; font-weight: 500; margin: 0; color: var(--fg); }
+.insp__close {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.insp__close:hover { color: var(--fg); background: var(--surface); }
+.insp__body {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@keyframes insp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes insp-slide {
+  from { transform: translateX(24px); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}

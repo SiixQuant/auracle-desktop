@@ -14,16 +14,18 @@ import {
   type LampTone,
   type Vital,
 } from "@/lib/aggregator";
-import { useEngineState } from "@/lib/useEngineState";
+import type { EngineStateHook } from "@/lib/useEngineState";
 
 export default function StandbyHome({
+  eng,
   onDoor,
 }: {
-  /** Open an inspector for a pressed status (status-is-the-door). In
-   *  Phase 0 the host routes these to Settings; Phase 1 mounts inspectors. */
+  /** Shared live engine read (owned by the Shell, so the home keeps
+   *  polling behind an open inspector). */
+  eng: EngineStateHook;
+  /** Open an inspector for a pressed status (status-is-the-door). */
   onDoor?: (door: Exclude<Door, null>) => void;
 }) {
-  const eng = useEngineState();
   const board = deriveBoard(eng.state);
   const { actuator } = board;
 
