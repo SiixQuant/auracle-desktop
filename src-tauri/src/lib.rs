@@ -71,8 +71,8 @@ use commands::{
     github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
     ibkr_login as ibkr_login_cmd, ide_update as ide_update_cmd, installer as installer_cmd,
     keychain as keychain_cmd, mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
-    scheduled_update as scheduled_update_cmd, settings as settings_cmd, tray as tray_cmd,
-    update as update_cmd, view as view_cmd,
+    scheduled_update as scheduled_update_cmd, settings as settings_cmd, strategy as strategy_cmd,
+    tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -341,6 +341,9 @@ pub fn run() {
             // configured flags). Keeps the launcher + IDE in sync.
             settings_cmd::settings_get,
             settings_cmd::settings_put,
+            // Strategy lifecycle — read-only per-stage states for the
+            // home's lifecycle belt (degrades to labels-only honestly).
+            strategy_cmd::strategy_states,
             // Broker data — first-class Tauri commands so any view
             // in the app (launcher Dashboard, Forge widgets, tray
             // menu, anything we build next) can pull live broker

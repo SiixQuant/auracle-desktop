@@ -298,6 +298,15 @@ export const cmd = {
   settingsPut: (patch: SettingsPatch, etag?: string) =>
     invoke<SettingsAggregate>("settings_put", { patch, etag }),
 
+  // ── Strategy lifecycle (read-only) ───────────────────────────
+  //
+  // Per-strategy lifecycle state for the home's lifecycle belt. Read-only
+  // and owner-gated over loopback (mirrors settings_get). Rejects when the
+  // engine has no states route yet OR isn't reachable — the belt then
+  // degrades to labels-only and never fabricates a count. `from_houston`
+  // is false when the engine served a cache rather than fresh truth.
+  strategyStates: () => invoke<StrategyStates>("strategy_states"),
+
   // ── Broker data (launcher-global, callable from any view) ────
   //
   // Same code paths the Forge agent uses, exposed as first-class

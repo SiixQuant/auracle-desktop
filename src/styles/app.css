@@ -1947,6 +1947,38 @@ table.data-table {
 }
 .unblockers__row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-dim); }
 
+/* Strategy lifecycle belt — read-only six-stage spine of work. */
+.belt {
+  display: flex;
+  margin-top: 4px;
+  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+}
+.belt__seg {
+  flex: 1;
+  text-align: center;
+  padding: 9px 2px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out;
+}
+.belt__seg:last-child { border-right: 0; }
+.belt__seg:hover { background: var(--surface-2); }
+.belt__seg b {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fg-dim);
+  margin-bottom: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.belt__seg.live { color: var(--accent-text); background: var(--accent-soft); border-radius: 6px; }
+.belt__seg.live b { color: var(--accent-text); }
+
 /* First-home coachmark — learn the anatomy once. */
 .coach-scrim {
   position: fixed;

@@ -29,7 +29,7 @@ export interface Command {
 export interface CommandContext {
   board: BoardState;
   containers: ContainerStatus[];
-  openInspector: (key: Door | "intelligence" | "system") => void;
+  openInspector: (key: Door | "intelligence" | "system" | "lifecycle") => void;
   /** The home's one verb (launch / start engine / connect / …). */
   runActuator: () => void;
   restartContainer: (name: string) => void;
@@ -63,10 +63,13 @@ export function buildCommands(ctx: CommandContext): Command[] {
   }
 
   // Destinations (status-is-the-door, also reachable by name).
-  const dests: Array<[Door | "intelligence" | "system", string, string, string]> = [
+  const dests: Array<
+    [Door | "intelligence" | "system" | "lifecycle", string, string, string]
+  > = [
     ["connections", "Open Connections", "connections", "broker data feed ibkr keys"],
     ["supervision", "Open Supervision", "supervision", "engine docker containers logs"],
     ["account", "Open Account", "account", "pnl positions exposure net liq"],
+    ["lifecycle", "Open Strategy lifecycle", "lifecycle", "strategies belt draft paper live"],
     ["intelligence", "Open Intelligence", "intelligence", "agent model deepseek ai key"],
     ["system", "Open System", "system", "license updates preferences settings"],
   ];

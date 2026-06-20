@@ -21,6 +21,7 @@ import {
   type BrokerTickEvent,
 } from "@/lib/tauri";
 import type { EngineStateHook } from "@/lib/useEngineState";
+import LifecycleInspector from "@/components/LifecycleInspector";
 import SupervisionInspector from "@/components/SupervisionInspector";
 import ConnectionsCard from "@/views/BrokerConnections";
 import {
@@ -38,7 +39,8 @@ export type InspectorKey =
   | "supervision"
   | "account"
   | "intelligence"
-  | "system";
+  | "system"
+  | "lifecycle";
 
 const TITLES: Record<InspectorKey, string> = {
   connections: "Connections",
@@ -46,6 +48,7 @@ const TITLES: Record<InspectorKey, string> = {
   account: "Account",
   intelligence: "Intelligence",
   system: "System",
+  lifecycle: "Strategy lifecycle",
 };
 
 export default function InspectorHost({
@@ -107,6 +110,8 @@ function InspectorBody({
       );
     case "supervision":
       return <SupervisionInspector />;
+    case "lifecycle":
+      return <LifecycleInspector />;
     case "account":
       return <AccountInspector eng={eng} onClose={onClose} />;
     case "intelligence":
