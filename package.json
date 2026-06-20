@@ -1,6 +1,6 @@
 {
   "name": "auracle-desktop-frontend",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Auracle Desktop frontend — React + Vite + TypeScript shell that ships inside the Tauri launcher.",
   "type": "module",
