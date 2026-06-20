@@ -1,22 +1,49 @@
-// Settings — install + Docker state, launcher updates, broker connections.
+// Settings — the launcher's Global Control Plane.
 //
-// License management lives on the Dashboard so customers see it on
-// first launch. Keeping it out of Settings avoids two places to
-// enter the same key + the confusion that comes with that.
+// The single home for every decision shared across this install. Cards
+// are ordered by how the product is actually set up, not by component
+// age:
+//
+//   1. Connections — brokers + data-provider keys + GitHub, the one
+//      "things I connect to" category.
+//   2. Intelligence — the agent the IDE uses (Auracle Agent default;
+//      frontier models as BYO-key alternatives).
+//   3. License — paste / activate / clear; live tier from engine truth.
+//   4. General — engine preferences that used to be engine-only.
+//   5. System — a slim maintenance strip (install, Docker, updates).
+//
+// Everything diagnostic or first-run folds into the Advanced /
+// Diagnostics drawer at the bottom, collapsed by default each session,
+// so the everyday view stays calm.
+//
+// HONESTY laws (carried over verbatim): configured-flags come from the
+// engine; saving a key shows "Saved", never "connected"; a Test gates
+// "verified"; a 409 surfaces a plain remediation, never a fake success;
+// a key value is never displayed, stored, or logged; "couldn't reach the
+// engine" is distinct from "nothing configured".
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import ConfirmRow from "@/components/ConfirmRow";
 import IncidentCard from "@/components/IncidentCard";
-import BrokerConnectionsCard from "@/views/BrokerConnections";
+import Tutorial from "@/components/Tutorial";
+import {
+  AGENTS,
+  agentById,
+  agentIdFromEngineProvider,
+  buildAiModelPatch,
+} from "@/lib/intelligence";
 import { useSettings } from "@/lib/settings";
+import BrokerConnectionsCard from "@/views/BrokerConnections";
 import {
   cmd,
   onEvent,
   openInBrowser,
   type DockerStatus,
+  type HealthSnapshot,
   type IdeUpdateInfo,
   type IdeUpdateProgressEvent,
+  type PreflightReport,
   type UpdateInfo,
 } from "@/lib/tauri";
 
@@ -24,24 +51,78 @@ export default function Settings() {
   return (
     <div className="settings">
       <h1>Settings</h1>
-      <div className="settings-grid">
-        <div className="sgcell"><LicenseCard /></div>
-        <div className="sgcell"><SystemCard /></div>
-        <div className="sgcell"><IdeUpdateCard /></div>
-        <div className="sgcell"><DataSourcesCard /></div>
-        <div className="sgcell"><AiModelCard /></div>
-        <div className="sgcell"><GithubCard /></div>
-        <div className="sgcell full"><BrokerConnectionsCard /></div>
-      </div>
+
+      {/* 1 — Connections (brokers + data keys + GitHub). */}
+      <SettingsSection title="Connections">
+        <div className="sgcell full">
+          <BrokerConnectionsCard />
+        </div>
+        <div className="sgcell">
+          <DataSourcesCard />
+        </div>
+        <div className="sgcell">
+          <GithubCard />
+        </div>
+      </SettingsSection>
+
+      {/* 2 — Intelligence (the agent the IDE uses). */}
+      <SettingsSection title="Intelligence">
+        <div className="sgcell full">
+          <IntelligenceCard />
+        </div>
+      </SettingsSection>
+
+      {/* 3 — License · 4 — General. */}
+      <SettingsSection title="Account">
+        <div className="sgcell">
+          <LicenseCard />
+        </div>
+        <div className="sgcell">
+          <GeneralCard />
+        </div>
+      </SettingsSection>
+
+      {/* 5 — System (slim maintenance strip). */}
+      <SettingsSection title="System">
+        <div className="sgcell">
+          <SystemCard />
+        </div>
+        <div className="sgcell">
+          <IdeUpdateCard />
+        </div>
+      </SettingsSection>
+
+      {/* Advanced / Diagnostics — collapsed by default each session. */}
+      <AdvancedDrawer />
     </div>
+  );
+}
+
+/** One titled group of cards. The mono-label heading recedes; the cards
+ *  do the talking (Percept). */
+function SettingsSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="section-head">
+        <h2>{title}</h2>
+      </div>
+      <div className="settings-grid">{children}</div>
+    </section>
   );
 }
 
 // ── License ──────────────────────────────────────────────────────
 //
-// Moved here from the home in the v7.1 hub: license is a one-time
-// global setup, not a daily glance. The rail shows the tier
-// (Community / Licensed); full management lives here.
+// License is a one-time global setup. The rail shows the tier; full
+// management lives here. The engine's live tier comes from the shared
+// aggregate, so the card reflects what the engine actually applied (not
+// just what's in the vault).
 
 function LicenseCard() {
   const { settings, refresh: refreshShared } = useSettings();
@@ -63,8 +144,6 @@ function LicenseCard() {
 
   if (stored === undefined) return null;
 
-  // The engine's live tier comes from the shared aggregate, so the card
-  // reflects what the engine actually applied (not just what's in the vault).
   const tier = settings?.tier;
 
   return (
@@ -126,9 +205,8 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
     }
     try {
       await cmd.licenseSet(v);
-      // Flip the running engine's tier now (best-effort). The web License
-      // page used to do this; the portal is gone, so the launcher owns it.
-      // The key is already in the vault, so engine-unreachable is not fatal.
+      // Flip the running engine's tier now (best-effort). The key is
+      // already in the vault, so engine-unreachable is not fatal.
       try {
         const tier = await cmd.licenseActivateEngine(v);
         setStatus(
@@ -181,12 +259,140 @@ function ActivationCard({ onSaved }: { onSaved: () => void }) {
   );
 }
 
+// ── General (engine preferences) ─────────────────────────────────
+//
+// Surfaces engine preferences that used to be engine-only (and only
+// reachable through the retired Houston web pages). Reads `prefs` from
+// the shared aggregate and renders each as a real toggle that PUTs
+// {prefs:{...}} — etag-guarded, so a change made in the IDE can't be
+// clobbered. The card is data-driven off the prefs the engine reports,
+// so a future engine pref appears without a launcher rewrite.
+//
+// HONESTY: a 409 surfaces a plain "changed elsewhere — reload" line, not
+// a fake success. An unreachable engine is distinct from "no prefs".
+
+// Friendly labels + help for the prefs we know about. Unknown keys fall
+// back to a humanized key name so a new engine pref is still operable.
+const PREF_META: Record<string, { label: string; help: string }> = {
+  yfinance_auto_ingest: {
+    label: "Auto-ingest market data (yfinance)",
+    help: "When on, the engine pulls missing daily bars from yfinance on demand. Turn off to lock backtests to a chosen provider for reproducibility.",
+  },
+};
+
+function humanizePrefKey(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function GeneralCard() {
+  const { settings, loading, error, refresh } = useSettings();
+  const prefs = settings?.prefs;
+
+  // Only boolean prefs render as toggles. ai_model_* live in the
+  // Intelligence card; non-boolean prefs would need a different control,
+  // so they're skipped here rather than mis-rendered.
+  const boolKeys = prefs
+    ? Object.keys(prefs)
+        .filter((k) => typeof prefs[k] === "boolean")
+        .sort()
+    : [];
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">General</span>
+      </div>
+      <p className="muted fs-sm m-0 mb-3 lh-relaxed">
+        Engine preferences shared across the launcher and the IDE.
+      </p>
+      {settings === null ? (
+        error ? (
+          <div className="err-text fs-xs lh-relaxed">
+            Couldn&apos;t reach the engine to load preferences.
+          </div>
+        ) : (
+          <div className="muted fs-sm">{loading ? "Loading…" : "No preferences."}</div>
+        )
+      ) : boolKeys.length === 0 ? (
+        <div className="muted fs-sm">No adjustable preferences.</div>
+      ) : (
+        boolKeys.map((key) => (
+          <PrefToggle
+            key={key}
+            prefKey={key}
+            value={prefs![key] as boolean}
+            etag={settings.etag}
+            onChanged={refresh}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+function PrefToggle({
+  prefKey,
+  value,
+  etag,
+  onChanged,
+}: {
+  prefKey: string;
+  value: boolean;
+  etag: string;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const meta = PREF_META[prefKey];
+
+  const toggle = async () => {
+    setBusy(true);
+    setStatus("");
+    try {
+      await cmd.settingsPut({ prefs: { [prefKey]: !value } }, etag);
+      // Re-read from engine truth — never optimistically flip the UI.
+      onChanged();
+    } catch (err) {
+      setStatus(String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3">
+      <div className="row">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="fs-sm">{meta?.label ?? humanizePrefKey(prefKey)}</div>
+          {meta?.help && (
+            <div className="muted fs-xs mt-1 lh-relaxed">{meta.help}</div>
+          )}
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={value}
+          aria-label={meta?.label ?? humanizePrefKey(prefKey)}
+          className={`pref-switch${value ? " on" : ""}`}
+          disabled={busy}
+          onClick={() => void toggle()}
+        >
+          <span className="pref-switch__knob" />
+        </button>
+      </div>
+      {status && <div className="err-text fs-xs mt-2 lh-relaxed">{status}</div>}
+    </div>
+  );
+}
+
 // ── System (install · docker · launcher updates) ────────────────
 //
-// Installation and Updates were two sections for one concern —
-// "system & maintenance." Merged into a single card: install
-// directory, Docker state, and the launcher version + update
-// control, in that order.
+// A slim maintenance strip: install state, the Docker glance chip,
+// launcher version + update. The DETAILED Docker incident readout and
+// preflight live in the Advanced / Diagnostics drawer — System keeps the
+// glance, the drawer keeps the deep detail.
 
 function SystemCard() {
   // Install + Docker
@@ -194,7 +400,6 @@ function SystemCard() {
   const [installing, setInstalling] = useState(false);
   const [installLabel, setInstallLabel] = useState("Run First-Time Install");
   const [docker, setDocker] = useState<DockerStatus | null | "error">(null);
-  const [dockerError, setDockerError] = useState<string | null>(null);
 
   // Launcher updates
   const [version, setVersion] = useState("?");
@@ -214,19 +419,11 @@ function SystemCard() {
     cmd.currentVersion().then(setVersion).catch(() => setVersion("?"));
   }, []);
 
-  // Defense-in-depth: the backend used to swallow spawn errors and
-  // never resolve, leaving the UI stuck on "checking..." forever.
-  // Fixed in 0.2.2+, but a stuck label is worse than a wrong one, so
-  // a rejection still lands as an explicit error state — and the
-  // incident card can retry it.
   const loadDocker = async () => {
     try {
-      const s = await cmd.dockerStatus();
-      setDocker(s);
-      setDockerError(null);
-    } catch (err) {
+      setDocker(await cmd.dockerStatus());
+    } catch {
       setDocker("error");
-      setDockerError(String(err));
     }
   };
 
@@ -264,13 +461,10 @@ function SystemCard() {
     try {
       await cmd.installUpdate();
       // install_update restarts the process before replying, so a
-      // resolved promise means the reply raced the exit — it is the
-      // same restart, not a separate outcome.
+      // resolved promise means the reply raced the exit — same restart.
       setResultText("Restarting on the new version.");
     } catch (err) {
       const msg = String(err);
-      // The backend dying mid-invoke IS the success signal; match the
-      // strings each webview emits when the process goes away.
       if (/closed|connection|communicating|reset/i.test(msg)) {
         setResultText("Restarting on the new version.");
       } else {
@@ -287,93 +481,87 @@ function SystemCard() {
       <div className="card-head">
         <span className="card-title">System</span>
       </div>
-        <div className="row">
-          <div>Trading engine</div>
-          {installed ? (
-            <span className="chip ok">installed</span>
-          ) : (
-            <button
-              type="button"
-              className="ghost btn-sm"
-              disabled={installed === null || installing}
-              onClick={runInstall}
-            >
-              {installLabel}
-            </button>
-          )}
-        </div>
-        <div className="row">
-          <div>Docker</div>
-          <DockerChip status={docker} />
-        </div>
-        <DockerIncident
-          status={docker}
-          error={dockerError}
-          onRetry={loadDocker}
-        />
-        <div className="row">
-          <div className="hstack">
-            <span>Launcher</span>
-            <span className="muted mono fs-xs">v{version}</span>
-            {updateAvailable && (
-              <span className="chip warn">v{info!.version} available</span>
-            )}
-          </div>
-          {updateAvailable ? (
-            <button
-              type="button"
-              className="primary btn-sm"
-              disabled={updating}
-              onClick={installUpdate}
-            >
-              {updating ? "Installing…" : `Install v${info!.version}`}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ghost btn-sm"
-              disabled={checking}
-              onClick={check}
-            >
-              {checking ? "Checking…" : "Check for update"}
-            </button>
-          )}
-        </div>
-        {updateAvailable && info?.notes && (
-          <div className="mt-2">
-            <div className="muted fs-2xs mb-2">Release notes</div>
-            <div
-              className="muted fs-xs lh-relaxed"
-              style={{ maxHeight: 66, overflow: "hidden", whiteSpace: "pre-line" }}
-            >
-              {info.notes}
-            </div>
-          </div>
-        )}
-        {updating && !resultText && (
-          <div className="banner info mt-2 m-0">
-            Downloading and installing — the launcher will restart
-            automatically.
-          </div>
-        )}
-        {resultText && (
-          <div
-            className={
-              /^(Install failed|Error)/.test(resultText)
-                ? "err-text fs-xs mt-2"
-                : "muted fs-xs mt-2"
-            }
+      <div className="row">
+        <div>Trading engine</div>
+        {installed ? (
+          <span className="chip ok">installed</span>
+        ) : (
+          <button
+            type="button"
+            className="ghost btn-sm"
+            disabled={installed === null || installing}
+            onClick={runInstall}
           >
-            {resultText}
-          </div>
+            {installLabel}
+          </button>
         )}
       </div>
+      <div className="row">
+        <div>Docker</div>
+        <DockerChip status={docker} />
+      </div>
+      <div className="row">
+        <div className="hstack">
+          <span>Launcher</span>
+          <span className="muted mono fs-xs">v{version}</span>
+          {updateAvailable && (
+            <span className="chip warn">v{info!.version} available</span>
+          )}
+        </div>
+        {updateAvailable ? (
+          <button
+            type="button"
+            className="primary btn-sm"
+            disabled={updating}
+            onClick={installUpdate}
+          >
+            {updating ? "Installing…" : `Install v${info!.version}`}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ghost btn-sm"
+            disabled={checking}
+            onClick={check}
+          >
+            {checking ? "Checking…" : "Check for update"}
+          </button>
+        )}
+      </div>
+      {updateAvailable && info?.notes && (
+        <div className="mt-2">
+          <div className="muted fs-2xs mb-2">Release notes</div>
+          <div
+            className="muted fs-xs lh-relaxed"
+            style={{ maxHeight: 66, overflow: "hidden", whiteSpace: "pre-line" }}
+          >
+            {info.notes}
+          </div>
+        </div>
+      )}
+      {updating && !resultText && (
+        <div className="banner info mt-2 m-0">
+          Downloading and installing — the launcher will restart
+          automatically.
+        </div>
+      )}
+      {resultText && (
+        <div
+          className={
+            /^(Install failed|Error)/.test(resultText)
+              ? "err-text fs-xs mt-2"
+              : "muted fs-xs mt-2"
+          }
+        >
+          {resultText}
+        </div>
+      )}
+    </div>
   );
 }
 
-/** Glance tier: the chip that lives in the Docker row's right cell.
- *  Incident states escalate to a full-width IncidentCard BELOW the
- *  row (banners are never row children) — see DockerIncident. */
+/** Glance tier: the chip that lives in the Docker row's right cell. The
+ *  full incident readout + retry lives in the Advanced drawer. */
 function DockerChip({ status }: { status: DockerStatus | null | "error" }) {
   if (status === null) return <span className="chip neutral">checking</span>;
   if (status === "error") return <span className="chip err">check failed</span>;
@@ -382,8 +570,9 @@ function DockerChip({ status }: { status: DockerStatus | null | "error" }) {
   return <span className="chip ok">running</span>;
 }
 
-/** Act tier: the shared incident contract for the three Docker
- *  failure states. Healthy and checking render nothing here. */
+/** Act tier: the shared incident contract for the three Docker failure
+ *  states. Healthy and checking render nothing. Lives in the Advanced
+ *  drawer's health readout, not the slim System card. */
 function DockerIncident({
   status,
   error,
@@ -438,21 +627,15 @@ function DockerIncident({
 
 // ── Auracle IDE (launcher-managed updates) ──────────────────────
 //
-// The launcher is the single update conduit on a customer's machine:
-// it auto-updates itself (System card above) AND the native IDE. The
-// IDE no longer self-updates — this card checks GitHub Releases for a
-// newer build, then downloads + installs the .dmg into /Applications
-// with progress.
+// The launcher is the single update conduit on a customer's machine: it
+// auto-updates itself (System card) AND the native IDE. The IDE no
+// longer self-updates — this card checks GitHub Releases for a newer
+// build, then downloads + installs the .dmg into /Applications.
 //
-// Honesty law: every state is real. "checking" while the network call
-// is in flight, "up to date" only after a successful compare, "update
-// available" with the concrete version + download size shown BEFORE
-// the user commits, "installing" with live progress, and a plain
-// failure reason on error (incl. a drag-install hint on permission
-// denial). Never a fake success. The passive check on mount flags an
-// available update without the user clicking anything; the install is
-// always an explicit click (downloading + writing /Applications is a
-// real action).
+// Honesty: every state is real — "checking" only while in flight, "up to
+// date" only after a successful compare, the concrete version + size
+// shown BEFORE the user commits, live install progress, a plain failure
+// reason on error. Never a fake success.
 
 type IdeInstallPhase =
   | { kind: "idle" }
@@ -470,7 +653,6 @@ function formatSize(bytes: number): string {
 
 function IdeUpdateCard() {
   const [info, setInfo] = useState<IdeUpdateInfo | null>(null);
-  // null = first load; "error" = the check itself failed.
   const [checkState, setCheckState] = useState<"loading" | "ok" | "error">(
     "loading",
   );
@@ -505,7 +687,6 @@ function IdeUpdateCard() {
     };
   }, [check]);
 
-  // Subscribe to backend progress events for the duration of an install.
   const runInstall = useCallback(async () => {
     if (!info?.asset_url) return;
     setInstall({ kind: "downloading", percent: 0, message: "Starting…" });
@@ -518,8 +699,6 @@ function IdeUpdateCard() {
         } else if (p.phase === "installing") {
           setInstall({ kind: "installing", percent: p.percent, message: p.message });
         }
-        // "done" / "error" are handled by the resolve/reject below so the
-        // final state is driven by the command's return, not a stray event.
       },
     );
     try {
@@ -529,7 +708,6 @@ function IdeUpdateCard() {
       );
       if (!mountedRef.current) return;
       setInstall({ kind: "idle" });
-      // Re-check so the card reflects the freshly-installed version.
       setInfo((prev) =>
         prev
           ? {
@@ -616,7 +794,6 @@ function IdeUpdateCard() {
         </div>
       )}
 
-      {/* Honest progress — real percent while downloading + installing. */}
       {busy && (
         <div className="banner info mt-2 m-0 lh-relaxed">
           {install.message} ({install.percent}%) — the launcher is
@@ -672,20 +849,13 @@ function IdeUpdateCard() {
 //
 // Native replacement for the retired Houston "Key Master" web page,
 // scoped to DATA providers (broker credentials live in the Broker
-// Connections card below). Each row saves through the engine's
-// /ui/api/keys surface over loopback (owner key handoff + CSRF).
+// Connections card). Each row saves through the engine's /ui/api/keys
+// surface over loopback.
 //
-// Honesty law: a row is only marked "verified" after a Test actually
-// passes. Saving a key never implies it works — Save shows "Saved",
-// not "connected". The "configured" badge is read from the shared
-// settings aggregate (the engine reports whether a key is on file —
-// never the value), so the card reflects one coherent state instead
-// of probing independently.
+// HONESTY: a row is only "verified" after a Test passes. Saving never
+// implies it works — Save shows "Saved". The "configured" badge reads
+// from the shared aggregate (engine truth, never the value).
 
-// The provider list is the engine's `market_data` category from
-// auracle/keys.py (PROVIDER_CATEGORIES["market_data"].members) — the
-// data-provider keys Key Master manages. Kept in sync with the engine;
-// an unknown provider would be rejected with a 404 by /ui/api/keys.
 const DATA_PROVIDERS: { id: string; label: string; hint: string }[] = [
   { id: "polygon", label: "Polygon.io", hint: "polygon api key" },
   { id: "eodhd", label: "EOD Historical Data", hint: "eodhd api token" },
@@ -820,29 +990,31 @@ function DataProviderRow({
   );
 }
 
-// ── AI model (provider + model + key → engine vault) ────────────
+// ── Intelligence (the agent the IDE uses) ───────────────────────
 //
-// Native door for the LLM the engine/agent uses. Provider picker +
-// model id + an API-key field. On save the launcher PUTs the AI-model
-// settings to the engine (the key rides to the engine vault and never
-// crosses back). The "configured" state comes from the shared
-// aggregate — the engine reports whether a key is on file, never the
-// value. A 409 (vault unavailable on a paid install) surfaces a plain
-// remediation line, never a fake success.
+// The control plane's home for the coding agent. One opinionated default
+// — the Auracle Agent, wrapping DeepSeek over the user's own loopback
+// engine with their own key — plus frontier bring-your-own-key
+// alternatives (Claude / GPT / Gemini). A single default-agent selector
+// the IDE consumes. One Save persists both the selection and any new key
+// together, so a selection never points at a key the vault refused.
+//
+// HONESTY: the "key on file" flag comes from the engine aggregate
+// (configured), never from the launcher. The launcher never displays a
+// secret. A 409 (vault unavailable on a paid install, or a concurrent
+// change) surfaces a plain remediation line, never a fake success.
+//
+// The agent HARNESS (system prompt, tools, MCP wiring) is a documented
+// placeholder owned by the IDE side — this card only configures the
+// selection + the key. See src/lib/intelligence.ts for the engine vs
+// IDE identity mapping.
 
-const AI_PROVIDERS: { id: string; label: string; placeholder: string }[] = [
-  { id: "anthropic", label: "Anthropic", placeholder: "claude-…" },
-  { id: "openai", label: "OpenAI", placeholder: "gpt-…" },
-  { id: "google", label: "Google", placeholder: "gemini-…" },
-  { id: "openrouter", label: "OpenRouter", placeholder: "vendor/model" },
-];
-
-function AiModelCard() {
+function IntelligenceCard() {
   const { settings, refresh } = useSettings();
   const current = settings?.ai_model;
 
-  const [provider, setProvider] = useState("anthropic");
-  const [modelId, setModelId] = useState("");
+  const [agentId, setAgentId] = useState(AGENTS[0].id);
+  const [modelOverride, setModelOverride] = useState("");
   const [key, setKey] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -851,37 +1023,34 @@ function AiModelCard() {
 
   useEffect(() => {
     if (seeded || !current) return;
-    if (current.provider) setProvider(current.provider);
-    if (current.model_id) setModelId(current.model_id);
+    setAgentId(agentIdFromEngineProvider(current.provider));
+    // A stored model id different from the agent's canonical model is an
+    // override the user set — surface it so a re-save doesn't drop it.
+    const seededAgent = agentById(agentIdFromEngineProvider(current.provider));
+    if (current.model_id && current.model_id !== seededAgent?.engineModel) {
+      setModelOverride(current.model_id);
+    }
     setSeeded(true);
   }, [current, seeded]);
 
-  const ph =
-    AI_PROVIDERS.find((p) => p.id === provider)?.placeholder ?? "model id";
+  const agent = agentById(agentId) ?? AGENTS[0];
+  // The configured flag is only meaningful for the currently-SELECTED
+  // engine provider (the engine reports configured for the stored
+  // selection). Show "key on file" when the selected agent matches the
+  // engine's stored provider and that provider has a key.
+  const selectionMatchesEngine =
+    current != null && current.provider === agent.engineProvider;
+  const keyOnFile = selectionMatchesEngine && (current?.configured ?? false);
 
   const save = async () => {
-    const m = modelId.trim();
-    if (!m) {
-      setStatus("Enter a model id first.");
-      return;
-    }
     setBusy(true);
     setStatus("");
     try {
-      // The key (when present) rides to the engine vault. An empty key
-      // leaves the stored one untouched — so changing only the model
-      // never wipes the saved key. The etag guards against clobbering a
-      // change made in another surface (the IDE).
-      await cmd.settingsPut(
-        {
-          ai_model: {
-            provider,
-            model_id: m,
-            ...(key.trim() ? { key: key.trim() } : {}),
-          },
-        },
-        settings?.etag,
-      );
+      // buildAiModelPatch supplies the engine-valid provider + model and
+      // only includes a non-empty key (so a selection change never wipes
+      // a stored key). The etag guards a concurrent change in the IDE.
+      const patch = buildAiModelPatch(agentId, modelOverride, key);
+      await cmd.settingsPut({ ai_model: patch }, settings?.etag);
       setKey("");
       setStatus("Saved.");
       refresh();
@@ -897,45 +1066,62 @@ function AiModelCard() {
   return (
     <div className="card">
       <div className="card-head">
-        <span className="card-title">AI model</span>
-        {current?.configured && <span className="badge ok">key on file</span>}
+        <span className="card-title">Intelligence</span>
+        {keyOnFile && <span className="badge ok">key on file</span>}
       </div>
       <p className="muted fs-sm m-0 mb-3 lh-relaxed">
-        The model the assistant uses. Pick a provider, set the model, and
-        paste a key — the key is stored in your local engine&apos;s vault.
+        The agent the IDE uses. The Auracle Agent is the default — it wraps
+        DeepSeek over your own engine on <span className="mono">127.0.0.1</span>,
+        so your prompts and key stay on your machine. Frontier models are
+        bring-your-own-key alternatives.
       </p>
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void save();
         }}
       >
-        <div className="hstack mb-2">
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-            aria-label="AI provider"
-          >
-            {AI_PROVIDERS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder={ph}
-            autoComplete="off"
-            value={modelId}
-            onChange={(e) => setModelId(e.target.value)}
-            aria-label="Model id"
-          />
+        <div className="vstack" style={{ gap: 0 }}>
+          {AGENTS.map((a) => {
+            const selected = a.id === agentId;
+            return (
+              <label key={a.id} className={`agent-row${selected ? " selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="default-agent"
+                  value={a.id}
+                  checked={selected}
+                  onChange={() => {
+                    setAgentId(a.id);
+                    setModelOverride("");
+                    setStatus("");
+                  }}
+                  aria-label={a.label}
+                />
+                <span className="agent-row__body">
+                  <span className="hstack">
+                    <span className="fs-sm" style={{ fontWeight: 500 }}>
+                      {a.label}
+                    </span>
+                    {a.isDefault && <span className="badge neutral">default</span>}
+                  </span>
+                  <span className="muted fs-xs lh-relaxed">{a.blurb}</span>
+                </span>
+              </label>
+            );
+          })}
         </div>
-        <div className="hstack">
+
+        {agent.prerequisite && (
+          <p className="muted fs-xs mt-3 mb-0 lh-relaxed">{agent.prerequisite}</p>
+        )}
+
+        <div className="hstack mt-3">
           <input
             type="password"
             placeholder={
-              current?.configured ? "Replace key (leave blank to keep)" : "Paste API key"
+              keyOnFile ? "Replace key (leave blank to keep)" : agent.keyPlaceholder
             }
             autoComplete="off"
             value={key}
@@ -947,6 +1133,7 @@ function AiModelCard() {
           </button>
         </div>
       </form>
+
       {status && (
         <div className={isError ? "err-text fs-xs mt-2 lh-relaxed" : "muted mono fs-xs mt-2"}>
           {status}
@@ -958,11 +1145,9 @@ function AiModelCard() {
 
 // ── GitHub (device-flow sign-in) ────────────────────────────────
 //
-// The user's own GitHub for git push/pull. The Rust side runs the
-// OAuth device flow and stores the access token in the system git
-// credential helper — the token never crosses this boundary. This is
-// the shared GitHub path the IDE inherits, surfaced here so it can be
-// connected from the launcher too.
+// The user's own GitHub for git push/pull. The Rust side runs the OAuth
+// device flow and stores the access token in the system git credential
+// helper — the token never crosses this boundary. The IDE inherits it.
 
 type GithubPhase =
   | { kind: "loading" }
@@ -1003,9 +1188,6 @@ function GithubCard() {
     };
   }, [clearPoll]);
 
-  // Recursive poll honoring GitHub's interval; nudges up on slow_down
-  // (another "pending"). The token is stored by the Rust side; it never
-  // crosses this boundary.
   const poll = useCallback(
     (deviceCode: string, intervalSec: number) => {
       clearPoll();
@@ -1093,6 +1275,239 @@ function GithubCard() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ── Advanced / Diagnostics drawer ───────────────────────────────
+//
+// Collapsed by default each session (no persisted "open" — the calm view
+// is the default every time the launcher opens). Holds the developer- and
+// troubleshooting-only material that used to compete for attention in the
+// everyday view: preflight checks, the detailed Docker/health readout,
+// the open-in-IDE-vs-browser preference, and the first-run tutorial entry.
+
+type LaunchTarget = "ide" | "browser";
+const LAUNCH_TARGET_KEY = "auracle_launch_target";
+
+function AdvancedDrawer() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section className="adv-drawer">
+      <button
+        type="button"
+        className="adv-drawer__toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={`adv-drawer__caret${open ? " open" : ""}`} aria-hidden="true">
+          ›
+        </span>
+        Advanced / Diagnostics
+      </button>
+      {open && (
+        <div className="settings-grid mt-2">
+          <div className="sgcell">
+            <PreflightDrawerCard />
+          </div>
+          <div className="sgcell">
+            <HealthReadoutCard />
+          </div>
+          <div className="sgcell">
+            <LaunchTargetCard />
+          </div>
+          <div className="sgcell">
+            <TutorialCard />
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Preflight — run the install readiness checks deliberately, on demand,
+ *  instead of being shown them constantly on the main view. */
+function PreflightDrawerCard() {
+  const [report, setReport] = useState<PreflightReport | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+
+  const run = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      setReport(await cmd.preflightCheck());
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Preflight checks</span>
+        <button type="button" className="ghost btn-sm" disabled={running} onClick={run}>
+          {running ? "Running…" : "Run checks"}
+        </button>
+      </div>
+      <p className="muted fs-sm m-0 lh-relaxed">
+        Verify this machine is ready to install — Docker, disk, ports.
+      </p>
+      {error && <div className="err-text fs-xs mt-2 lh-relaxed">{error}</div>}
+      {report &&
+        report.checks.map((c, i) => {
+          const variant = c.passed ? "ok" : c.level === "warning" ? "warn" : "err";
+          const label = c.passed ? "pass" : c.level === "warning" ? "warn" : "fail";
+          return (
+            <div key={i} className="mt-3">
+              <div className="hstack">
+                <span className={`chip ${variant}`}>{label}</span>
+                <span className="fs-sm">{c.name}</span>
+              </div>
+              <div className="muted fs-xs mt-1 lh-relaxed">{c.message}</div>
+              {c.remediation && (
+                <div className="muted fs-xs mt-1 lh-relaxed">{c.remediation}</div>
+              )}
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
+/** The detailed Docker/health readout — the full incident detail + retry
+ *  that the slim System card deliberately omits. */
+function HealthReadoutCard() {
+  const [docker, setDocker] = useState<DockerStatus | null | "error">(null);
+  const [dockerError, setDockerError] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthSnapshot | null | "error">(null);
+
+  const load = useCallback(async () => {
+    try {
+      setDocker(await cmd.dockerStatus());
+      setDockerError(null);
+    } catch (err) {
+      setDocker("error");
+      setDockerError(String(err));
+    }
+    try {
+      setHealth(await cmd.currentHealth());
+    } catch {
+      setHealth("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Engine &amp; Docker health</span>
+        <button type="button" className="ghost btn-sm" onClick={() => void load()}>
+          Refresh
+        </button>
+      </div>
+      <div className="row">
+        <div>Engine</div>
+        {health === null ? (
+          <span className="chip neutral">checking</span>
+        ) : health === "error" ? (
+          <span className="chip err">unreachable</span>
+        ) : (
+          <span className={`chip ${health.state === "healthy" ? "ok" : "warn"}`}>
+            {health.state}
+          </span>
+        )}
+      </div>
+      {health && health !== "error" && health.last_error && (
+        <div className="muted fs-xs mt-1 lh-relaxed">{health.last_error}</div>
+      )}
+      <div className="row">
+        <div>Docker</div>
+        <DockerChip status={docker} />
+      </div>
+      <DockerIncident status={docker} error={dockerError} onRetry={load} />
+    </div>
+  );
+}
+
+/** Open-in-IDE vs browser — a developer preference that used to occupy a
+ *  top-level card. Stored locally; consumed by the launch action. */
+function LaunchTargetCard() {
+  const [target, setTarget] = useState<LaunchTarget>(() => {
+    try {
+      return localStorage.getItem(LAUNCH_TARGET_KEY) === "browser"
+        ? "browser"
+        : "ide";
+    } catch {
+      return "ide";
+    }
+  });
+
+  const choose = (t: LaunchTarget) => {
+    setTarget(t);
+    try {
+      localStorage.setItem(LAUNCH_TARGET_KEY, t);
+    } catch {
+      // localStorage unavailable — the in-memory choice still applies.
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Open workspace in</span>
+      </div>
+      <p className="muted fs-sm m-0 mb-3 lh-relaxed">
+        Where the launcher opens your workspace. The IDE is the default home;
+        the browser is a fallback for diagnostics.
+      </p>
+      <div className="seg-toggle" role="group" aria-label="Open workspace in">
+        <button
+          type="button"
+          className={`seg-tab${target === "ide" ? " active" : ""}`}
+          aria-pressed={target === "ide"}
+          onClick={() => choose("ide")}
+        >
+          IDE
+        </button>
+        <button
+          type="button"
+          className={`seg-tab${target === "browser" ? " active" : ""}`}
+          aria-pressed={target === "browser"}
+          onClick={() => choose("browser")}
+        >
+          Browser
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** First-run tutorial entry — replay the tour on demand from the drawer
+ *  rather than having it block the main view. */
+function TutorialCard() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">First-run tutorial</span>
+      </div>
+      <div className="row">
+        <div>
+          <div>Take the tour</div>
+          <div className="muted fs-sm mt-1">A short walkthrough of the launcher.</div>
+        </div>
+        <button type="button" className="ghost btn-sm" onClick={() => setOpen(true)}>
+          Open tour
+        </button>
+      </div>
+      {open && <Tutorial onClose={() => setOpen(false)} />}
     </div>
   );
 }
