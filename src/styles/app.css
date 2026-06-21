@@ -741,6 +741,32 @@ h2 {
 .health-banner.warn { background: var(--warn-soft); color: var(--fg); }
 .health-banner strong { font-weight: 600; }
 
+/* ── Setup hint — the actionable "no owner account yet" affordance ─── */
+.setup-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: var(--s-2);
+  padding: 11px 12px;
+  background: var(--accent-soft);
+  border-radius: var(--r-md);
+}
+.setup-hint.is-compact { background: none; padding: 0; margin-top: 6px; }
+.setup-hint__msg { font-size: 12px; line-height: 1.5; color: var(--fg); }
+.setup-hint__btn {
+  align-self: flex-start;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.setup-hint__btn:hover { background: var(--accent-2); }
+
 @keyframes riser-up { from { transform: translateY(101%); } to { transform: translateY(0); } }
 @keyframes riser-fade { from { opacity: 0; } to { opacity: 1; } }
 

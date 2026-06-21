@@ -837,6 +837,25 @@ export async function openInBrowser(url: string): Promise<void> {
   window.open(url, "_blank", "noopener");
 }
 
+/** The engine's first-run wizard — license activation, then create the
+ *  owner account. Stays reachable even in the headless web profile (it's
+ *  on the profile-gate allowlist). Every owner-gated launcher feature
+ *  needs this done first. */
+export const ENGINE_SETUP_URL = "http://127.0.0.1:1969/ui/setup";
+
+export async function openEngineSetup(): Promise<void> {
+  return openInBrowser(ENGINE_SETUP_URL);
+}
+
+/** True when an error is the "no on-box owner account" / "connect-sign-in"
+ *  signal — i.e. the engine has no owner yet, so the user must finish
+ *  first-run setup before any owner-gated action works. */
+export function needsOwnerSetup(err: unknown): boolean {
+  return /no on-box owner account|connect\/sign in to the engine/i.test(
+    String(err),
+  );
+}
+
 /**
  * Open the Auracle IDE focused on a native panel via the `auracle://`
  * deep-link scheme. The OS routes the URL to the IDE app, launching it if

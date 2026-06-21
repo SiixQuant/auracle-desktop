@@ -15,7 +15,8 @@
 
 import { useState } from "react";
 
-import { cmd } from "@/lib/tauri";
+import SetupHint from "@/components/SetupHint";
+import { cmd, needsOwnerSetup } from "@/lib/tauri";
 
 type Phase =
   | { kind: "form" }
@@ -200,9 +201,14 @@ export default function IbkrConnect({
         </div>
       </form>
 
-      {phase.kind === "error" && (
-        <div className="banner err mono mt-2 lh-relaxed">{phase.message}</div>
-      )}
+      {phase.kind === "error" &&
+        (needsOwnerSetup(phase.message) ? (
+          <div className="mt-2">
+            <SetupHint />
+          </div>
+        ) : (
+          <div className="banner err mono mt-2 lh-relaxed">{phase.message}</div>
+        ))}
     </div>
   );
 }
