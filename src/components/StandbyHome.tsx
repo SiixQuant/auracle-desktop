@@ -22,6 +22,7 @@ import type { EngineStateHook } from "@/lib/useEngineState";
 export default function StandbyHome({
   eng,
   onActuator,
+  onSkip,
   onDoor,
   onAgent,
 }: {
@@ -31,6 +32,10 @@ export default function StandbyHome({
   /** Run the home's one verb — owned by the Shell so the palette and the
    *  button trigger the same action. */
   onActuator: () => void;
+  /** Skip broker setup and open the workspace anyway. Shown only when the
+   *  verb is "connect" — connecting a broker is recommended (live data +
+   *  execution need it) but never required to reach the IDE. */
+  onSkip?: () => void;
   /** Open an inspector for a pressed status (status-is-the-door). */
   onDoor?: (door: Exclude<Door, null>) => void;
   /** Open the Intelligence inspector (the agent on-ramp). */
@@ -56,6 +61,12 @@ export default function StandbyHome({
       {asOf && <div className="standby__stamp">{asOf}</div>}
 
       <Actuator actuator={actuator} onClick={onActuator} />
+
+      {actuator.action === "connect" && onSkip && (
+        <button type="button" className="standby__skip" onClick={onSkip}>
+          Set up later — open the workspace
+        </button>
+      )}
 
       <button type="button" className="standby__agent" onClick={onAgent}>
         <span className="standby__agent-label">agent</span>

@@ -1743,6 +1743,20 @@ table.data-table {
   100% { left: 100%; }
 }
 .standby__act-reason { font-size: 12px; color: var(--fg-muted); max-width: 38ch; }
+/* Quiet "do it later" escape under the connect verb — connecting a broker
+ * is recommended, never required, to reach the workspace. */
+.standby__skip {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  transition: color 0.14s;
+}
+.standby__skip:hover { color: var(--fg); text-decoration: underline; }
 .standby__err { margin-top: 14px; color: var(--err); font-size: 12.5px; max-width: 46ch; }
 
 /* Quiet vitals row — each item is a door (status-is-the-door). */
