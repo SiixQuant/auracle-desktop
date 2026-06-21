@@ -194,6 +194,7 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
         <StandbyHome
           eng={eng}
           onActuator={runActuator}
+          onSkip={() => void eng.launch()}
           onDoor={(d) => setInspector(d)}
           onAgent={() => setInspector("intelligence")}
         />
