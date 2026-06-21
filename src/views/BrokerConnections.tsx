@@ -412,7 +412,7 @@ function ConnectSheet({
       {isIbkr && connected && <HealthBanner mdStatus={mdStatus} />}
 
       <div className="riser-body">
-        {isIbkr && <IbkrConnect onStateChange={onRefresh} />}
+        {isIbkr && <IbkrConnect onStateChange={onRefresh} onLater={onClose} />}
         {isDataKey && <DataKeyForm providerId={broker.id} />}
         {!isIbkr && !isDataKey && (
           <p className="muted fs-sm m-0 lh-relaxed">Not available yet.</p>
