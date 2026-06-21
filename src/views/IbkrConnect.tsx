@@ -57,10 +57,8 @@ export default function IbkrConnect({ onStateChange }: { onStateChange: () => vo
     return (
       <div className="subcard">
         <div className="banner info m-0 lh-relaxed">
-          <strong>Gateway starting.</strong> The IB Gateway is coming up with your
-          credentials — your strategies will use this same connection for data and
-          execution. With your TOTP key it re-logs in automatically through IBKR&apos;s
-          daily reset; no phone taps needed. This row flips to connected once it&apos;s up.
+          <strong>Gateway starting.</strong> Flips to connected when it&apos;s up.
+          Your 2FA key keeps it logged in.
         </div>
         <button
           type="button"
@@ -76,9 +74,7 @@ export default function IbkrConnect({ onStateChange }: { onStateChange: () => vo
   return (
     <div className="subcard">
       <p className="muted fs-xs m-0 mb-2 lh-relaxed">
-        Connects the IB Gateway your strategies use for both market data and order
-        execution. Credentials are encrypted in your engine vault — never shown or
-        logged. Needs Docker running.
+        Stored encrypted in your vault. Needs Docker running.
       </p>
 
       <form
@@ -121,7 +117,7 @@ export default function IbkrConnect({ onStateChange }: { onStateChange: () => vo
                 onChange={(e) => setLiveConfirmed(e.target.checked)}
               />
               <span className="lh-relaxed">
-                This is a real-money account — armed strategies will place real orders.
+                Real money — armed strategies place real orders.
               </span>
             </label>
           )}
@@ -153,7 +149,7 @@ export default function IbkrConnect({ onStateChange }: { onStateChange: () => vo
         </div>
         <div>
           <label htmlFor="ibkr-totp" className="micro-label">
-            2FA reconnect key (TOTP secret) — required
+            2FA key (TOTP) — required
           </label>
           <input
             id="ibkr-totp"
@@ -165,9 +161,8 @@ export default function IbkrConnect({ onStateChange }: { onStateChange: () => vo
             className="mt-1"
           />
           <p className="muted fs-2xs m-0 mt-1 lh-relaxed">
-            Required so the gateway re-logs in unattended through IBKR&apos;s daily
-            reset — otherwise automated strategies pause. Get it in IBKR: Secure Login
-            Settings → set up an authenticator → save the secret.
+            Keeps the gateway logged in through IBKR&apos;s daily reset. From IBKR →
+            Secure Login Settings.
           </p>
         </div>
 

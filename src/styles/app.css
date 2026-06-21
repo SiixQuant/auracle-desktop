@@ -444,11 +444,10 @@ h2 {
 .dir-row:last-child { border-bottom: none; }
 .dir-row__top {
   display: grid;
-  /* Fixed trailing columns keep every status pill on the same x and
-   * the action column stable whether or not a row has a button; the
-   * last 16px column holds the expand chevron (empty on non-expandable
-   * rows so alignment never shifts). */
-  grid-template-columns: 32px 1fr auto 72px 16px;
+  /* Logo · meta · state-stack (pill + health word) · chevron. The fixed
+   * 16px trailing column holds the drill-in chevron (empty on non-openable
+   * rows) so alignment never shifts. */
+  grid-template-columns: 32px 1fr auto 16px;
   align-items: center;
   gap: var(--s-3);
   padding: 10px 8px;
@@ -609,6 +608,141 @@ h2 {
   color: var(--fg-muted);
 }
 .dir-legend .cap-badge { margin: 0 1px; }
+
+/* ── Connections: state-stack + per-row health ──────────────────── */
+.dir-row__statestack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  justify-self: end;
+}
+/* The real-time / delayed verdict for a connected execution broker —
+ * engine data-quality truth, the difference between "connected" and
+ * "can actually trade". A quiet word, colored by tone, never a pill. */
+.health-word {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+.health-word.ok    { color: var(--ok); }
+.health-word.warn  { color: var(--warn); }
+.health-word.muted { color: var(--fg-muted); }
+
+/* ── Connections: "More sources — coming soon" disclosure ───────── */
+.dir-more { margin-top: var(--s-4); }
+.dir-more__btn {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--s-2) 2px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.dir-more__btn:hover { color: var(--fg-dim); }
+.dir-more__chev { font-size: 15px; line-height: 1; transition: transform 0.16s ease-out; }
+.dir-more__chev.open { transform: rotate(90deg); }
+.dir-more__count {
+  margin-left: auto;
+  background: var(--surface-3);
+  border-radius: 20px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+/* ── The Riser: focused connect sheet over the dimmed list ───────── */
+/* The connections card fills the inspector viewport and scrolls its list
+ * internally, so the rising sheet always matches the actual panel size —
+ * from a minimized window up to fullscreen (dynamic sizing, no fixed
+ * height). */
+.conn-root {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.conn-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* Keep search anchored while the list scrolls under it. */
+.conn-root .dir-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-elev);
+  padding-bottom: var(--s-2);
+}
+.riser-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 6, 8, 0.62);
+  border-radius: var(--r-lg);
+  z-index: 1;
+  animation: riser-fade 0.16s ease-out;
+}
+.riser-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 10px var(--s-4) var(--s-4);
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--hairline-top);
+  animation: riser-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+}
+.riser-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 3px;
+  background: var(--line-strong);
+  margin: 0 auto 6px;
+  flex: none;
+}
+.riser-back {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--accent-text);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 2px;
+  flex: none;
+}
+.riser-back:hover { color: var(--fg); }
+.riser-hero { text-align: center; flex: none; margin-top: 2px; }
+.riser-title { font-size: 16px; font-weight: 500; margin-top: 10px; }
+.riser-chips { justify-content: center; margin-top: 8px; }
+.dir-logo--hero { width: 56px; height: 56px; display: inline-flex; border-radius: var(--r-md); }
+.dir-logo--hero.dir-logo--official img { width: 40px; height: 40px; }
+.dir-logo--hero.dir-logo--placeholder { font-size: 18px; }
+/* Scrollable form region so the connect controls never push below the
+ * sheet — the whole point of the rise (kills the old below-the-fold bug). */
+.riser-body { flex: 1; overflow: auto; margin-top: var(--s-3); padding-right: 2px; }
+.riser-body .datakey-form { margin-left: 0; }
+
+/* The real-time-vs-delayed verdict, full width, where the user connects. */
+.health-banner {
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  margin-top: var(--s-3);
+  flex: none;
+}
+.health-banner.ok   { background: var(--ok-soft);   color: var(--fg); }
+.health-banner.warn { background: var(--warn-soft); color: var(--fg); }
+.health-banner strong { font-weight: 600; }
+
+@keyframes riser-up { from { transform: translateY(101%); } to { transform: translateY(0); } }
+@keyframes riser-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .sr-only {
   position: absolute;
@@ -1759,6 +1893,11 @@ table.data-table {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Fill the panel height so a single fill-card (Connections) can size to
+   * the viewport and scroll internally — dynamic from minimized to
+   * fullscreen. Multi-card inspectors just gain trailing space + scroll. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 @keyframes insp-fade { from { opacity: 0; } to { opacity: 1; } }
