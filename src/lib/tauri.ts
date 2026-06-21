@@ -86,9 +86,11 @@ export interface UpdateInfo {
 // flags everything else so the UI degrades honestly.
 
 export interface IdeUpdateInfo {
-  /** Installed IDE version (CFBundleShortVersionString), or null when
-   *  the IDE isn't installed on this machine. */
+  /** Installed IDE version, from the launcher's install marker, or null
+   *  when not installed OR installed out-of-band (version untrusted). */
   installed_version?: string | null;
+  /** True iff installed_version is trustworthy (came from our marker). */
+  version_tracked: boolean;
   /** Newest published IDE version, or null when nothing matching is
    *  published yet. */
   latest_version?: string | null;
@@ -205,7 +207,8 @@ export const cmd = {
   isInstalled: () => invoke<boolean>("is_installed"),
   runFirstInstall: () => invoke<void>("run_first_install"),
   installPath: () => invoke<string>("install_path"),
-  preflightCheck: () => invoke<PreflightReport>("preflight_check"),
+  preflightCheck: (expectPortsInUse?: boolean) =>
+    invoke<PreflightReport>("preflight_check", { expectPortsInUse }),
 
   // Keychain (license)
   licenseGet: () => invoke<string | null>("license_get"),
@@ -242,10 +245,15 @@ export const cmd = {
    *  rejects with a plain message (incl. a drag-install hint on
    *  permission-denied). Subscribe to 'ide-update-progress' for progress
    *  while this runs. */
-  ideDownloadAndInstall: (assetUrl: string, expectedSize?: number | null) =>
+  ideDownloadAndInstall: (
+    assetUrl: string,
+    expectedSize: number | null | undefined,
+    version: string,
+  ) =>
     invoke<string>("ide_download_and_install", {
       assetUrl,
       expectedSize: expectedSize ?? null,
+      version,
     }),
 
   // IBKR Client Portal login (embedded webview). IBKR connects in-app

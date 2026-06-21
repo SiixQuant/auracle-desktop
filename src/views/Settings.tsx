@@ -229,8 +229,11 @@ export function GeneralCard() {
       </p>
       {settings === null ? (
         error ? (
-          <div className="err-text fs-xs lh-relaxed">
-            Couldn&apos;t reach the engine to load preferences.
+          <div className="muted fs-xs lh-relaxed">
+            Can&apos;t reach the engine right now — it may still be starting.{" "}
+            <button type="button" className="linklike" onClick={refresh}>
+              Retry
+            </button>
           </div>
         ) : (
           <div className="muted fs-sm">{loading ? "Loading…" : "No preferences."}</div>
@@ -625,6 +628,7 @@ export function IdeUpdateCard() {
       const version = await cmd.ideDownloadAndInstall(
         info.asset_url,
         info.asset_size ?? null,
+        info.latest_version ?? "",
       );
       if (!mountedRef.current) return;
       setInstall({ kind: "idle" });
@@ -634,6 +638,7 @@ export function IdeUpdateCard() {
               ...prev,
               installed: true,
               installed_version: version,
+              version_tracked: true,
               update_available: false,
             }
           : prev,
@@ -651,14 +656,23 @@ export function IdeUpdateCard() {
   const latestVersion = info?.latest_version ?? null;
   const updateAvailable = info?.update_available ?? false;
   const unsupported = info?.unsupported_platform ?? false;
+  const versionTracked = info?.version_tracked ?? false;
+  // Installed but we don't know which version (installed outside the
+  // launcher) — offer a reinstall to a known, tracked version rather than
+  // a bogus "up to date".
+  const reinstallable =
+    installed && !versionTracked && !!info?.asset_url && !unsupported;
   const busy = install.kind === "downloading" || install.kind === "installing";
 
   return (
     <div className="card">
       <div className="card-head">
         <span className="card-title">Auracle IDE</span>
-        {checkState === "ok" && installed && !updateAvailable && (
+        {checkState === "ok" && installed && versionTracked && !updateAvailable && (
           <span className="chip ok">up to date</span>
+        )}
+        {checkState === "ok" && installed && !versionTracked && !updateAvailable && (
+          <span className="chip neutral">installed</span>
         )}
         {updateAvailable && (
           <span className="chip warn">
@@ -677,11 +691,13 @@ export function IdeUpdateCard() {
             {checkState === "loading"
               ? "checking…"
               : installed
-                ? `v${installedVersion ?? "?"}`
+                ? versionTracked
+                  ? `v${installedVersion}`
+                  : "version unknown"
                 : "not installed"}
           </span>
         </div>
-        {!updateAvailable && !busy && (
+        {!updateAvailable && !reinstallable && !busy && (
           <button
             type="button"
             className="ghost btn-sm"
@@ -702,16 +718,22 @@ export function IdeUpdateCard() {
               <span className="muted fs-2xs">({formatSize(info.asset_size)})</span>
             ) : null}
           </div>
-          {updateAvailable && !busy && install.kind !== "failed" && (
+          {(updateAvailable || reinstallable) && !busy && install.kind !== "failed" && (
             <button
               type="button"
               className="primary btn-sm"
               onClick={() => void runInstall()}
             >
-              {installed ? "Update IDE" : "Install IDE"}
+              {!installed ? "Install" : updateAvailable ? "Update" : "Reinstall"}
             </button>
           )}
         </div>
+      )}
+      {reinstallable && !busy && (
+        <p className="muted fs-xs mt-1 m-0 lh-relaxed">
+          Installed outside the launcher — reinstall to track the version and
+          get update alerts.
+        </p>
       )}
 
       {busy && (
@@ -1010,7 +1032,9 @@ export function GithubCard() {
     }
   }, [poll]);
 
-  if (phase.kind === "loading") return null;
+  // Nothing to show while probing, or when this build can't do GitHub
+  // sign-in at all — hide the card rather than surfacing a dead row.
+  if (phase.kind === "loading" || phase.kind === "not_configured") return null;
 
   return (
     <div className="card">
@@ -1018,11 +1042,7 @@ export function GithubCard() {
         <span className="card-title">GitHub</span>
         {phase.kind === "connected" && <span className="badge ok">signed in</span>}
       </div>
-      {phase.kind === "not_configured" ? (
-        <p className="muted fs-sm m-0 lh-relaxed">
-          GitHub sign-in isn&apos;t configured in this build.
-        </p>
-      ) : phase.kind === "connected" ? (
+      {phase.kind === "connected" ? (
         <p className="muted fs-sm m-0 lh-relaxed">
           Signed in{phase.login ? ` as ${phase.login}` : ""}. Your git push and
           pull use this account — the IDE inherits it too.
@@ -1115,7 +1135,19 @@ function PreflightDrawerCard() {
     setRunning(true);
     setError(null);
     try {
-      setReport(await cmd.preflightCheck());
+      // Post-install, our own stack holds the required ports — tell
+      // preflight so expected occupancy isn't flagged as a conflict.
+      let expectPortsInUse = false;
+      try {
+        const [inst, dk] = await Promise.all([
+          cmd.isInstalled(),
+          cmd.dockerStatus(),
+        ]);
+        expectPortsInUse = !!inst && !!dk?.running;
+      } catch {
+        // fall back to strict (fresh-install) behavior
+      }
+      setReport(await cmd.preflightCheck(expectPortsInUse));
     } catch (err) {
       setError(String(err));
     } finally {
@@ -1132,7 +1164,7 @@ function PreflightDrawerCard() {
         </button>
       </div>
       <p className="muted fs-sm m-0 lh-relaxed">
-        Verify this machine is ready to install — Docker, disk, ports.
+        Checks Docker, disk space, and ports.
       </p>
       {error && <div className="err-text fs-xs mt-2 lh-relaxed">{error}</div>}
       {report &&
@@ -1141,12 +1173,12 @@ function PreflightDrawerCard() {
           const label = c.passed ? "pass" : c.level === "warning" ? "warn" : "fail";
           return (
             <div key={i} className="mt-3">
-              <div className="hstack">
-                <span className={`chip ${variant}`}>{label}</span>
+              <div className="row">
                 <span className="fs-sm">{c.name}</span>
+                <span className={`chip ${variant}`}>{label}</span>
               </div>
               <div className="muted fs-xs mt-1 lh-relaxed">{c.message}</div>
-              {c.remediation && (
+              {c.remediation && !c.passed && (
                 <div className="muted fs-xs mt-1 lh-relaxed">{c.remediation}</div>
               )}
             </div>
