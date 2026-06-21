@@ -19,7 +19,7 @@
 //
 // The connect action is per-connector, derived from engine truth:
 //   * execution-capable broker (IBKR) → the in-app gateway/portal login
-//     (the IbeamSetup sub-card + a one-click Sign in).
+//     (the IbkrConnect form: enter creds → the engine starts the dockerized gateway).
 //   * data-only provider with a key flow (Polygon / EODHD / …) → the
 //     API-key entry/test form (dataKeySave / dataKeyTest → /ui/api/keys),
 //     expanded inline under the row.
@@ -43,7 +43,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import IncidentCard from "@/components/IncidentCard";
 import { useSettings } from "@/lib/settings";
-import IbeamSetup from "@/views/IbeamSetup";
+import IbkrConnect from "@/views/IbkrConnect";
 // Official broker marks — used under nominative fair use to identify the
 // connection (full provenance in each SVG's header). ONLY verified,
 // in-repo official assets belong here; brokers without one fall back to
@@ -477,7 +477,7 @@ function DirectoryRow({
       </div>
       {canExpand && expanded && (
         <div className="dir-row__expand" ref={expandRef}>
-          {isIbkr && <IbeamSetup onStateChange={onRefresh} />}
+          {isIbkr && <IbkrConnect onStateChange={onRefresh} />}
           {isDataKey && <DataKeyForm providerId={broker.id} />}
         </div>
       )}
@@ -491,7 +491,7 @@ function DirectoryRow({
  *  non-integrated source (honesty contract). Data-key providers have no
  *  trailing button (their action is the inline Save/Test form below);
  *  the column stays empty so every status pill keeps its x-position. For
- *  IBKR the managed gateway lifecycle lives in the IbeamSetup sub-card,
+ *  IBKR the managed gateway lifecycle lives in the IbkrConnect form,
  *  but when the gateway is up-and-unauthenticated the row offers a
  *  one-click "Sign in" that opens the broker's own Client Portal login. */
 function RowAction({
@@ -514,7 +514,7 @@ function RowAction({
         />
       );
     }
-    return null; // offline/connected/error handled by the IbeamSetup card
+    return null; // offline/connected/error handled by the inline IbkrConnect form
   }
   if (broker.state.state === "error") {
     return (

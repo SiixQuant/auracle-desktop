@@ -19,6 +19,7 @@ pub mod engine_auth;
 pub mod github_auth;
 pub mod healthcheck;
 pub mod ibeam;
+pub mod ibkr_gateway;
 pub mod ibkr_login;
 pub mod ide_update;
 pub mod installer;
