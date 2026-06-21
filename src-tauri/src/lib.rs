@@ -69,10 +69,10 @@ use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
     broker_stream as broker_stream_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
     github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
-    ibkr_login as ibkr_login_cmd, ide_update as ide_update_cmd, installer as installer_cmd,
-    keychain as keychain_cmd, mcp_sidecar as mcp_cmd, preflight as preflight_cmd,
-    scheduled_update as scheduled_update_cmd, settings as settings_cmd, strategy as strategy_cmd,
-    tray as tray_cmd, update as update_cmd, view as view_cmd,
+    ibkr_gateway as ibkr_gateway_cmd, ibkr_login as ibkr_login_cmd, ide_update as ide_update_cmd,
+    installer as installer_cmd, keychain as keychain_cmd, mcp_sidecar as mcp_cmd,
+    preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, settings as settings_cmd,
+    strategy as strategy_cmd, tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -313,6 +313,10 @@ pub fn run() {
             // in-app; its login opens inside the launcher, never bounced out.
             ibkr_login_cmd::open_ibkr_login,
             ibkr_login_cmd::close_ibkr_login,
+            // Dockerized IB Gateway connect (unified path: the same
+            // ib_insync gateway strategies use, via the engine).
+            ibkr_gateway_cmd::ibkr_connect,
+            ibkr_gateway_cmd::ibkr_connection_status,
             // "Sign in with GitHub" via the OAuth device flow — the
             // user's own GitHub for git push/pull, stored in the system
             // git credential helper. See commands/github_auth.rs. The

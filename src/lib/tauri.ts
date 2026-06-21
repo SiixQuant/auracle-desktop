@@ -263,6 +263,18 @@ export const cmd = {
   githubDevicePoll: (deviceCode: string) =>
     invoke<GithubDevicePoll>("github_device_poll", { deviceCode }),
 
+  // ── IBKR connect (unified: the dockerized IB Gateway strategies use) ──
+  //
+  // The launcher's IBKR connect drives the engine's owner-gated
+  // connections API (POST /ui/api/connections/ibkr/save, dockerized) so
+  // the SAME ib_insync gateway serves data + execution for automated
+  // strategies. TOTP is required by the engine (unattended-by-contract);
+  // a missing-TOTP / vault error returns the engine's plain message.
+  ibkrConnect: (username: string, password: string, totpKey: string, mode: "paper" | "live") =>
+    invoke<unknown>("ibkr_connect", { username, password, totpKey, mode }),
+  /** The engine's IBKR connection status (fields + state). No secrets. */
+  ibkrConnectionStatus: () => invoke<unknown>("ibkr_connection_status"),
+
   // ── Broker connections ───────────────────────────────────────
   forgeBrokerStatus: () => invoke<BrokerStatus[]>("forge_broker_status"),
   forgeBrokerTest: (brokerId: string) =>
