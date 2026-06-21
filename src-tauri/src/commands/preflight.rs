@@ -61,15 +61,20 @@ const REQUIRED_PORTS: &[u16] = &[80, 443, 1969, 5432, 7777, 8888];
 /// growth budget for ingested bars + audit logs.
 const REQUIRED_DISK_KB: u64 = 10 * 1024 * 1024; // 10 GB in KB
 
+/// `expect_ports_in_use` — true when the stack is already installed AND
+/// running. In that state the required ports SHOULD be held by our own
+/// containers, so an "in use" port is expected (PASS), not a conflict.
+/// The fresh-install path passes false and keeps the strict check.
 #[tauri::command]
-pub async fn preflight_check() -> Result<PreflightResult, String> {
+pub async fn preflight_check(expect_ports_in_use: Option<bool>) -> Result<PreflightResult, String> {
+    let expect_in_use = expect_ports_in_use.unwrap_or(false);
     let install_path = resolve_install_path().map_err(to_error_string)?;
     let install_path_str = install_path.to_string_lossy().to_string();
 
     let mut checks = Vec::with_capacity(REQUIRED_PORTS.len() + 3);
 
     // ── Docker daemon ─────────────────────────────────────────────────
-    checks.push(check_docker_daemon());
+    checks.push(check_docker_daemon().await);
 
     // ── Disk space at install path ───────────────────────────────────
     checks.push(check_disk_space(&install_path_str));
@@ -79,7 +84,7 @@ pub async fn preflight_check() -> Result<PreflightResult, String> {
 
     // ── Each required port ───────────────────────────────────────────
     for port in REQUIRED_PORTS {
-        checks.push(check_port(*port));
+        checks.push(check_port(*port, expect_in_use));
     }
 
     let can_install = checks.iter().all(|c| c.passed || c.level != "critical");
@@ -92,11 +97,29 @@ pub async fn preflight_check() -> Result<PreflightResult, String> {
 
 // ─── Individual checks ─────────────────────────────────────────────────
 
-fn check_docker_daemon() -> PreflightCheck {
+async fn check_docker_daemon() -> PreflightCheck {
+    // Resolve the docker binary the same way the System card does — a
+    // Finder-launched app gets a minimal PATH (`/usr/bin:/bin:/usr/sbin:
+    // /sbin`), so the docker CLI (in /usr/local/bin, /opt/homebrew/bin, or
+    // the Docker.app bundle) isn't on PATH. resolve_docker_bin probes the
+    // known locations; without it we'd false-negative "not found" even
+    // when Docker is running.
+    let Some(bin) = crate::commands::docker::resolve_docker_bin().await else {
+        return PreflightCheck {
+            name: "Docker daemon".to_string(),
+            passed: false,
+            level: "critical".to_string(),
+            message: "Docker isn't installed (or its CLI couldn't be found).".to_string(),
+            remediation: Some(
+                "Install Docker Desktop from https://docker.com/products/docker-desktop, then re-check."
+                    .to_string(),
+            ),
+        };
+    };
     // `docker info` returns non-zero if the daemon isn't reachable.
     // This is a stronger signal than `docker --version` (which just
-    // confirms the binary is on PATH).
-    let output = Command::new("docker")
+    // confirms the binary is present).
+    let output = Command::new(&bin)
         .arg("info")
         .arg("--format")
         .arg("{{.ServerVersion}}")
@@ -131,13 +154,13 @@ fn check_docker_daemon() -> PreflightCheck {
                 ),
             }
         }
-        Err(_) => PreflightCheck {
+        Err(e) => PreflightCheck {
             name: "Docker daemon".to_string(),
             passed: false,
             level: "critical".to_string(),
-            message: "Docker not found on PATH.".to_string(),
+            message: format!("Couldn't run Docker: {e}"),
             remediation: Some(
-                "Install Docker Desktop from https://docker.com/products/docker-desktop, then re-check."
+                "Open Docker Desktop / OrbStack / Colima and wait for it to start, then re-check."
                     .to_string(),
             ),
         },
@@ -288,108 +311,93 @@ async fn check_network() -> PreflightCheck {
     }
 }
 
-fn check_port(port: u16) -> PreflightCheck {
-    let name = format!("Port {port} availability");
+/// Resolve `lsof`. A Finder-launched app's PATH may not include
+/// `/usr/sbin`, so probe the absolute macOS location first, then PATH.
+fn lsof_bin() -> Option<&'static str> {
+    if Path::new("/usr/sbin/lsof").exists() {
+        return Some("/usr/sbin/lsof");
+    }
+    if Path::new("/usr/bin/lsof").exists() {
+        return Some("/usr/bin/lsof");
+    }
+    Some("lsof") // last resort: hope it's on PATH
+}
 
-    // For ports < 1024, binding may fail with PermissionDenied on
-    // unprivileged processes — that doesn't mean the port is in use,
-    // just that we can't test it from here. Fall back to lsof for
-    // those ports so we don't show a false-positive "port in use"
-    // error to the user.
-    let needs_lsof = port < 1024;
-
-    if !needs_lsof {
+/// (in_use, occupant, untestable). `untestable` means we genuinely
+/// couldn't determine the state (no bind error kind / no lsof).
+fn probe_port(port: u16) -> (bool, Option<String>, bool) {
+    // Privileged ports (<1024) can't be bind-tested unprivileged, so use
+    // lsof. Higher ports use a bind probe (no external dependency).
+    if port >= 1024 {
         match TcpListener::bind(("127.0.0.1", port)) {
-            Ok(_listener) => PreflightCheck {
-                name,
-                passed: true,
-                level: "critical".to_string(),
-                message: format!("Port {port} is free."),
-                remediation: None,
-            },
+            Ok(_listener) => (false, None, false),
             Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-                let occupant = identify_port_occupant(port);
-                PreflightCheck {
-                    name,
-                    passed: false,
-                    level: "critical".to_string(),
-                    message: format!(
-                        "Port {port} is already in use{}.",
-                        occupant
-                            .as_ref()
-                            .map(|s| format!(" by {s}"))
-                            .unwrap_or_default(),
-                    ),
-                    remediation: Some(format!(
-                        "Stop whatever is using port {port} (try: `lsof -i :{port}` to identify it), then re-check."
-                    )),
-                }
+                (true, port_occupant(port), false)
             }
-            Err(e) => PreflightCheck {
-                name,
-                passed: true,
-                level: "warning".to_string(),
-                message: format!("Couldn't test port {port}: {e}"),
-                remediation: None,
-            },
+            Err(_) => (false, None, true),
         }
     } else {
-        // Privileged port — use lsof to see if anything's listening.
-        match Command::new("lsof")
-            .args(["-nP", "-iTCP:", "-sTCP:LISTEN"])
-            .arg(format!("-iTCP:{port}"))
-            .output()
-        {
-            Ok(out) if out.status.success() => {
-                let s = String::from_utf8_lossy(&out.stdout);
-                // lsof prints a header line + N data lines. If only the
-                // header is present (or output is empty), nothing is
-                // bound. Non-empty = something listening.
-                let data_lines: Vec<&str> = s.lines().skip(1).filter(|l| !l.trim().is_empty()).collect();
-                if data_lines.is_empty() {
-                    PreflightCheck {
-                        name,
-                        passed: true,
-                        level: "critical".to_string(),
-                        message: format!("Port {port} is free."),
-                        remediation: None,
-                    }
-                } else {
-                    // First column of lsof is COMMAND
-                    let occupant = data_lines[0]
-                        .split_whitespace()
-                        .next()
-                        .unwrap_or("(unknown)")
-                        .to_string();
-                    PreflightCheck {
-                        name,
-                        passed: false,
-                        level: "critical".to_string(),
-                        message: format!("Port {port} is already in use by `{occupant}`."),
-                        remediation: Some(format!(
-                            "Stop whatever is using port {port} (try: `sudo lsof -i :{port}` for details), then re-check."
-                        )),
-                    }
-                }
-            }
-            _ => PreflightCheck {
-                name,
-                passed: true,
-                level: "warning".to_string(),
-                message: format!(
-                    "Couldn't check port {port} (lsof unavailable). Install may still fail if the port is in use."
-                ),
-                remediation: None,
-            },
+        match port_occupant(port) {
+            Some(occ) => (true, Some(occ), false),
+            // lsof ran and found nothing → free; lsof missing → untestable.
+            None if lsof_bin().is_some() => (false, None, false),
+            None => (false, None, true),
         }
     }
 }
 
-/// Best-effort: shell out to lsof to identify what's holding a port.
-/// Falls through to `None` if lsof isn't available — the user gets a
-/// less-specific message but the check still works.
-fn identify_port_occupant(port: u16) -> Option<String> {
-    let out = Command::new("lsof")
+fn check_port(port: u16, expect_in_use: bool) -> PreflightCheck {
+    let name = format!("Port {port} availability");
+    let (in_use, occupant, untestable) = probe_port(port);
+    let occ = occupant
+        .as_ref()
+        .map(|s| format!(" by {s}"))
+        .unwrap_or_default();
+
+    if untestable {
+        return PreflightCheck {
+            name,
+            passed: true,
+            level: "warning".to_string(),
+            message: format!("Couldn't check port {port}."),
+            remediation: None,
+        };
+    }
+    if in_use {
+        // Post-install, our own containers hold the required ports — that's
+        // expected, not a conflict.
+        if expect_in_use {
+            return PreflightCheck {
+                name,
+                passed: true,
+                level: "critical".to_string(),
+                message: format!("Port {port} in use by Auracle{occ} (expected)."),
+                remediation: None,
+            };
+        }
+        return PreflightCheck {
+            name,
+            passed: false,
+            level: "critical".to_string(),
+            message: format!("Port {port} is already in use{occ}."),
+            remediation: Some(format!(
+                "Stop whatever is using port {port}, then re-check."
+            )),
+        };
+    }
+    PreflightCheck {
+        name,
+        passed: true,
+        level: "critical".to_string(),
+        message: format!("Port {port} is free."),
+        remediation: None,
+    }
+}
+
+/// Best-effort: shell out to lsof to name what's holding a port. `None`
+/// when nothing's listening OR lsof couldn't run.
+fn port_occupant(port: u16) -> Option<String> {
+    let out = Command::new(lsof_bin()?)
         .args(["-nP", "-sTCP:LISTEN"])
         .arg(format!("-iTCP:{port}"))
         .output()

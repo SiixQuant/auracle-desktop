@@ -87,9 +87,17 @@ const MAX_CHECKSUM_BYTES: usize = 1 << 20; // 1 MiB
 
 #[derive(Debug, Clone, Serialize)]
 pub struct IdeUpdateInfo {
-    /// Installed IDE version (`CFBundleShortVersionString` from the
-    /// app's Info.plist), or `None` when the IDE isn't installed here.
+    /// Installed IDE version, read from the marker the launcher writes when
+    /// it installs a release (`~/.auracle/ide_version`). `None` when the
+    /// IDE isn't installed here, OR it was installed out-of-band so we
+    /// can't trust its version (the app bundle's own version string is the
+    /// upstream editor's, not the Auracle release — comparing it would lie).
     pub installed_version: Option<String>,
+    /// True iff `installed_version` came from our marker (trustworthy).
+    /// False when the bundle exists but we never recorded its version —
+    /// the UI then shows "version unknown" + offers a reinstall rather
+    /// than a bogus up-to-date/upgrade claim.
+    pub version_tracked: bool,
     /// Newest published IDE version (the version part of the newest
     /// `auracle-v*` release tag), or `None` if the repo has no matching
     /// release yet.
@@ -224,30 +232,19 @@ fn is_supported_platform() -> bool {
 
 // ── Installed-version probe ─────────────────────────────────────────
 
-/// Read `CFBundleShortVersionString` from the installed IDE's
-/// `Info.plist` via `/usr/bin/defaults`, which handles both the binary
-/// and XML plist formats. Returns `None` when the IDE isn't installed
-/// or the key is absent. Best-effort — never an error to the caller.
-#[cfg(target_os = "macos")]
-fn installed_version() -> Option<String> {
-    use std::process::Command;
-    let plist = Path::new(INSTALLED_APP).join("Contents/Info.plist");
-    if !plist.exists() {
-        return None;
-    }
-    // `defaults read <path-without-.plist> <key>` — defaults wants the
-    // path WITHOUT the trailing `.plist` extension.
-    let plist_stem = plist.with_extension("");
-    let out = Command::new("/usr/bin/defaults")
-        .arg("read")
-        .arg(&plist_stem)
-        .arg("CFBundleShortVersionString")
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
+/// Path to the version marker the launcher writes after it installs an
+/// IDE release: `~/.auracle/ide_version`. This — not the app bundle's own
+/// version string (which is the upstream editor's) — is the source of
+/// truth for "which Auracle IDE release is installed".
+fn version_marker_path() -> Option<std::path::PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    Some(Path::new(&home).join(".auracle").join("ide_version"))
+}
+
+/// Read the recorded installed version, or `None` if we never wrote one.
+fn tracked_version() -> Option<String> {
+    let p = version_marker_path()?;
+    let v = std::fs::read_to_string(p).ok()?.trim().to_string();
     if v.is_empty() {
         None
     } else {
@@ -255,9 +252,26 @@ fn installed_version() -> Option<String> {
     }
 }
 
+/// Record the version we just installed so future checks compare against
+/// the real Auracle release, not the bundle's upstream version. Best-effort.
+fn write_version_marker(version: &str) {
+    if let Some(p) = version_marker_path() {
+        if let Some(parent) = p.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&p, version);
+    }
+}
+
+/// True iff the IDE app bundle is present on disk.
+#[cfg(target_os = "macos")]
+fn bundle_present() -> bool {
+    Path::new(INSTALLED_APP).exists()
+}
+
 #[cfg(not(target_os = "macos"))]
-fn installed_version() -> Option<String> {
-    None
+fn bundle_present() -> bool {
+    false
 }
 
 // ── HTTP ────────────────────────────────────────────────────────────
@@ -314,8 +328,15 @@ fn pick_dmg_asset(rel: &GhRelease) -> Option<(String, u64)> {
 /// releases). Network / rate-limit errors come back as plain messages.
 #[tauri::command]
 pub async fn ide_check_update() -> Result<IdeUpdateInfo, String> {
-    let installed = installed_version();
-    let installed_present = installed.is_some();
+    let installed_present = bundle_present();
+    // Only a marker-recorded version is trustworthy; the bundle's own
+    // version string is the upstream editor's, not the Auracle release.
+    let installed = if installed_present {
+        tracked_version()
+    } else {
+        None
+    };
+    let version_tracked = installed.is_some();
     let unsupported = !is_supported_platform();
 
     let client = http_client(HTTP_TIMEOUT_SECS)?;
@@ -367,6 +388,7 @@ pub async fn ide_check_update() -> Result<IdeUpdateInfo, String> {
         // published", not an error.
         return Ok(IdeUpdateInfo {
             installed_version: installed,
+            version_tracked,
             latest_version: None,
             update_available: false,
             installed: installed_present,
@@ -383,14 +405,21 @@ pub async fn ide_check_update() -> Result<IdeUpdateInfo, String> {
         None => (None, None),
     };
 
-    // An update is only actionable when: the platform is supported, a
-    // .dmg asset exists, and the latest is strictly newer than installed
-    // (or the IDE isn't installed at all).
-    let newer = is_newer(&latest_version, installed.as_deref());
+    // An update is actionable when the platform is supported, a .dmg asset
+    // exists, and either the IDE isn't installed, or the latest is strictly
+    // newer than the TRACKED installed version. An installed-but-untracked
+    // IDE never claims an upgrade (we can't trust its version) — the UI
+    // offers a reinstall instead, keyed off version_tracked.
+    let newer = if installed_present && !version_tracked {
+        false
+    } else {
+        is_newer(&latest_version, installed.as_deref())
+    };
     let update_available = newer && !unsupported && asset_url.is_some();
 
     Ok(IdeUpdateInfo {
         installed_version: installed,
+        version_tracked,
         latest_version: Some(latest_version),
         update_available,
         installed: installed_present,
@@ -416,6 +445,7 @@ pub async fn ide_download_and_install(
     app: AppHandle,
     asset_url: String,
     expected_size: Option<u64>,
+    version: String,
 ) -> Result<String, String> {
     if !is_supported_platform() {
         return Err(
@@ -454,16 +484,24 @@ pub async fn ide_download_and_install(
     // result regardless of whether cleanup succeeds.
     let _ = std::fs::remove_file(&dmg_path);
 
-    match &result {
-        Ok(version) => emit(
-            &app,
-            "done",
-            &format!("Auracle IDE {version} installed."),
-            100,
-        ),
-        Err(e) => emit(&app, "error", e, 0),
+    match result {
+        Ok(_bundle_ver) => {
+            // Record the Auracle release we installed — the source of truth
+            // for future checks (the bundle's own version is upstream's).
+            write_version_marker(&version);
+            emit(
+                &app,
+                "done",
+                &format!("Auracle IDE {version} installed."),
+                100,
+            );
+            Ok(version)
+        }
+        Err(e) => {
+            emit(&app, "error", &e, 0);
+            Err(e)
+        }
     }
-    result
 }
 
 /// Only allow downloading from GitHub's release-asset hosts. GitHub
