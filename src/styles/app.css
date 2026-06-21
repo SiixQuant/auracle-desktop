@@ -656,7 +656,26 @@ h2 {
 }
 
 /* ── The Riser: focused connect sheet over the dimmed list ───────── */
-.conn-root { position: relative; min-height: 440px; }
+/* The connections card fills the inspector viewport and scrolls its list
+ * internally, so the rising sheet always matches the actual panel size —
+ * from a minimized window up to fullscreen (dynamic sizing, no fixed
+ * height). */
+.conn-root {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.conn-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* Keep search anchored while the list scrolls under it. */
+.conn-root .dir-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-elev);
+  padding-bottom: var(--s-2);
+}
 .riser-scrim {
   position: absolute;
   inset: 0;
@@ -1874,6 +1893,11 @@ table.data-table {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Fill the panel height so a single fill-card (Connections) can size to
+   * the viewport and scroll internally — dynamic from minimized to
+   * fullscreen. Multi-card inspectors just gain trailing space + scroll. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 @keyframes insp-fade { from { opacity: 0; } to { opacity: 1; } }

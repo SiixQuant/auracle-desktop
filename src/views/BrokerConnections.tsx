@@ -155,19 +155,17 @@ export default function ConnectionsCard() {
           {refreshing ? "Checking…" : "Refresh"}
         </button>
       </div>
-      <p className="muted fs-sm m-0 mb-3">
-        One place for brokers, crypto venues, and market data. Pick a source to
-        connect it right here.
-      </p>
-      {error && <div className="mono err-text mb-3">{error}</div>}
-      {!statuses && !error && <div className="muted fs-xs mt-1">Checking…</div>}
-      {statuses && (
-        <ConnectionsDirectory
-          statuses={statuses}
-          mdStatus={mdStatus}
-          onOpen={setActiveId}
-        />
-      )}
+      <div className="conn-scroll">
+        {error && <div className="mono err-text mb-3">{error}</div>}
+        {!statuses && !error && <div className="muted fs-xs mt-1">Checking…</div>}
+        {statuses && (
+          <ConnectionsDirectory
+            statuses={statuses}
+            mdStatus={mdStatus}
+            onOpen={setActiveId}
+          />
+        )}
+      </div>
 
       {active && (
         <>
@@ -244,7 +242,7 @@ function ConnectionsDirectory({
           <input
             type="text"
             value={query}
-            placeholder="Search brokers and data sources"
+            placeholder="Search"
             aria-label="Search brokers and data sources"
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -290,7 +288,7 @@ function ConnectionsDirectory({
             onClick={() => setShowSoon((v) => !v)}
           >
             <span className={`dir-more__chev ${showSoon ? "open" : ""}`}>›</span>
-            More sources — coming soon
+            More — coming soon
             <span className="dir-more__count">{soon.length}</span>
           </button>
           {showSoon &&
@@ -417,9 +415,7 @@ function ConnectSheet({
         {isIbkr && <IbkrConnect onStateChange={onRefresh} />}
         {isDataKey && <DataKeyForm providerId={broker.id} />}
         {!isIbkr && !isDataKey && (
-          <p className="muted fs-sm m-0 lh-relaxed">
-            This source isn’t connectable from the launcher yet.
-          </p>
+          <p className="muted fs-sm m-0 lh-relaxed">Not available yet.</p>
         )}
       </div>
     </div>
@@ -435,16 +431,14 @@ function HealthBanner({ mdStatus }: { mdStatus: BrokerMarketDataStatus | null })
   if (q === "realtime") {
     return (
       <div className="health-banner ok">
-        <strong>Real-time data — trade-ready.</strong> The engine will route
-        orders for live and paper strategies.
+        <strong>Real-time data.</strong> Ready to trade.
       </div>
     );
   }
   if (q === "delayed" || q === "frozen" || q === "halted") {
     return (
       <div className="health-banner warn">
-        <strong>Market data is delayed — live trading is paused.</strong>{" "}
-        Strategies won’t run until IBKR real-time data is enabled.
+        <strong>Delayed data — live trading paused.</strong>
         {mdStatus?.hint ? ` ${mdStatus.hint}` : ""}
       </div>
     );
@@ -508,8 +502,8 @@ function DataKeyForm({ providerId }: { providerId: string }) {
       <div className="hstack mb-2">
         <span className="muted fs-xs" style={{ flex: 1 }}>
           {configured
-            ? "A key is on file. Paste a new one to replace it."
-            : "Add an API key so this provider’s data works."}
+            ? "Key saved. Paste a new one to replace it."
+            : "Add this provider’s API key."}
         </span>
         {verified ? (
           <span className="badge ok">verified</span>
