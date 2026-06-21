@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import ConfirmRow from "@/components/ConfirmRow";
 import IncidentCard from "@/components/IncidentCard";
+import SetupHint from "@/components/SetupHint";
 import Tutorial from "@/components/Tutorial";
 import {
   AGENTS,
@@ -27,6 +28,7 @@ import {
 import { useSettings } from "@/lib/settings";
 import {
   cmd,
+  needsOwnerSetup,
   onEvent,
   openInBrowser,
   type DockerStatus,
@@ -229,12 +231,16 @@ export function GeneralCard() {
       </p>
       {settings === null ? (
         error ? (
-          <div className="muted fs-xs lh-relaxed">
-            Can&apos;t reach the engine right now — it may still be starting.{" "}
-            <button type="button" className="linklike" onClick={refresh}>
-              Retry
-            </button>
-          </div>
+          needsOwnerSetup(error) ? (
+            <SetupHint />
+          ) : (
+            <div className="muted fs-xs lh-relaxed">
+              Can&apos;t reach the engine right now — it may still be starting.{" "}
+              <button type="button" className="linklike" onClick={refresh}>
+                Retry
+              </button>
+            </div>
+          )
         ) : (
           <div className="muted fs-sm">{loading ? "Loading…" : "No preferences."}</div>
         )
@@ -934,11 +940,12 @@ export function IntelligenceCard() {
         </div>
       </form>
 
-      {status && (
+      {status && !needsOwnerSetup(status) && (
         <div className={isError ? "err-text fs-xs mt-2 lh-relaxed" : "muted mono fs-xs mt-2"}>
           {status}
         </div>
       )}
+      {needsOwnerSetup(status) && <SetupHint />}
     </div>
   );
 }
