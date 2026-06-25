@@ -370,7 +370,19 @@ function Step3({
     setPreflightError(null);
     setPreflight(null);
     try {
-      const report = await cmd.preflightCheck();
+      // When the Auracle stack is already up — e.g. re-running setup on a
+      // live install — its own containers legitimately hold the required
+      // ports, so an "in use" port is expected, not a conflict. Probe both
+      // the install marker and live engine health (the health probe also
+      // catches a stack started outside the launcher's install path) and
+      // tell the pre-flight to treat held ports as ours rather than telling
+      // the user to kill their own stack.
+      const [installed, health] = await Promise.all([
+        cmd.isInstalled().catch(() => false),
+        cmd.healthcheckNow().catch(() => null),
+      ]);
+      const stackUp = installed || (!!health && health.state !== "down");
+      const report = await cmd.preflightCheck(stackUp);
       setPreflight(report);
     } catch (err) {
       setPreflightError(String(err));
