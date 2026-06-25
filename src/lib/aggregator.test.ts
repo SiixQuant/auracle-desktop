@@ -69,6 +69,19 @@ test("healthy: the verb is Open workspace, never connect-broker", () => {
   assert.equal(b.actuator.disabled, false);
 });
 
+test("healthy but no owner yet: the verb is Finish setup, not Open workspace", () => {
+  const b = deriveBoard({ ...base, health: { state: "healthy" }, needsSetup: true });
+  assert.equal(b.actuator.action, "setup");
+  assert.equal(b.actuator.label, "Finish setup");
+  assert.equal(b.actuator.disabled, false);
+  assert.notEqual(b.systemLine, "Everything's ready.");
+});
+
+test("needsSetup only applies when healthy — down still says Start engine", () => {
+  const b = deriveBoard({ ...base, health: { state: "down" }, needsSetup: true });
+  assert.equal(b.actuator.action, "start");
+});
+
 // ── The adaptive verb is ONLY ever launch / start (never connect) ──
 
 test("no engine state produces a 'connect' actuator action", () => {

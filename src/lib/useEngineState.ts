@@ -45,8 +45,13 @@ export function useEngineState(): EngineStateHook {
   const [launching, setLaunching] = useState(false);
   const [ideError, setIdeError] = useState<string | null>(null);
   const [engineErr, setEngineErr] = useState<string | null>(null);
+  // First-run gate: true once we've confirmed the healthy engine still has
+  // no owner account. Undefined = we don't know yet (don't block the user).
+  const [needsSetup, setNeedsSetup] = useState<boolean | undefined>(undefined);
 
   const mounted = useRef(true);
+  // Latch: once an owner account exists it never un-exists, so stop probing.
+  const ownerConfirmed = useRef(false);
 
   const pollHealth = useCallback(async () => {
     try {
@@ -54,6 +59,22 @@ export function useEngineState(): EngineStateHook {
       if (mounted.current) {
         setHealth(h);
         if (h) setLastOkAt(Date.now());
+      }
+      // When the engine is healthy, find out whether first-run setup is
+      // finished (an owner account exists). Until it is, the home must offer
+      // "Finish setup" — never "Open workspace" into a blank IDE (P0-10).
+      // An indeterminate probe leaves needsSetup falsy so we never block on a
+      // signal we can't read; the latch stops probing once an owner is found.
+      if (h?.state === "healthy" && !ownerConfirmed.current) {
+        try {
+          const ns = await cmd.engineNeedsSetup();
+          if (mounted.current && ns !== null) {
+            setNeedsSetup(ns);
+            if (ns === false) ownerConfirmed.current = true;
+          }
+        } catch {
+          /* probe failed — leave the home as-is, don't block launch */
+        }
       }
       return h;
     } catch {
@@ -136,7 +157,7 @@ export function useEngineState(): EngineStateHook {
     void pollHealth();
   }, [pollHealth]);
 
-  const state: EngineState = { health, starting };
+  const state: EngineState = { health, starting, needsSetup };
 
   return {
     state,

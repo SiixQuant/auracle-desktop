@@ -27,6 +27,7 @@ export type ActuatorAction =
   | "start" // engine down — compose up
   | "starting" // engine coming up — disabled, in-flight
   | "degraded" // engine up but unhealthy — route to Supervision
+  | "setup" // engine healthy but no owner account yet — finish first-run
   | "launch"; // engine ready — open the workspace
 
 /** Which inspector a status opens (status-is-the-door). */
@@ -39,6 +40,11 @@ export interface EngineState {
   health: HealthSnapshot | null;
   /** True while the user-initiated start sequence is running. */
   starting?: boolean;
+  /** True when the engine is healthy but has NO owner account yet, so
+   *  first-run setup isn't finished. Only meaningful when healthy; left
+   *  undefined when indeterminate (probe couldn't tell) so the home falls
+   *  back to the normal "Open workspace" verb rather than guessing. */
+  needsSetup?: boolean;
 }
 
 export interface Vital {
@@ -130,6 +136,13 @@ export function deriveBoard(s: EngineState): BoardState {
       disabled: true,
       reason: "Open Supervision to see which service is unhealthy.",
     };
+  } else if (s.needsSetup) {
+    // engine healthy, but no owner account yet — first-run isn't finished.
+    // Offering "Open workspace" here would land the IDE in a blank Connect
+    // modal, so the verb is "Finish setup" instead (audit P0-10).
+    lamp = "accent";
+    systemLine = "Almost there — finish first-run setup.";
+    actuator = { label: "Finish setup", action: "setup", disabled: false };
   } else {
     // engine healthy — the workspace is one click away
     lamp = "ok";

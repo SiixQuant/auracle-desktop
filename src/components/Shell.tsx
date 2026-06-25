@@ -16,7 +16,7 @@ import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
 import StandbyHome from "@/components/StandbyHome";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
-import { cmd, openIdePanel, type ContainerStatus } from "@/lib/tauri";
+import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/tauri";
 import { useEngineState } from "@/lib/useEngineState";
 
 export default function Shell({
@@ -60,6 +60,12 @@ export default function Shell({
         break;
       case "start":
         void eng.startEngine();
+        break;
+      case "setup":
+        // Engine's up but has no owner yet — open the first-run wizard
+        // (/ui/setup) in the browser; the next health poll flips the home
+        // to "Open workspace" once the account exists.
+        void openEngineSetup();
         break;
       case "degraded":
         setInspector("supervision");
@@ -125,7 +131,13 @@ export default function Shell({
         case "L":
           e.preventDefault();
           runActuator();
-          emit(board.actuator.action === "start" ? "engine start" : "launch");
+          emit(
+            board.actuator.action === "start"
+              ? "engine start"
+              : board.actuator.action === "setup"
+                ? "finish setup"
+                : "launch",
+          );
           break;
         case "u":
           e.preventDefault();

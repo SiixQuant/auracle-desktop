@@ -44,7 +44,8 @@ export interface CommandContext {
  *  incident (start/connect/degraded) — that's "incident-floats-to-top". */
 export function buildCommands(ctx: CommandContext): Command[] {
   const a = ctx.board.actuator;
-  const incident = a.action === "start" || a.action === "degraded";
+  const incident =
+    a.action === "start" || a.action === "degraded" || a.action === "setup";
 
   const cmds: Command[] = [];
 
@@ -55,7 +56,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
       title: a.label,
       verb: actuatorVerb(a.action),
       group: "Action",
-      keywords: "launch start engine open workspace go",
+      keywords: "launch start engine open workspace go finish setup first-run account owner",
       relevance: incident ? 100 : 60,
       destructive: false,
       run: ctx.runActuator,
@@ -154,6 +155,8 @@ function actuatorVerb(action: BoardState["actuator"]["action"]): string {
       return "engine start";
     case "degraded":
       return "supervision";
+    case "setup":
+      return "finish setup";
     default:
       return action;
   }

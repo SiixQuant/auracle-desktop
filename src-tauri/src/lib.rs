@@ -68,6 +68,7 @@ use tauri::Builder;
 use commands::{
     broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
     broker_stream as broker_stream_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
+    engine_auth as engine_auth_cmd,
     github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
     ibkr_gateway as ibkr_gateway_cmd, ibkr_login as ibkr_login_cmd, ide_update as ide_update_cmd,
     installer as installer_cmd, keychain as keychain_cmd, mcp_sidecar as mcp_cmd,
@@ -301,6 +302,10 @@ pub fn run() {
             // View mode (browser vs embedded)
             view_cmd::open_auracle_ide,
             view_cmd::license_activate_engine,
+            // First-run probe: is the engine healthy but still without an
+            // owner account? The Standby home uses this so it never offers
+            // "Open workspace" into a blank IDE before setup is done (P0-10).
+            engine_auth_cmd::engine_needs_setup,
             // Launcher-managed Auracle IDE updates — the launcher is the
             // single update conduit (the IDE no longer self-updates). The
             // check is an unauthenticated GitHub Releases query; the install

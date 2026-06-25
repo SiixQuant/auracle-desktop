@@ -230,6 +230,12 @@ export const cmd = {
   // when the IDE isn't installed on this machine.
   openAuracleIDE: () => invoke<void>("open_auracle_ide"),
 
+  /** First-run probe: is the engine healthy but still has no owner account?
+   *  `true` = needs first-run setup, `false` = owner exists, `null` =
+   *  indeterminate (don't block the user). Read-only — writes nothing and
+   *  never returns the owner key. Powers the home's "Finish setup" verb. */
+  engineNeedsSetup: () => invoke<boolean | null>("engine_needs_setup"),
+
   // ── Launcher-managed IDE updates ──────────────────────────────
   //
   // The launcher detects + installs Auracle IDE updates (the IDE no

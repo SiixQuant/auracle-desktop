@@ -91,6 +91,51 @@ pub async fn fetch_owner_api_key(client: &reqwest::Client) -> Result<Option<Stri
     Ok(body.api_key.filter(|key| !key.is_empty()))
 }
 
+/// First-run probe (read-only): does the local engine have an owner
+/// account yet?
+///
+/// The launcher home calls this when the engine is healthy so it never
+/// offers "Open workspace" — which would land the IDE in a blank Connect
+/// modal — before first-run setup is finished (audit P0-10). It reuses the
+/// loopback owner-key handoff purely as a signal: it writes nothing on this
+/// machine and never returns the key value.
+///
+///   * `Ok(Some(true))`  — engine reachable, NO owner account yet (HTTP 409)
+///   * `Ok(Some(false))` — engine reachable, owner account exists
+///   * `Ok(None)`        — indeterminate (no on-box handoff secret, engine
+///                         not reachable right now, or an unexpected status).
+///                         The caller MUST NOT block the user on a signal it
+///                         can't read — it falls back to the normal verb.
+#[tauri::command]
+pub async fn engine_needs_setup() -> Result<Option<bool>, String> {
+    let secret = match read_handoff_secret() {
+        Some(token) => token,
+        None => return Ok(None),
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(to_error_string)?;
+
+    let resp = match client
+        .post(format!("{ENGINE_BASE}/ui/api/ide/provision-local"))
+        .header("X-Auracle-Handoff-Token", secret)
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        // Engine not answering loopback right now — can't tell; don't block.
+        Err(_) => return Ok(None),
+    };
+
+    Ok(match resp.status().as_u16() {
+        409 => Some(true),                            // healthy, no owner → needs setup
+        s if (200..300).contains(&s) => Some(false),  // owner exists → ready
+        _ => None,                                    // unexpected → don't block
+    })
+}
+
 /// Fetch the double-submit CSRF token: GET `/ui/api/status` with the owner
 /// session cookie so the engine issues an `auracle_csrf` cookie, then read
 /// that cookie's value to echo back on the mutation. The engine's CSRF
