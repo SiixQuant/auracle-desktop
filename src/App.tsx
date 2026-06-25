@@ -70,7 +70,10 @@ export default function App() {
 
   return (
     <SettingsProvider>
-      <Shell onOpenTutorial={() => setShowTutorial(true)} />
+      <Shell
+        onOpenTutorial={() => setShowTutorial(true)}
+        onRerunSetup={() => setNeedsOnboarding(true)}
+      />
       {showTutorial && <Tutorial onClose={closeTutorial} />}
     </SettingsProvider>
   );

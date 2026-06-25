@@ -44,7 +44,7 @@ export interface CommandContext {
  *  incident (start/connect/degraded) — that's "incident-floats-to-top". */
 export function buildCommands(ctx: CommandContext): Command[] {
   const a = ctx.board.actuator;
-  const incident = a.action === "start" || a.action === "connect" || a.action === "degraded";
+  const incident = a.action === "start" || a.action === "degraded";
 
   const cmds: Command[] = [];
 
@@ -55,7 +55,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
       title: a.label,
       verb: actuatorVerb(a.action),
       group: "Action",
-      keywords: "launch start engine connect workspace go",
+      keywords: "launch start engine open workspace go",
       relevance: incident ? 100 : 60,
       destructive: false,
       run: ctx.runActuator,
@@ -66,9 +66,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
   const dests: Array<
     [Door | "intelligence" | "system" | "lifecycle", string, string, string]
   > = [
-    ["connections", "Open Connections", "connections", "broker data feed ibkr keys"],
     ["supervision", "Open Supervision", "supervision", "engine docker containers logs"],
-    ["account", "Open Account", "account", "pnl positions exposure net liq"],
     ["lifecycle", "Open Strategy lifecycle", "lifecycle", "strategies belt draft paper live"],
     ["intelligence", "Open Intelligence", "intelligence", "agent model deepseek ai key"],
     ["system", "Open System", "system", "license updates preferences settings"],
@@ -154,8 +152,6 @@ function actuatorVerb(action: BoardState["actuator"]["action"]): string {
       return "launch";
     case "start":
       return "engine start";
-    case "connect":
-      return "connect broker";
     case "degraded":
       return "supervision";
     default:
@@ -164,8 +160,8 @@ function actuatorVerb(action: BoardState["actuator"]["action"]): string {
 }
 
 /** Subsequence fuzzy score: -1 = no match; higher = tighter. Rewards a
- *  prefix match and contiguous runs, so "con" ranks "connections" above
- *  "Open Account". Case-insensitive. */
+ *  prefix match and contiguous runs, so "sup" ranks "Open Supervision"
+ *  above "Open Updates". Case-insensitive. */
 export function fuzzyScore(query: string, text: string): number {
   const q = query.trim().toLowerCase();
   const t = text.toLowerCase();

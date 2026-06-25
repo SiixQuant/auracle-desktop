@@ -1,11 +1,14 @@
 // StandbyHome — the launcher home, "The Standby".
 //
 // The calm panel of an already-running machine: a single status lamp, one
-// plain-English System Line, and one adaptive verb. Everything denser is
-// one drill-in deeper (status-is-the-door, via the vitals) — this surface
-// shows only "status + the next move". All three focal elements are pure
-// derivations of one engine snapshot (deriveBoard), so what the home says
-// is, by construction, what the engine reports.
+// plain-English System Line, and one adaptive verb. The launcher is a
+// global hub now — connections (brokers / data sources) live in the IDE —
+// so the home's verb is only "Open workspace" (engine ready) or "Start
+// engine" (engine down), never "connect a broker". Below the verb sits a
+// 2x2 hub-card grid (Updates / Changelog / FAQ / Support) and a quiet
+// "Re-run setup". The lamp + System Line + verb are pure derivations of one
+// engine snapshot (deriveBoard), so what the home says is, by construction,
+// what the engine reports.
 
 import IncidentCard from "@/components/IncidentCard";
 import {
@@ -18,12 +21,14 @@ import {
 import { agentById, agentIdFromEngineProvider } from "@/lib/intelligence";
 import { useSettings } from "@/lib/settings";
 import type { EngineStateHook } from "@/lib/useEngineState";
+import type { InspectorKey } from "@/components/InspectorHost";
 
 export default function StandbyHome({
   eng,
   onActuator,
-  onSkip,
   onDoor,
+  onCard,
+  onRerunSetup,
   onAgent,
 }: {
   /** Shared live engine read (owned by the Shell, so the home keeps
@@ -32,12 +37,12 @@ export default function StandbyHome({
   /** Run the home's one verb — owned by the Shell so the palette and the
    *  button trigger the same action. */
   onActuator: () => void;
-  /** Skip broker setup and open the workspace anyway. Shown only when the
-   *  verb is "connect" — connecting a broker is recommended (live data +
-   *  execution need it) but never required to reach the IDE. */
-  onSkip?: () => void;
   /** Open an inspector for a pressed status (status-is-the-door). */
   onDoor?: (door: Exclude<Door, null>) => void;
+  /** Open one of the hub cards (Updates / Changelog / FAQ / Support). */
+  onCard?: (key: InspectorKey) => void;
+  /** Re-run the first-run stack setup (Docker + engine + IDE). */
+  onRerunSetup?: () => void;
   /** Open the Intelligence inspector (the agent on-ramp). */
   onAgent?: () => void;
 }) {
@@ -51,7 +56,7 @@ export default function StandbyHome({
     : "Auracle Agent";
   const keyOnFile = ai?.configured ?? false;
 
-  const asOf = stamp(eng.lastOkAt, eng.now, eng.state.brokerStale ?? false);
+  const asOf = stamp(eng.lastOkAt, eng.now);
 
   return (
     <div className="standby">
@@ -61,12 +66,6 @@ export default function StandbyHome({
       {asOf && <div className="standby__stamp">{asOf}</div>}
 
       <Actuator actuator={actuator} onClick={onActuator} />
-
-      {actuator.action === "connect" && onSkip && (
-        <button type="button" className="standby__skip" onClick={onSkip}>
-          Set up later — open the workspace
-        </button>
-      )}
 
       <button type="button" className="standby__agent" onClick={onAgent}>
         <span className="standby__agent-label">agent</span>
@@ -87,6 +86,39 @@ export default function StandbyHome({
             action={{ label: "Open Supervision", onClick: () => onDoor?.("supervision") }}
           />
         </div>
+      )}
+
+      <div className="hub-grid" role="group" aria-label="Hub">
+        <HubCard
+          title="Updates"
+          desc="Update the launcher and the IDE"
+          onClick={() => onCard?.("updates")}
+          icon={<DownloadIcon />}
+        />
+        <HubCard
+          title="Changelog"
+          desc="What changed in each release"
+          onClick={() => onCard?.("changelog")}
+          icon={<ListIcon />}
+        />
+        <HubCard
+          title="FAQ"
+          desc="Common questions, answered"
+          onClick={() => onCard?.("faq")}
+          icon={<HelpIcon />}
+        />
+        <HubCard
+          title="Support"
+          desc="Diagnostics + how to reach us"
+          onClick={() => onCard?.("support")}
+          icon={<LifebuoyIcon />}
+        />
+      </div>
+
+      {onRerunSetup && (
+        <button type="button" className="standby__rerun" onClick={onRerunSetup}>
+          Re-run setup
+        </button>
       )}
 
       <div className="standby__vitals" role="group" aria-label="System vitals">
@@ -140,16 +172,35 @@ function Actuator({
         title={actuator.reason}
       >
         <span>{actuator.label}</span>
-        {actuator.badge && (
-          <span className={`standby__badge${actuator.badge === "live" ? " is-live" : ""}`}>
-            {actuator.badge.toUpperCase()}
-          </span>
-        )}
       </button>
       {actuator.reason && actuator.disabled && (
         <div className="standby__act-reason">{actuator.reason}</div>
       )}
     </div>
+  );
+}
+
+// ── Hub card ────────────────────────────────────────────────────────
+
+function HubCard({
+  title,
+  desc,
+  icon,
+  onClick,
+}: {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className="hub-card" onClick={onClick}>
+      <span className="hub-card__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="hub-card__title">{title}</span>
+      <span className="hub-card__desc">{desc}</span>
+    </button>
   );
 }
 
@@ -165,7 +216,7 @@ function VitalButton({ v, onClick }: { v: Vital; onClick: () => void }) {
     >
       <span className={`vital__dot ${v.dot}`} />
       <span className="vital__label">{v.label}</span>
-      <span className={`vital__value${v.key === "mode" && v.value === "LIVE" ? " is-live" : ""}`}>
+      <span className="vital__value">
         {v.freshness === "stale" ? "stale" : v.value}
       </span>
       {v.provenance && <span className="vital__prov">{v.provenance}</span>}
@@ -175,9 +226,8 @@ function VitalButton({ v, onClick }: { v: Vital; onClick: () => void }) {
 
 // ── Stamp helpers ───────────────────────────────────────────────────
 
-function stamp(lastOkAt: number | null, now: number, stale: boolean): string {
+function stamp(lastOkAt: number | null, now: number): string {
   if (!lastOkAt) return "";
-  if (stale) return `stale · last ok ${clock(lastOkAt)} · ${relAge(lastOkAt, now)}`;
   const age = now - lastOkAt;
   return `as of ${clock(lastOkAt)}${age >= 60_000 ? ` · ${relAge(lastOkAt, now)}` : ""}`;
 }
@@ -192,4 +242,54 @@ function relAge(ms: number, now: number): string {
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m ago`;
   return `${Math.floor(m / 60)}h ago`;
+}
+
+// ── Hub-card icons (inline, currentColor) ───────────────────────────
+
+const cardIconProps = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 20 20",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.6,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function DownloadIcon() {
+  return (
+    <svg {...cardIconProps}>
+      <path d="M10 3 v9 M6.5 8.5 L10 12 l3.5 -3.5 M4 15.5 h12" />
+    </svg>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg {...cardIconProps}>
+      <path d="M7 6 h9 M7 10 h9 M7 14 h9 M4 6 h0.01 M4 10 h0.01 M4 14 h0.01" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg {...cardIconProps}>
+      <circle cx="10" cy="10" r="7.2" />
+      <path d="M8.2 8 a2 2 0 1 1 2.6 2 c-0.6 0.35 -0.8 0.8 -0.8 1.4" />
+      <circle cx="10" cy="14.3" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function LifebuoyIcon() {
+  return (
+    <svg {...cardIconProps}>
+      <circle cx="10" cy="10" r="7" />
+      <circle cx="10" cy="10" r="3" />
+      <path d="M5 5 l2.2 2.2 M12.8 12.8 L15 15 M15 5 l-2.2 2.2 M7.2 12.8 L5 15" />
+    </svg>
+  );
 }

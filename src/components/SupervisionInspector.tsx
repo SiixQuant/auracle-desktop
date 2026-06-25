@@ -2,11 +2,10 @@
 //
 // The engine vital opens this. It surfaces what's already on the wire:
 // each container's state/health with a per-row Restart, stack-level
-// Start/Stop/Pull-update, the Docker fault as an IncidentCard, and the
-// ibeam IBKR-gateway panel (status + real logs). HONESTY: there is no
-// generic per-container log binding, so only ibeam (which has one) shows
-// logs; and ibeam's daily IBKR re-login is described, not faked with a
-// countdown we can't source.
+// Start/Stop/Pull-update, and the Docker fault as an IncidentCard.
+// HONESTY: there is no generic per-container log binding, so no panel
+// claims logs it can't source. (Broker gateways — IBKR and friends — are
+// supervised inside the IDE now, alongside the connections themselves.)
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,7 +16,6 @@ import {
   type ContainerStatus,
   type DockerStatus,
   type HealthSnapshot,
-  type IbeamStatus,
 } from "@/lib/tauri";
 
 export default function SupervisionInspector() {
@@ -164,9 +162,6 @@ export default function SupervisionInspector() {
           ))
         )}
       </div>
-
-      {/* IBKR gateway (ibeam) */}
-      <IbeamPanel />
     </>
   );
 }
@@ -227,87 +222,4 @@ function DockerFault({
     );
   }
   return null;
-}
-
-function IbeamPanel() {
-  const [status, setStatus] = useState<IbeamStatus | null | "error">(null);
-  const [logs, setLogs] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setStatus(await cmd.ibeamStatus());
-    } catch {
-      setStatus("error");
-    }
-  }, []);
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (status === null) return null;
-  if (status === "error" || status.state.state === "not_installed") {
-    // Nothing to supervise — ibeam isn't set up. Stay quiet (Connections
-    // owns the IBKR setup flow); don't show a broken panel.
-    return null;
-  }
-
-  const st = status.state;
-  const tone =
-    st.state === "running" ? (st.auth_ok ? "ok" : "warn") : st.state === "stopped" ? "warn" : "err";
-  const label =
-    st.state === "running"
-      ? st.auth_ok
-        ? "running · authenticated"
-        : "running · re-authenticating"
-      : st.state;
-
-  return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">IBKR gateway</span>
-        <span className={`chip ${tone}`}>{label}</span>
-      </div>
-      <p className="muted fs-xs m-0 lh-relaxed">
-        The gateway keeps your IBKR session alive and auto-re-logs in on IBKR&apos;s
-        daily session reset — no action needed unless it shows an error.
-      </p>
-      <div className="hstack mt-3">
-        <button
-          type="button"
-          className="ghost btn-sm"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await cmd.ibeamRestart();
-              await load();
-            } catch {
-              // surfaced via status on reload
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "Restarting…" : "Restart"}
-        </button>
-        <button
-          type="button"
-          className="ghost btn-sm"
-          onClick={async () => {
-            try {
-              setLogs(await cmd.ibeamLogs(200));
-            } catch (err) {
-              setLogs(String(err));
-            }
-          }}
-        >
-          Logs
-        </button>
-      </div>
-      {logs !== null && (
-        <pre className="term-block mt-2">{logs || "(no output)"}</pre>
-      )}
-    </div>
-  );
 }

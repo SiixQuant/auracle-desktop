@@ -1,7 +1,7 @@
 // SetupHint — the actionable "you have no owner account yet" affordance.
 //
-// Every owner-gated launcher action (save an AI key, load prefs, connect a
-// broker) fails with the same engine signal when first-run setup hasn't
+// Every owner-gated launcher action (save an AI key, load prefs) fails with
+// the same engine signal when first-run setup hasn't
 // been done: there's no owner account, so the on-box key handoff returns
 // nothing. Rather than a dead-end red error, point the user at the engine's
 // first-run wizard (license activation → create your account), which stays

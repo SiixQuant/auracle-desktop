@@ -360,387 +360,6 @@ h2 {
 .seg-tab--paper.active { background: var(--surface-2); color: var(--fg-dim); }
 .seg-tab--live.active  { background: var(--err-soft);  color: var(--err); }
 
-/* Collapsed "more brokers coming" line (Settings → Brokers) — replaces
- * three full not-implemented broker blocks with one quiet line. */
-.broker-soon {
-  padding: 10px 0 2px;
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-
-/* ── Connections directory (Settings → Connections) ─────────────────
- * Compact enterprise integration catalog: search + category filter,
- * status-first sections, fixed 4-zone rows. Capability badges are
- * deliberately hairline/neutral; only the status pill carries color
- * (honesty: a badge must never read as "connected"). */
-.dir-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-2);
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--s-3);
-}
-.dir-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1 1 220px;
-  min-width: 200px;
-}
-.dir-search svg { position: absolute; left: 10px; color: var(--fg-faint); pointer-events: none; transition: color 0.15s; }
-.dir-search:focus-within svg { color: var(--fg-muted); }
-.dir-search input {
-  width: 100%;
-  padding: 7px 10px 7px 30px;
-  font-size: var(--t-sm, 13px);
-}
-.dir-filters { display: flex; gap: 4px; }
-.dir-filter {
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  /* Resting fill so the filters read as a row of pressable chips, not
-     borderless text. */
-  background: var(--surface);
-  color: var(--fg-dim);
-  font-size: var(--t-xs);
-  cursor: pointer;
-  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
-}
-.dir-filter:hover { background: var(--surface-2); color: var(--fg); border-color: var(--line-strong); }
-.dir-filter.active { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-dim); }
-
-.dir-empty { padding: var(--s-4) 0; }
-.linklike {
-  background: none; border: none; padding: 0;
-  color: var(--accent-text); cursor: pointer; font: inherit;
-}
-.linklike:hover { text-decoration: underline; }
-
-.dir-section { margin-top: var(--s-4); }
-/* Sub-section mono-label — same Percept treatment as .card-title
- * (SF Mono, tracked, uppercase, tertiary), one tier smaller. */
-.dir-section__head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-2) 0 6px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-  border-bottom: 1px solid var(--line);
-}
-.dir-section__count {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--fg-muted);
-}
-
-.dir-row { border-bottom: 1px solid var(--line); }
-.dir-row:last-child { border-bottom: none; }
-.dir-row__top {
-  display: grid;
-  /* Logo · meta · state-stack (pill + health word) · chevron. The fixed
-   * 16px trailing column holds the drill-in chevron (empty on non-openable
-   * rows) so alignment never shifts. */
-  grid-template-columns: 32px 1fr auto 16px;
-  align-items: center;
-  gap: var(--s-3);
-  padding: 10px 8px;
-  border-radius: var(--r-sm);
-  transition: background-color 0.12s;
-}
-/* Row hover — a step above the card surface so the pointer target is
-   obvious; available rows only (soon rows stay quiet at 55%). */
-.dir-row:not(.is-soon):hover .dir-row__top { background: var(--surface-2); }
-/* Connectable rows are click-to-expand accordion headers. */
-.dir-row.is-expandable > .dir-row__top { cursor: pointer; }
-.dir-row.is-expandable > .dir-row__top:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-.dir-row__chev {
-  color: var(--fg-muted);
-  font-size: 16px;
-  line-height: 1;
-  text-align: center;
-  transition: transform 0.15s ease-out;
-}
-.dir-row.is-open .dir-row__chev { transform: rotate(90deg); color: var(--accent-text); }
-.dir-row.is-soon { opacity: 0.7; }
-.dir-row.is-soon .dir-logo { filter: saturate(0.5); }
-
-.dir-logo {
-  width: 32px;
-  height: 32px;
-  flex: none;
-  border-radius: var(--r-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  overflow: hidden;
-}
-/* Neutral, brand-agnostic placeholder — no per-broker color (a colored
- * mark would be a homemade logo approximation). The text label beside
- * it identifies the broker. */
-.dir-logo--placeholder {
-  background: var(--surface-2);
-  color: var(--fg-muted);
-  border: 1px solid var(--line);
-}
-/* Official mark sits on a light tile so dark logos (e.g. Alpaca's
- * black roundel) stay visible on the dark UI — a container background,
- * never a recolor of the mark itself. */
-.dir-logo--official { background: #f3f4f6; }
-.dir-logo--official img {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-  display: block;
-}
-.dir-row__meta { min-width: 0; }
-.dir-name { font-size: 14px; font-weight: 500; color: var(--fg); }
-.dir-tags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 3px;
-}
-.achip {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  color: var(--fg-muted);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: 1px 5px;
-  white-space: nowrap;
-}
-.achip--more { color: var(--fg-faint); border-style: dashed; }
-/* Capability chip — mono, hairline, tertiary. Data/Trade only render
- * when the capability is real (honesty contract), so the active state
- * carries a surgical accent-soft (blue) tint to mark a live capability. */
-.cap-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--accent-text);
-  padding: 1px 5px 1px 4px;
-  border: 1px solid var(--accent-dim);
-  border-radius: var(--r-sm);
-  background: var(--accent-soft);
-}
-.cap-badge svg { color: var(--accent-text); }
-
-/* Connect-method tag — how you link the broker. "Portal" (an in-launcher
- * gateway login flow) is accented because it's connectable now; API key /
- * Wallet are neutral (honest: no portal yet). */
-.method-tag {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-muted);
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  white-space: nowrap;
-}
-.method-tag--portal {
-  color: var(--accent-text);
-  border-color: var(--accent-dim);
-  background: var(--accent-soft);
-}
-
-.dir-pill {
-  justify-self: end;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: var(--r-pill);
-  white-space: nowrap;
-}
-/* The connected pill is the most assertive element on screen — it's the
- * one real "you're live" claim, so it gets a stronger fill + border than
- * the (intentionally quiet) capability badges and filter chips. */
-.dir-pill.ok   { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
-.dir-pill.warn { background: var(--warn-soft);   color: var(--warn);   border: 1px solid var(--warn-dim); }
-.dir-pill.err  { background: var(--err-soft);    color: var(--err);    border: 1px solid var(--err-dim); }
-/* Coming-soon pill must stay legible even on the dimmed (70%) row —
- * use the mid foreground, not the faintest. */
-.dir-pill.soon { background: var(--surface-2);         color: var(--fg-muted); border: 1px solid var(--line); }
-
-.dir-row__action { justify-self: end; min-width: 0; }
-.dir-row__expand { padding: 0 0 10px; }
-
-/* Inline API-key form for a data-key provider, nested under its row.
- * A quiet inset panel (one surface step in, hairline border) so the key
- * entry reads as "part of this row" rather than a second card — the
- * unified Connections list stays one list. Indented to clear the row's
- * 32px monogram column so the form aligns with the connector's name. */
-.datakey-form {
-  margin-left: calc(32px + var(--s-3));
-  padding: var(--s-3);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
-
-.dir-legend {
-  margin: var(--s-4) 0 0;
-  padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
-  font-size: 11px;
-  line-height: 1.7;
-  color: var(--fg-muted);
-}
-.dir-legend .cap-badge { margin: 0 1px; }
-
-/* ── Connections: state-stack + per-row health ──────────────────── */
-.dir-row__statestack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  justify-self: end;
-}
-/* The real-time / delayed verdict for a connected execution broker —
- * engine data-quality truth, the difference between "connected" and
- * "can actually trade". A quiet word, colored by tone, never a pill. */
-.health-word {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.3px;
-  line-height: 1;
-}
-.health-word.ok    { color: var(--ok); }
-.health-word.warn  { color: var(--warn); }
-.health-word.muted { color: var(--fg-muted); }
-
-/* ── Connections: "More sources — coming soon" disclosure ───────── */
-.dir-more { margin-top: var(--s-4); }
-.dir-more__btn {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  width: 100%;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: var(--s-2) 2px;
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-.dir-more__btn:hover { color: var(--fg-dim); }
-.dir-more__chev { font-size: 15px; line-height: 1; transition: transform 0.16s ease-out; }
-.dir-more__chev.open { transform: rotate(90deg); }
-.dir-more__count {
-  margin-left: auto;
-  background: var(--surface-3);
-  border-radius: 20px;
-  padding: 1px 8px;
-  font-size: 11px;
-}
-
-/* ── The Riser: focused connect sheet over the dimmed list ───────── */
-/* The connections card fills the inspector viewport and scrolls its list
- * internally, so the rising sheet always matches the actual panel size —
- * from a minimized window up to fullscreen (dynamic sizing, no fixed
- * height). */
-.conn-root {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.conn-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-/* Keep search anchored while the list scrolls under it. */
-.conn-root .dir-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--bg-elev);
-  padding-bottom: var(--s-2);
-}
-.riser-scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(5, 6, 8, 0.62);
-  border-radius: var(--r-lg);
-  z-index: 1;
-  animation: riser-fade 0.16s ease-out;
-}
-.riser-sheet {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  padding: 10px var(--s-4) var(--s-4);
-  background: var(--bg-elev);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  box-shadow: var(--hairline-top);
-  animation: riser-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
-  overflow: hidden;
-}
-.riser-handle {
-  width: 36px;
-  height: 4px;
-  border-radius: 3px;
-  background: var(--line-strong);
-  margin: 0 auto 6px;
-  flex: none;
-}
-.riser-back {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  color: var(--accent-text);
-  cursor: pointer;
-  font-size: 13px;
-  padding: 4px 2px;
-  flex: none;
-}
-.riser-back:hover { color: var(--fg); }
-.riser-hero { text-align: center; flex: none; margin-top: 2px; }
-.riser-title { font-size: 16px; font-weight: 500; margin-top: 10px; }
-.riser-chips { justify-content: center; margin-top: 8px; }
-.dir-logo--hero { width: 56px; height: 56px; display: inline-flex; border-radius: var(--r-md); }
-.dir-logo--hero.dir-logo--official img { width: 40px; height: 40px; }
-.dir-logo--hero.dir-logo--placeholder { font-size: 18px; }
-/* Scrollable form region so the connect controls never push below the
- * sheet — the whole point of the rise (kills the old below-the-fold bug). */
-.riser-body { flex: 1; overflow: auto; margin-top: var(--s-3); padding-right: 2px; }
-.riser-body .datakey-form { margin-left: 0; }
-
-/* The real-time-vs-delayed verdict, full width, where the user connects. */
-.health-banner {
-  border-radius: var(--r-md);
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.55;
-  margin-top: var(--s-3);
-  flex: none;
-}
-.health-banner.ok   { background: var(--ok-soft);   color: var(--fg); }
-.health-banner.warn { background: var(--warn-soft); color: var(--fg); }
-.health-banner strong { font-weight: 600; }
-
 /* ── Setup hint — the actionable "no owner account yet" affordance ─── */
 .setup-hint {
   display: flex;
@@ -1740,17 +1359,6 @@ table.data-table {
   cursor: default;
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.standby__badge {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  padding: 4px 7px;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-.standby__badge.is-live { background: rgba(255, 255, 255, 0.28); }
 /* In-button progress sweep while the engine is coming up — honest
  * "working" motion (compose-up reports no percent), not a fake bar. */
 .standby__actuator.is-progress { position: relative; overflow: hidden; }
@@ -1769,9 +1377,8 @@ table.data-table {
   100% { left: 100%; }
 }
 .standby__act-reason { font-size: 12px; color: var(--fg-muted); max-width: 38ch; }
-/* Quiet "do it later" escape under the connect verb — connecting a broker
- * is recommended, never required, to reach the workspace. */
-.standby__skip {
+/* Quiet "re-run the first-run stack setup" escape under the hub grid. */
+.standby__rerun {
   margin-top: 12px;
   background: none;
   border: none;
@@ -1782,8 +1389,99 @@ table.data-table {
   border-radius: var(--r-sm);
   transition: color 0.14s;
 }
-.standby__skip:hover { color: var(--fg); text-decoration: underline; }
+.standby__rerun:hover { color: var(--fg); text-decoration: underline; }
 .standby__err { margin-top: 14px; color: var(--err); font-size: 12.5px; max-width: 46ch; }
+
+/* ── Hub card grid (Updates / Changelog / FAQ / Support) ──────────────
+ * The launcher's hub destinations, below the primary verb. 2x2 grid of
+ * quiet cards that each open a right-docked inspector. */
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-2);
+  width: 100%;
+  max-width: 420px;
+  margin-top: var(--s-5);
+}
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, transform 0.06s;
+}
+.hub-card:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+.hub-card:active { transform: scale(0.99); }
+.hub-card:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.hub-card__icon { color: var(--accent-text); margin-bottom: 2px; }
+.hub-card__title { font-size: 14px; font-weight: 500; color: var(--fg); }
+.hub-card__desc { font-size: 12px; color: var(--fg-muted); line-height: 1.4; }
+
+/* ── Hub inspector content (Changelog / FAQ / Support) ────────────────
+ * Lives inside the right-docked InspectorHost cards; matches the dark
+ * theme via tokens (no hardcoded colors). */
+
+/* Changelog + diagnostics: bundled plain text, monospace, scrollable. */
+.changelog-text,
+.diag-text {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--surface-0, var(--surface-1));
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.diag-text { max-height: 220px; }
+
+/* FAQ accordion. */
+.faq-list { display: flex; flex-direction: column; }
+.faq-item { border-bottom: 1px solid var(--line); }
+.faq-item:last-child { border-bottom: none; }
+.faq-q {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.faq-q:hover { color: var(--accent-text); }
+.faq-chev {
+  flex: none;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--fg-muted);
+  transition: transform 0.16s ease-out;
+}
+.faq-chev.open { transform: rotate(90deg); color: var(--accent-text); }
+.faq-a {
+  margin: 0 0 12px 20px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
 
 /* Quiet vitals row — each item is a door (status-is-the-door). */
 .standby__vitals {

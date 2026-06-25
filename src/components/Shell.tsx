@@ -19,7 +19,13 @@ import { buildCommands, type Command } from "@/lib/commands";
 import { cmd, openIdePanel, type ContainerStatus } from "@/lib/tauri";
 import { useEngineState } from "@/lib/useEngineState";
 
-export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }) {
+export default function Shell({
+  onOpenTutorial,
+  onRerunSetup,
+}: {
+  onOpenTutorial: () => void;
+  onRerunSetup: () => void;
+}) {
   const eng = useEngineState();
   const board = deriveBoard(eng.state);
 
@@ -54,9 +60,6 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
         break;
       case "start":
         void eng.startEngine();
-        break;
-      case "connect":
-        setInspector("connections");
         break;
       case "degraded":
         setInspector("supervision");
@@ -124,10 +127,10 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
           runActuator();
           emit(board.actuator.action === "start" ? "engine start" : "launch");
           break;
-        case "c":
+        case "u":
           e.preventDefault();
-          setInspector("connections");
-          emit("connections");
+          setInspector("updates");
+          emit("updates");
           break;
         case "s":
           e.preventDefault();
@@ -171,6 +174,10 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
             <SearchIcon />
             <span className="kbd-hint">⌘K</span>
           </button>
+          <button type="button" className="topbar__btn" onClick={() => setInspector("updates")}>
+            <DownloadIcon />
+            Updates
+          </button>
           <button type="button" className="topbar__btn" onClick={() => setInspector("intelligence")}>
             <BrainIcon />
             Intelligence
@@ -182,8 +189,8 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
           <button
             type="button"
             className="topbar__btn icon-only"
-            onClick={onOpenTutorial}
-            aria-label="Help"
+            onClick={() => setInspector("faq")}
+            aria-label="Help and FAQ"
           >
             <HelpIcon />
           </button>
@@ -194,11 +201,12 @@ export default function Shell({ onOpenTutorial }: { onOpenTutorial: () => void }
         <StandbyHome
           eng={eng}
           onActuator={runActuator}
-          onSkip={() => void eng.launch()}
           onDoor={(d) => setInspector(d)}
+          onCard={(k) => setInspector(k)}
+          onRerunSetup={onRerunSetup}
           onAgent={() => setInspector("intelligence")}
         />
-        <InspectorHost open={inspector} onClose={() => setInspector(null)} eng={eng} />
+        <InspectorHost open={inspector} onClose={() => setInspector(null)} />
         {echo && (
           <div className="echo-line" role="status" aria-live="polite">
             ran <span className="mono">{echo}</span>
@@ -266,6 +274,14 @@ function HelpIcon() {
       <circle cx="10" cy="10" r="7.2" />
       <path d="M8.2 8 a2 2 0 1 1 2.6 2 c-0.6 0.35 -0.8 0.8 -0.8 1.4" />
       <circle cx="10" cy="14.3" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M10 3 v9 M6.5 8.5 L10 12 l3.5 -3.5 M4 15.5 h12" />
     </svg>
   );
 }

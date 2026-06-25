@@ -24,12 +24,12 @@ const STEPS: Step[] = [
     body: "This launcher runs your local engine and opens the Auracle IDE — your quant workspace for taking an idea from research to live.",
   },
   {
-    title: "Start, then Launch",
-    body: "The home screen has one primary button. If your engine isn't running it reads Start engine; once it's up it becomes Launch and opens the IDE. The status line under it always tells you the engine's real state.",
+    title: "Start, then open the workspace",
+    body: "The home screen has one primary button. If your engine isn't running it reads Start engine; once it's up it becomes Open workspace and launches the IDE. The status line under it always tells you the engine's real state.",
   },
   {
-    title: "Your account, at a glance",
-    body: "Home shows your unrealized P&L, exposure, and data feed from your broker, stamped with when it last updated. If a refresh fails the whole glance flips to amber 'stale' — so a number is never shown as live when it isn't.",
+    title: "Your hub, at a glance",
+    body: "The launcher is your hub: the lamp and status line show the engine's real state, and the cards take you to Updates, Changelog, FAQ, and Support. Brokers and data sources connect inside the workspace itself.",
   },
   {
     title: "Connect GitHub",
@@ -38,7 +38,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Settings & help",
-    body: "Connect your broker, manage your license, and control the engine in Settings. Linking IBKR uses your IBKR login plus a one-time approval on the IBKR Mobile app. Reopen this tour any time from Help.",
+    body: "Manage your license, choose your agent, and control the engine in Settings. Need help? The FAQ and Support cards on the home screen answer common questions and let you copy diagnostics. Reopen this tour any time from Help.",
   },
 ];
 

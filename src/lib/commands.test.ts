@@ -18,11 +18,11 @@ const cmd = (id: string, title: string, verb: string, relevance: number): Comman
 });
 
 test("fuzzyScore: prefix beats scattered subsequence beats no-match", () => {
-  const prefix = fuzzyScore("con", "connections"); // strong prefix bonus
-  const scattered = fuzzyScore("con", "cannon"); // c…o…n in order, not a prefix
+  const prefix = fuzzyScore("sup", "support"); // strong prefix bonus
+  const scattered = fuzzyScore("sup", "startup"); // s…u…p in order, not a prefix
   assert.ok(prefix > scattered);
   assert.ok(scattered > 0);
-  assert.equal(fuzzyScore("xyz", "connections"), -1); // chars not in order
+  assert.equal(fuzzyScore("xyz", "support"), -1); // chars not in order
 });
 
 test("fuzzyScore: empty query matches everything (score 0)", () => {
@@ -31,7 +31,7 @@ test("fuzzyScore: empty query matches everything (score 0)", () => {
 
 test("rankCommands: empty query orders by relevance (incident first)", () => {
   const cmds = [
-    cmd("open", "Open Connections", "connections", 20),
+    cmd("open", "Open Supervision", "supervision", 20),
     cmd("act", "Start engine", "engine start", 100), // incident verb
     cmd("refresh", "Refresh status", "refresh", 8),
   ];
@@ -42,11 +42,11 @@ test("rankCommands: empty query orders by relevance (incident first)", () => {
 
 test("rankCommands: a query only surfaces matching commands", () => {
   const cmds = [
-    cmd("a", "Open Connections", "connections", 20),
+    cmd("a", "Open Supervision", "supervision", 20),
     cmd("b", "Start engine", "engine start", 100),
-    cmd("c", "Open Account", "account", 20),
+    cmd("c", "Open Support", "support", 20),
   ];
-  const ranked = rankCommands(cmds, "conn");
+  const ranked = rankCommands(cmds, "superv");
   assert.deepEqual(
     ranked.map((c) => c.id),
     ["a"],
@@ -56,16 +56,16 @@ test("rankCommands: a query only surfaces matching commands", () => {
 test("rankCommands: query match beats raw relevance", () => {
   const cmds = [
     cmd("act", "Start engine", "engine start", 100),
-    cmd("acct", "Open Account", "account", 20),
+    cmd("upd", "Open Updates", "updates", 20),
   ];
-  // "account" should win for the query even though "Start engine" has
+  // "updates" should win for the query even though "Start engine" has
   // higher base relevance — query relevance dominates.
-  const ranked = rankCommands(cmds, "account");
-  assert.equal(ranked[0].id, "acct");
+  const ranked = rankCommands(cmds, "updates");
+  assert.equal(ranked[0].id, "upd");
 });
 
 test("rankCommands: matches keyword synonyms, not just the title", () => {
-  const c: Command = { ...cmd("a", "Open Account", "account", 20), keywords: "pnl positions" };
-  const ranked = rankCommands([c], "pnl");
+  const c: Command = { ...cmd("a", "Open Updates", "updates", 20), keywords: "ide version install" };
+  const ranked = rankCommands([c], "version");
   assert.equal(ranked.length, 1);
 });
