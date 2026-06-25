@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import Shell from "@/components/Shell";
 import Tutorial from "@/components/Tutorial";
+import { needsOnboarding as shouldOnboard } from "@/lib/onboarding";
 import { SettingsProvider } from "@/lib/settings";
 import { cmd } from "@/lib/tauri";
 import Onboarding from "@/views/Onboarding";
@@ -30,7 +31,18 @@ export default function App() {
       try {
         const installed = await cmd.isInstalled();
         if (cancelled) return;
-        if (!installed) setNeedsOnboarding(true);
+        // The install marker is necessary but not sufficient: a stack can
+        // be up without it (installed out-of-band, a dev stack, or a prior
+        // run that wrote the compose file but isn't the live one). If the
+        // engine is already answering, there is nothing to onboard — go
+        // straight to the Shell rather than offering a fresh install that
+        // would collide with the running stack.
+        let health = null;
+        if (!installed) {
+          health = await cmd.healthcheckNow().catch(() => null);
+          if (cancelled) return;
+        }
+        if (shouldOnboard(installed, health)) setNeedsOnboarding(true);
       } catch {
         // Backend unavailable — fall through to the Shell so the user
         // sees a (failing) status rather than a blank screen.

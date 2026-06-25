@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { engineIsUp } from "@/lib/onboarding";
 import {
   cmd,
   onEvent,
@@ -348,6 +349,7 @@ function Step3({
 }) {
   const [preflight, setPreflight] = useState<PreflightReport | null>(null);
   const [preflightError, setPreflightError] = useState<string | null>(null);
+  const [alreadyRunning, setAlreadyRunning] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [finished, setFinished] = useState(false);
   const [progress, setProgress] = useState<InstallerProgress>({});
@@ -381,7 +383,12 @@ function Step3({
         cmd.isInstalled().catch(() => false),
         cmd.healthcheckNow().catch(() => null),
       ]);
-      const stackUp = installed || (!!health && health.state !== "down");
+      const engineUp = engineIsUp(health);
+      const stackUp = installed || engineUp;
+      // If the engine is already answering, a fresh install would only
+      // collide with the running stack (it owns the required ports). Surface
+      // an "open it" path instead of an "Install" button that's doomed.
+      setAlreadyRunning(engineUp);
       const report = await cmd.preflightCheck(stackUp);
       setPreflight(report);
     } catch (err) {
@@ -442,7 +449,8 @@ function Step3({
     }
   };
 
-  const canInstall = !!preflight?.can_install && !installing && !finished;
+  const canInstall =
+    !!preflight?.can_install && !installing && !finished && !alreadyRunning;
 
   return (
     <Actions canNext={false} hideSkip>
@@ -474,6 +482,22 @@ function Step3({
           </p>
           <button type="button" className="primary" onClick={runPreflight}>
             Re-check
+          </button>
+          <button type="button" className="ghost ml-2" onClick={onBack}>
+            ← Back
+          </button>
+        </div>
+      )}
+
+      {alreadyRunning && !installing && !finished && (
+        <div className="mt-2">
+          <div className="banner info">
+            <strong>Auracle is already running.</strong> The platform is up and
+            answering at <code>localhost:1969</code> — there&apos;s nothing to
+            install. Re-installing over a live stack would only collide with it.
+          </div>
+          <button type="button" className="primary" onClick={onDone}>
+            Open Auracle
           </button>
           <button type="button" className="ghost ml-2" onClick={onBack}>
             ← Back
