@@ -256,11 +256,6 @@ export const cmd = {
       version,
     }),
 
-  // IBKR Client Portal login (embedded webview). IBKR connects in-app
-  // — its login window opens inside the launcher, never bouncing out.
-  openIbkrLogin: (url: string) => invoke<void>("open_ibkr_login", { url }),
-  closeIbkrLogin: () => invoke<void>("close_ibkr_login"),
-
   // ── GitHub device-flow sign-in ────────────────────────────────
   //
   // The user's own GitHub for git push/pull. The Rust side stores the
@@ -270,23 +265,6 @@ export const cmd = {
   githubDeviceStart: () => invoke<GithubDeviceStart>("github_device_start"),
   githubDevicePoll: (deviceCode: string) =>
     invoke<GithubDevicePoll>("github_device_poll", { deviceCode }),
-
-  // ── IBKR connect (unified: the dockerized IB Gateway strategies use) ──
-  //
-  // The launcher's IBKR connect drives the engine's owner-gated
-  // connections API (POST /ui/api/connections/ibkr/save, dockerized) so
-  // the SAME ib_insync gateway serves data + execution for automated
-  // strategies. TOTP is required by the engine (unattended-by-contract);
-  // a missing-TOTP / vault error returns the engine's plain message.
-  ibkrConnect: (username: string, password: string, totpKey: string, mode: "paper" | "live") =>
-    invoke<unknown>("ibkr_connect", { username, password, totpKey, mode }),
-  /** The engine's IBKR connection status (fields + state). No secrets. */
-  ibkrConnectionStatus: () => invoke<unknown>("ibkr_connection_status"),
-
-  // ── Broker connections ───────────────────────────────────────
-  forgeBrokerStatus: () => invoke<BrokerStatus[]>("forge_broker_status"),
-  forgeBrokerTest: (brokerId: string) =>
-    invoke<string>("forge_broker_test", { brokerId }),
 
   // ── Data-provider API keys ───────────────────────────────────
   //
@@ -326,87 +304,7 @@ export const cmd = {
   // degrades to labels-only and never fabricates a count. `from_houston`
   // is false when the engine served a cache rather than fresh truth.
   strategyStates: () => invoke<StrategyStates>("strategy_states"),
-
-  // ── Broker data (launcher-global, callable from any view) ────
-  //
-  // Same code paths the Forge agent uses, exposed as first-class
-  // IPC commands so the main Dashboard, the Forge widget refresh
-  // loop, the tray menu, and anything else we build next can pull
-  // broker data without going through the agent's tool surface.
-  brokerAccountSummary: () =>
-    invoke<BrokerAccountSummary>("broker_account_summary"),
-  brokerOpenPositions: () =>
-    invoke<BrokerPositionsPayload>("broker_open_positions"),
-  brokerQuote: (symbol: string) =>
-    invoke<BrokerQuote>("broker_quote", { symbol }),
-  brokerHistoricalBars: (symbol: string, days?: number) =>
-    invoke<BrokerHistoricalBars>("broker_historical_bars", { symbol, days }),
-  brokerOptionsChain: (
-    symbol: string,
-    month: string,
-    maxStrikes?: number,
-  ) =>
-    invoke<BrokerOptionsChain>("broker_options_chain", {
-      symbol,
-      month,
-      maxStrikes,
-    }),
-  /** Returns the user's market-data subscription tier per asset
-   *  class, derived from probing the gateway's response codes. */
-  brokerMarketDataStatus: () =>
-    invoke<BrokerMarketDataStatus>("broker_market_data_status"),
-
-  // ── Real-time quote streaming ────────────────────────────────
-  //
-  // Subscribe via `brokerStreamSubscribe(symbol)`, then listen on
-  // the 'broker-tick' Tauri event for {symbol, last, bid, ask,
-  // data_quality, ts} payloads. Refcounted — call unsubscribe
-  // when you're done so the underlying poll loop can stop.
-  brokerStreamSubscribe: (symbol: string, intervalMs?: number) =>
-    invoke<void>("broker_stream_subscribe", { symbol, intervalMs }),
-  brokerStreamUnsubscribe: (symbol: string) =>
-    invoke<void>("broker_stream_unsubscribe", { symbol }),
-  brokerStreamStatus: () =>
-    invoke<BrokerStreamStatus[]>("broker_stream_status"),
-
-  // ── ibeam supervisor (auto-managed IBKR gateway) ─────────────
-  //
-  // Wraps the voyz/ibeam Docker container that keeps the IBKR
-  // Client Portal Gateway session alive indefinitely (auto re-login
-  // on the daily IBKR session reset). See commands/ibeam.rs for
-  // the full background.
-  ibeamStatus: () => invoke<IbeamStatus>("ibeam_status"),
-  ibeamInstall: (creds: IbeamCredentials) =>
-    invoke<void>("ibeam_install", { creds }),
-  ibeamStart: () => invoke<void>("ibeam_start"),
-  ibeamStop: () => invoke<void>("ibeam_stop"),
-  ibeamRestart: () => invoke<void>("ibeam_restart"),
-  ibeamLogs: (lines?: number) =>
-    invoke<string>("ibeam_logs", { lines }),
-  ibeamUninstall: () => invoke<void>("ibeam_uninstall"),
 };
-
-export type IbeamState =
-  | { state: "not_installed" }
-  | { state: "stopped"; reason: string }
-  | { state: "running"; auth_ok: boolean }
-  | { state: "docker_unavailable"; detail: string }
-  | { state: "other"; detail: string };
-
-export interface IbeamStatus {
-  state: IbeamState;
-  compose_dir: string;
-  has_credentials: boolean;
-}
-
-export interface IbeamCredentials {
-  username: string;
-  password: string;
-  /** "paper" | "live" — which IBKR environment the gateway logs into.
-   *  Declared by the user at setup (login depends on it, so it can't be
-   *  auto-detected first); defaults to paper. */
-  trading_mode: "paper" | "live";
-}
 
 export interface ToolInvocationResult {
   result: string;
@@ -575,44 +473,6 @@ export interface DashboardSummary {
   refresh_interval_seconds: number;
 }
 
-// ── Broker connections ──────────────────────────────────────────
-//
-// Tagged union mirrors `commands/broker_connections.rs::BrokerState`.
-// The frontend renders different controls per variant so the type
-// describes UX intent, not just network status.
-
-export type BrokerState =
-  | { state: "offline"; hint: string }
-  | { state: "unauthenticated"; login_url: string }
-  | {
-      state: "connected";
-      account_id: string;
-      account_label: string | null;
-    }
-  | { state: "error"; detail: string }
-  | { state: "not_implemented" };
-
-export interface BrokerStatus {
-  id: string;
-  label: string;
-  description: string;
-  capabilities: string[];
-  /** Directory grouping: "broker" | "data" | "crypto". */
-  category: "broker" | "data" | "crypto";
-  /** Asset classes covered, rendered as chips. */
-  assets: string[];
-  /** Engine can ingest market data from this source today. */
-  provides_data: boolean;
-  /** A real execution adapter exists for this source. */
-  provides_execution: boolean;
-  /** How you connect from the launcher:
-   *  "gateway" = in-launcher portal/gateway login flow exists (IBKR);
-   *  "api_key" = connects by API key/secret; "wallet" = wallet-signed;
-   *  "none" = data-only provider. Only "gateway" implies a portal. */
-  connect_method: "gateway" | "api_key" | "wallet" | "none";
-  state: BrokerState;
-}
-
 // ── Shared global settings ──────────────────────────────────────
 //
 // Mirrors the engine's owner-gated settings aggregate. The launcher and
@@ -654,90 +514,6 @@ export interface SettingsPatch {
   prefs?: Record<string, unknown>;
 }
 
-// ── Broker data payloads ────────────────────────────────────────
-//
-// Match what `commands/broker_bridge.rs` returns — numbers can be
-// null on after-hours / illiquid instruments, so each one is
-// optional. Keeping the typing loose-but-named is the right
-// tradeoff for cross-broker data where Alpaca / Tradier / Hyper
-// will eventually fill the same shapes from different upstreams.
-
-export interface BrokerAccountSummary {
-  account_id: string;
-  currency: string;
-  net_liquidation: number | null;
-  buying_power: number | null;
-  available_funds: number | null;
-  excess_liquidity: number | null;
-  total_cash: number | null;
-  gross_position_value: number | null;
-  maintenance_margin: number | null;
-  initial_margin: number | null;
-  unrealized_pnl: number | null;
-  realized_pnl: number | null;
-}
-
-export interface BrokerPosition {
-  symbol: string;
-  asset_class: string;
-  quantity: number | null;
-  avg_cost: number | null;
-  market_price: number | null;
-  market_value: number | null;
-  unrealized_pnl: number | null;
-  realized_pnl: number | null;
-  currency: string;
-  conid: number | null;
-}
-
-export interface BrokerPositionsPayload {
-  account_id: string;
-  rows: BrokerPosition[];
-}
-
-export type BrokerDataQuality =
-  | "realtime"
-  | "delayed"
-  | "frozen"
-  | "closed"
-  | "halted"
-  | "unknown";
-
-export interface BrokerQuote {
-  symbol: string;
-  conid: number;
-  last: number | null;
-  bid: number | null;
-  ask: number | null;
-  volume: number | null;
-  high: number | null;
-  low: number | null;
-  open: number | null;
-  ts: number;
-  data_quality: BrokerDataQuality;
-  /** Raw IBKR availability code (`R`, `D`, `Z`, `Y`, etc.) — for diagnostics. */
-  data_quality_raw: string;
-}
-
-/** Emitted by the polling stream on each tick. Subscribe via the
- *  Tauri event 'broker-tick' after calling brokerStreamSubscribe. */
-export interface BrokerTickEvent {
-  symbol: string;
-  last: number | null;
-  bid: number | null;
-  ask: number | null;
-  data_quality: BrokerDataQuality;
-  /** Unix milliseconds — note this is the LAUNCHER's clock when the
-   *  snapshot returned, not the exchange's quote timestamp. */
-  ts: number;
-}
-
-export interface BrokerStreamStatus {
-  symbol: string;
-  refcount: number;
-  interval_ms: number;
-}
-
 // ── Tauri event payloads (centralized) ──────────────────────────
 //
 // All `app.emit(...)` event payload shapes the frontend listens to.
@@ -755,7 +531,6 @@ export interface BrokerStreamStatus {
 //   forge-chat-tool-call      → ChatToolCallPayload
 //   forge-chat-tool-result    → ChatToolResultPayload
 //   forge-dashboard-open      → string (the dashboard slug)
-//   broker-tick               → BrokerTickEvent
 
 export interface InstallerProgressEvent {
   phase?: string;
@@ -767,55 +542,6 @@ export interface InstallerProgressEvent {
 /** Payload for the `forge-dashboard-open` event — Rust emits the
  *  dashboard slug as a bare string. */
 export type ForgeDashboardOpenEvent = string;
-
-export interface BrokerMarketDataStatus {
-  /** "realtime" | "delayed" | "frozen" | "unknown" — IBKR's
-   *  availability tier for US equities, derived from a SPY probe. */
-  us_equity: BrokerDataQuality;
-  us_equity_raw: string;
-  /** Reserved for future per-asset-class introspection (options,
-   *  futures, FX); currently a constant marker until we add probes. */
-  options: string;
-  hint: string;
-}
-
-export interface BrokerBar {
-  date: string;
-  timestamp: number;
-  open: number | null;
-  high: number | null;
-  low: number | null;
-  close: number;
-  volume: number | null;
-}
-
-export interface BrokerHistoricalBars {
-  symbol: string;
-  currency: string;
-  rows: BrokerBar[];
-  /** "ibkr" (user's subscription tier) or "yahoo" (free 15-min
-   *  delayed daily fallback). UI uses this to render a source pill. */
-  source?: "ibkr" | "yahoo";
-  /** IBKR cadence label ('1d', '1h', '5mins', etc.) when source=ibkr;
-   *  always '1d' for Yahoo. */
-  bar?: string;
-  /** Present on Yahoo path ('delayed'); IBKR path inherits the
-   *  account's tier (real-time vs delayed). */
-  data_quality?: BrokerDataQuality;
-}
-
-export interface BrokerOptionChainRow {
-  strike: number;
-  [k: string]: number | null;
-}
-
-export interface BrokerOptionsChain {
-  symbol: string;
-  month: string;
-  spot: number;
-  underlying_conid: number;
-  rows: BrokerOptionChainRow[];
-}
 
 // ── Misc helpers ────────────────────────────────────────────────
 //

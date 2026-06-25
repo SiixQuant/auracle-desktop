@@ -171,7 +171,7 @@ function Step1({ onNext }: { onNext: () => void }) {
           schedules, brokers, live runs
         </li>
         <li>
-          The <strong>Seer IDE</strong> — an AI engineer inside Build that
+          The <strong>Auracle IDE</strong> — an AI engineer inside Build that
           drafts, edits, and backtests strategies with you
         </li>
         <li>
@@ -529,7 +529,8 @@ function Step3({
             <div className="banner info">
               <strong>The stack is up.</strong> Finishing first-run setup in
               your browser at <code>localhost:1969</code> — the launcher stays
-              here for status, brokers, and updates.
+              here for engine status and updates; brokers connect in the
+              workspace.
             </div>
           ) : (
             <div className="muted fs-sm" style={{ minHeight: 20 }}>

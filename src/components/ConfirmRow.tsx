@@ -23,7 +23,7 @@ export default function ConfirmRow({
 }: {
   /** Text on the quiet trigger button (e.g. "Uninstall", "Clear"). */
   trigger: string;
-  /** Bolded question naming the action (e.g. "Uninstall ibeam?"). */
+  /** Bolded question naming the action (e.g. "Clear license?"). */
   title: string;
   /** Consequence sentence shown beside the title. */
   body: string;

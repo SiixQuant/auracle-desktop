@@ -1,8 +1,8 @@
 // SharedSettings — one coherent read of the engine's owner-gated
 // settings aggregate, shared across every Settings card.
 //
-// Why a context: the License, System, Data sources, AI model, and Broker
-// Connections cards all want a consistent picture of engine state (tier,
+// Why a context: the License, System, General (engine prefs), and AI-model
+// cards all want a consistent picture of engine state (tier,
 // which keys are configured, which AI model is set). Without this, each
 // card would poll the engine independently and drift. The provider loads
 // once, refreshes on window focus, and runs a low-frequency etag poll

@@ -45,14 +45,15 @@ export default function Coachmark({ onClose }: { onClose: () => void }) {
         <div className="coach__beat">
           <span className="coach__n">2</span>
           <div>
-            The button is always your next move — launch, start the engine, or connect a
-            broker.
+            The button is always your next move — start the engine, then open your
+            workspace.
           </div>
         </div>
         <div className="coach__beat">
           <span className="coach__n">3</span>
           <div>
-            Press a vital (or ⌘K) to go deeper — connections, supervision, account.
+            Press the engine vital (or ⌘K) to go deeper — supervision, updates, and
+            settings. Brokers and data sources live in the workspace.
           </div>
         </div>
         <button type="button" className="coach__done" onClick={done}>
