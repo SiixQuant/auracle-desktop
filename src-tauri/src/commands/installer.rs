@@ -159,10 +159,21 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     //    installer script's prompt-for-key step skips. Operator who
     //    wants to install without a key (Community tier) can clear
     //    the key in Settings before running install.
-    let license = keychain::license_get(app.clone())
-        .ok()
-        .flatten()
-        .unwrap_or_default();
+    // Distinguish a genuine "no key" (→ Community, fine) from a vault READ
+    // FAILURE (audit P0-12). The old `.ok().flatten().unwrap_or_default()`
+    // mapped any keychain error to an empty key, silently downgrading a paid
+    // customer to Community at install time. Abort on a real error instead.
+    let license = match keychain::license_get(app.clone()) {
+        Ok(Some(key)) => key,
+        Ok(None) => String::new(), // genuinely no key on file → Community tier
+        Err(e) => {
+            return Err(format!(
+                "Couldn't read your license key from the system keychain ({e}). \
+                 Aborting install rather than silently downgrading to Community — \
+                 retry, or clear the key in Settings to install Community on purpose."
+            ));
+        }
+    };
 
     emit_progress(
         &app,
@@ -176,8 +187,17 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     // 3. Spawn install.sh with stdout/stderr piped so we can
     //    forward each line to the frontend as a progress event.
     let mut cmd = Command::new("bash");
-    cmd.arg(&script_path)
-        .current_dir(&path)
+    cmd.arg(&script_path);
+    // If a prior install left a .env, install.sh's idempotency gate would
+    // exit 0 without doing anything (audit P0-11) — run_first_install then
+    // falsely "succeeds" or dead-ends at the health timeout, with no way to
+    // recover. Pass --reset so install.sh backs up the .env and actually
+    // re-pulls + re-ups; it carries forward the DB password + install UUID
+    // from the backup, so preserved volumes keep authenticating.
+    if path.join(".env").exists() {
+        cmd.arg("--reset");
+    }
+    cmd.current_dir(&path)
         .env("AURACLE_LICENSE_KEY", &license)
         .env("AURACLE_NONINTERACTIVE", "1")
         .stdout(Stdio::piped())
