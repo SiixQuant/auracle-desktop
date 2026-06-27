@@ -113,6 +113,40 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      # OS code signing (F1) — AUTO-ENGAGES when the Apple secrets exist,
+      # ad-hoc otherwise. We export APPLE_* into $GITHUB_ENV (which the
+      # Tauri build step below inherits) ONLY when the certificate secret
+      # is non-empty, so absent secrets stay genuinely UNSET rather than
+      # empty-string — an empty APPLE_CERTIFICATE makes `security import`
+      # fail with "parameters were not valid". No code edit is needed when
+      # the operator procures an Apple Developer ID: just set the six
+      # secrets via `gh secret set` and the next release signs + notarizes.
+      - name: Configure Apple signing (auto, no-op without secrets)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            {
+              echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
+              echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+              echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+              echo "APPLE_ID=$APPLE_ID"
+              echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            } >> "$GITHUB_ENV"
+            echo "Apple Developer ID signing + notarization ENABLED for this build."
+          else
+            echo "No Apple signing secrets present — building ad-hoc (Gatekeeper"
+            echo "shows 'unidentified developer'; users right-click → Open once)."
+          fi
+
       - name: Build + bundle (Tauri)
         uses: tauri-apps/tauri-action@v0
         env:
@@ -122,25 +156,10 @@ jobs:
           # won't work and every release needs manual re-download.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # OS code signing — OPTIONAL.
-          #
-          # APPLE_* env vars must be UNSET (not empty string) for
-          # tauri-action to fall back to ad-hoc signing. Empty-string
-          # secrets cause `security import` to fail with "parameters
-          # were not valid". The lines below are commented out; when
-          # the operator buys Apple Developer ID + adds the secrets
-          # via `gh secret set`, uncomment to enable Developer-ID
-          # codesigning + notarization. Until then, ad-hoc signing
-          # applies (Gatekeeper warning shows "unidentified developer"
-          # instead of "damaged" — workable via right-click → Open
-          # OR `xattr -dr com.apple.quarantine` Terminal one-liner).
-          #
-          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # OS code signing is injected by the "Configure Apple signing"
+          # step above (into $GITHUB_ENV) — present only when the secrets
+          # are set, so this build is Developer-ID signed + notarized in
+          # production and ad-hoc in their absence. No edit needed here.
         with:
           # Only create a GitHub Release when triggered by a tag push.
           # workflow_dispatch on main / a branch just builds artifacts
