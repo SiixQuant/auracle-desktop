@@ -1920,17 +1920,30 @@ table.data-table {
 @tailwind components;
 @tailwind utilities;
 
-/* The sign-in screen (src/components/ui/sign-in-flow-1.tsx) was authored for
-   Tailwind preflight, which we keep OFF globally. Re-supply just the two input
-   resets it needs — inherited font (not the UA Arial) and a transparent base
-   background (the UA white made white text invisible) — scoped to the sign-in
-   surface and in the base layer, so utility classes (bg-*, text-*, font-*)
-   still win. */
-@layer base {
-  .auracle-signin input,
-  .auracle-signin textarea,
-  .auracle-signin button {
-    background-color: transparent;
-    font-family: inherit;
-  }
+/* The sign-in screen (src/components/ui/sign-in-flow-1.tsx) runs with Tailwind
+   preflight OFF (to protect the launcher's design system), so re-supply
+   preflight's form-control resets for that screen only — otherwise bare
+   <button>/<input> elements inherit the browser defaults (white background,
+   Arial font, a native border box) and Tailwind utilities like `border` don't
+   render (no border-style).
+
+   :where() keeps the selector's specificity at ZERO, so the component's own
+   utility classes (bg-*, border-*, px-*, text-*, font-*, …) always win — only
+   the un-utilitied defaults get normalized. (An earlier version used
+   `.auracle-signin button`, whose class+element specificity outranked the
+   single-class utilities and wiped the buttons' backgrounds/borders.) */
+:where(.auracle-signin) button,
+:where(.auracle-signin) input,
+:where(.auracle-signin) textarea {
+  font-family: inherit;
+  font-size: 100%;
+  color: inherit;
+  background-color: transparent;
+  background-image: none;
+  border: 0 solid;
+  padding: 0;
+  margin: 0;
+}
+:where(.auracle-signin) button {
+  cursor: pointer;
 }
