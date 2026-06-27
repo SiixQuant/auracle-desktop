@@ -1956,6 +1956,7 @@ table.data-table {
 .shell-standby {
   position: relative;
   background: #000;
+  isolation: isolate;
 }
 /* Shader canvas + gradient overlays at z-0; all chrome sits above. */
 .shell-bg {
@@ -1968,6 +1969,12 @@ table.data-table {
 .shell-standby > .standby-stage {
   position: relative;
   z-index: 1;
+  /* Promote each to its own compositing layer so WebKit (the macOS WKWebView)
+     paints it ABOVE the WebGL canvas. Without this, the canvas composites over
+     the hero text/lamp/button and washes them out — the glass tiles already
+     get their own layer via backdrop-filter, which is why they stayed crisp.
+     Invisible in Chromium; required in WKWebView. */
+  transform: translateZ(0);
 }
 /* Transparent chrome so the shader reads through the whole surface. */
 .shell-standby .topbar {

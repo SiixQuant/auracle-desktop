@@ -25,9 +25,12 @@ export default function ShellBackground() {
           reverse={false}
         />
       </Suspense>
-      {/* Same overlays as the sign-in: darken the centre for legibility, fade
-          the top edge. */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,1)_0%,_transparent_100%)]" />
+      {/* Readability: a light flat veil dims the dots everywhere, a soft
+          central vignette deepens the hero column, and the top edge fades —
+          the home's hero spans more screen than the sign-in form, so it needs
+          a touch more than the sign-in's overlay. */}
+      <div className="absolute inset-0 bg-black/30" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_70%_at_50%_44%,_rgba(0,0,0,0.8)_0%,_transparent_75%)]" />
       <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-black to-transparent" />
     </div>
   );
