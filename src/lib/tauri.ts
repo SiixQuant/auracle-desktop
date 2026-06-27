@@ -169,6 +169,12 @@ export interface GithubDevicePoll {
   login?: string | null;
 }
 
+export interface SignInStart {
+  ok: boolean;
+  /** Opaque device code for a future poll step. Treat as a secret. */
+  device_code: string;
+}
+
 // ── Command bindings ────────────────────────────────────────────
 
 export const cmd = {
@@ -271,6 +277,13 @@ export const cmd = {
   githubDeviceStart: () => invoke<GithubDeviceStart>("github_device_start"),
   githubDevicePoll: (deviceCode: string) =>
     invoke<GithubDevicePoll>("github_device_poll", { deviceCode }),
+
+  // ── Keyless sign-in (magic link) ──────────────────────────────
+  //
+  // Asks the local engine to email a magic sign-in link. See
+  // commands/auth_device.rs. The device_code is opaque (future poll).
+  signInStart: (email: string) =>
+    invoke<SignInStart>("sign_in_start", { email }),
 
   // ── Data-provider API keys ───────────────────────────────────
   //

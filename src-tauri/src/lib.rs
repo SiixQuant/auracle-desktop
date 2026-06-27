@@ -66,7 +66,8 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    broker_bridge as broker_cmd, broker_connections as broker_conn_cmd,
+    auth_device as auth_device_cmd, broker_bridge as broker_cmd,
+    broker_connections as broker_conn_cmd,
     broker_stream as broker_stream_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
     engine_auth as engine_auth_cmd,
     github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
@@ -330,6 +331,7 @@ pub fn run() {
             github_auth_cmd::github_auth_status,
             github_auth_cmd::github_device_start,
             github_auth_cmd::github_device_poll,
+            auth_device_cmd::sign_in_start,
             // MCP sidecar supervisor (Phase 4c foundation; the
             // actual chat tool-use loop lands in Phase 4d)
             mcp_cmd::mcp_sidecar_status,

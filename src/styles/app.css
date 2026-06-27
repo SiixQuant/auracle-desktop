@@ -1909,3 +1909,13 @@ table.data-table {
   border: 0; border-radius: 8px; padding: 9px 16px;
   font-size: 13px; font-weight: 500; cursor: pointer;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Tailwind utilities — scoped to the sign-in screen component only.
+   Preflight (the global reset) is DISABLED in tailwind.config.js so
+   none of the hand-built styles above are touched; only the utility
+   classes used by src/components/ui/sign-in-flow-1.tsx are emitted.
+   ────────────────────────────────────────────────────────────────── */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

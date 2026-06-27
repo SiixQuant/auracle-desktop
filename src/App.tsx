@@ -8,7 +8,7 @@
 //   3. Drive the first-run Tutorial (once, gated on localStorage),
 //      re-openable from the Shell's Help control.
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import Shell from "@/components/Shell";
 import Tutorial from "@/components/Tutorial";
@@ -17,12 +17,28 @@ import { SettingsProvider } from "@/lib/settings";
 import { cmd } from "@/lib/tauri";
 import Onboarding from "@/views/Onboarding";
 
+// Lazy so the WebGL/animation deps (three, @react-three/fiber, framer-motion)
+// only load on the sign-in screen, never in the signed-in app bundle.
+const SignInScreen = lazy(() =>
+  import("@/components/ui/sign-in-flow-1").then((m) => ({
+    default: m.SignInPage,
+  })),
+);
+
 const TUTORIAL_SEEN_KEY = "auracle_tutorial_seen";
+const SIGNED_IN_KEY = "auracle_signed_in";
 
 export default function App() {
   const [bootstrapped, setBootstrapped] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SIGNED_IN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   // First-launch gate.
   useEffect(() => {
@@ -74,7 +90,34 @@ export default function App() {
     }
   };
 
+  const completeSignIn = () => {
+    setSignedIn(true);
+    try {
+      localStorage.setItem(SIGNED_IN_KEY, "1");
+    } catch {
+      // ignore
+    }
+  };
+
   if (!bootstrapped) return null;
+
+  // Sign-in is the first screen until completed once. The flow resolves
+  // client-side (the email step also fires the engine's magic-link send),
+  // so a user is never locked out of the launcher if the engine is down.
+  if (!signedIn) {
+    return (
+      <Suspense
+        fallback={<div style={{ minHeight: "100vh", background: "#000" }} />}
+      >
+        <SignInScreen
+          onComplete={completeSignIn}
+          onRequestLink={(email) => {
+            void cmd.signInStart(email).catch(() => {});
+          }}
+        />
+      </Suspense>
+    );
+  }
 
   if (needsOnboarding) {
     return <Onboarding onDone={() => setNeedsOnboarding(false)} />;

@@ -10,6 +10,7 @@
 //! aren't UI-safe go to the log file via `log::warn!` /
 //! `log::error!` first.
 
+pub mod auth_device;
 pub mod broker_bridge;
 pub mod broker_connections;
 pub mod broker_stream;
