@@ -66,13 +66,9 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    auth_device as auth_device_cmd, broker_bridge as broker_cmd,
-    broker_connections as broker_conn_cmd,
-    broker_stream as broker_stream_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
-    engine_auth as engine_auth_cmd,
-    github_auth as github_auth_cmd, healthcheck as health_cmd, ibeam as ibeam_cmd,
-    ibkr_gateway as ibkr_gateway_cmd, ibkr_login as ibkr_login_cmd, ide_update as ide_update_cmd,
-    installer as installer_cmd, keychain as keychain_cmd, mcp_sidecar as mcp_cmd,
+    auth_device as auth_device_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
+    engine_auth as engine_auth_cmd, github_auth as github_auth_cmd, healthcheck as health_cmd,
+    ide_update as ide_update_cmd, installer as installer_cmd, keychain as keychain_cmd,
     preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, settings as settings_cmd,
     strategy as strategy_cmd, tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
@@ -279,7 +275,6 @@ pub fn run() {
             docker_cmd::stack_stop,
             docker_cmd::stack_pull_update,
             docker_cmd::stack_restart_container,
-            docker_cmd::container_logs,
             // Health
             health_cmd::healthcheck_now,
             health_cmd::current_health,
@@ -315,14 +310,6 @@ pub fn run() {
             // honestly. See commands/ide_update.rs.
             ide_update_cmd::ide_check_update,
             ide_update_cmd::ide_download_and_install,
-            // IBKR Client Portal embedded login window — IBKR connects
-            // in-app; its login opens inside the launcher, never bounced out.
-            ibkr_login_cmd::open_ibkr_login,
-            ibkr_login_cmd::close_ibkr_login,
-            // Dockerized IB Gateway connect (unified path: the same
-            // ib_insync gateway strategies use, via the engine).
-            ibkr_gateway_cmd::ibkr_connect,
-            ibkr_gateway_cmd::ibkr_connection_status,
             // "Sign in with GitHub" via the OAuth device flow — the
             // user's own GitHub for git push/pull, stored in the system
             // git credential helper. See commands/github_auth.rs. The
@@ -334,15 +321,6 @@ pub fn run() {
             auth_device_cmd::sign_in_start,
             auth_device_cmd::sign_in_verify,
             auth_device_cmd::sign_in_status,
-            // MCP sidecar supervisor (Phase 4c foundation; the
-            // actual chat tool-use loop lands in Phase 4d)
-            mcp_cmd::mcp_sidecar_status,
-            mcp_cmd::mcp_sidecar_start,
-            mcp_cmd::mcp_sidecar_stop,
-            // Broker connection status + test surface. Powers the
-            // Settings Connections card (IBKR connects in-app below it).
-            broker_conn_cmd::forge_broker_status,
-            broker_conn_cmd::forge_broker_test,
             // Data-provider API keys (Polygon, EODHD, ...). Native
             // door for saving + testing data-source keys over loopback
             // (owner key handoff + double-submit CSRF). Powers the
@@ -357,45 +335,11 @@ pub fn run() {
             // Strategy lifecycle — read-only per-stage states for the
             // home's lifecycle belt (degrades to labels-only honestly).
             strategy_cmd::strategy_states,
-            // Broker data — first-class Tauri commands so any view
-            // in the app (launcher Dashboard, Forge widgets, tray
-            // menu, anything we build next) can pull live broker
-            // data without going through the agent surface.
-            broker_cmd::broker_account_summary,
-            broker_cmd::broker_open_positions,
-            broker_cmd::broker_quote,
-            broker_cmd::broker_historical_bars,
-            broker_cmd::broker_options_chain,
-            broker_cmd::broker_market_data_status,
-            // Real-time quote streaming surface. Spawns a polling
-            // task per subscribed symbol; emits broker-tick events
-            // to the frontend at the chosen interval (clamped 500ms
-            // to 60s). Subscribers are refcounted so multiple views
-            // can share one underlying poll.
-            broker_stream_cmd::broker_stream_subscribe,
-            broker_stream_cmd::broker_stream_unsubscribe,
-            broker_stream_cmd::broker_stream_status,
-            // Conflict detection + remediation between the launcher-
-            // managed ibeam container and the bundled IBKR gateway
-            // container. Both want port 5000 — one of them has to
-            // yield. docker_remove_container is the modern path
-            // (bypasses compose so it works even when the stack's
-            // .env is incomplete); stack_stop_service is the legacy
-            // wrapper kept until any cached frontend bundle stops
-            // calling it.
+            // Force-remove a bundled IBKR gateway container off port 5000
+            // (bypasses compose so it works even when the stack's .env is
+            // incomplete), and a lightweight running-container probe.
             docker_cmd::docker_remove_container,
-            docker_cmd::stack_stop_service,
             docker_cmd::docker_container_running,
-            // ibeam supervisor — auto-managed IBKR gateway via
-            // a Docker container that handles daily reauth on
-            // its own. See commands/ibeam.rs.
-            ibeam_cmd::ibeam_status,
-            ibeam_cmd::ibeam_install,
-            ibeam_cmd::ibeam_start,
-            ibeam_cmd::ibeam_stop,
-            ibeam_cmd::ibeam_restart,
-            ibeam_cmd::ibeam_logs,
-            ibeam_cmd::ibeam_uninstall,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook

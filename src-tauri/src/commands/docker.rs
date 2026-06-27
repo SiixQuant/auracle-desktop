@@ -419,21 +419,6 @@ pub async fn docker_remove_container(name: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Legacy wrapper — old `stack_stop_service` API kept so any cached
-/// frontend bundle doesn't break. Routes to the new
-/// docker_remove_container by mapping the service name to its
-/// project-prefixed container name. Schedule for removal after the
-/// next launcher release tag.
-#[tauri::command]
-pub async fn stack_stop_service(name: String) -> Result<(), String> {
-    let container_name = if name.starts_with("auracle-") {
-        name
-    } else {
-        format!("auracle-{name}")
-    };
-    docker_remove_container(container_name).await
-}
-
 /// Lightweight "is this container running" probe. Doesn't go through
 /// compose — uses `docker ps --filter` so it works regardless of which
 /// compose project owns the container (handles both `auracle-cpgateway`
@@ -478,20 +463,6 @@ pub async fn docker_container_running(names: Vec<String>) -> Result<Option<Strin
         .filter(|l| !l.is_empty())
         .collect();
     Ok(names.into_iter().find(|n| running.contains(n.as_str())))
-}
-
-#[tauri::command]
-pub async fn container_logs(name: String, tail: u32) -> Result<Vec<String>, String> {
-    let dir = installer::resolve_install_path().map_err(to_error_string)?;
-    let tail_arg = format!("--tail={}", tail.min(2000));
-    let out = run_capture_in(
-        "docker",
-        &["compose", "logs", "--no-color", &tail_arg, &name],
-        &dir,
-    )
-    .await
-    .map_err(to_error_string)?;
-    Ok(out.lines().map(|l| l.to_string()).collect())
 }
 
 // ─── Internal subprocess helpers ────────────────────────────────────
