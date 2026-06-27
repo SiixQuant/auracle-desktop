@@ -15,19 +15,12 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@codemirror/lang-python": "^6.1.6",
-    "@codemirror/state": "^6.4.1",
-    "@codemirror/view": "^6.34.1",
     "@react-three/fiber": "^8.18.0",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.2.0",
-    "@uiw/codemirror-theme-vscode": "^4.23.6",
-    "@uiw/react-codemirror": "^4.23.6",
     "clsx": "^2.1.1",
-    "diff": "^7.0.0",
     "framer-motion": "^11.18.2",
-    "lightweight-charts": "^5.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^3.6.0",
@@ -35,7 +28,6 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",
-    "@types/diff": "^6.0.0",
     "@types/node": "^22.10.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

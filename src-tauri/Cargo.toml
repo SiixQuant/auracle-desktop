@@ -81,7 +81,6 @@ keyring = "3"
 # commands return Result<T, String> so we map anyhow errors to
 # strings at the boundary.
 anyhow = "1"
-thiserror = "1"
 
 # Time formatting for log lines + healthcheck timestamps.
 chrono = { version = "0.4", features = ["serde"] }
