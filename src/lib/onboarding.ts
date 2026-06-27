@@ -29,3 +29,48 @@ export function needsOnboarding(
 ): boolean {
   return !installed && !engineIsUp(health);
 }
+
+/**
+ * True when the engine is actually SERVING — Houston answered a health
+ * probe with a real status. Stricter than engineIsUp(): "starting" means
+ * containers launched but Houston isn't ready, so it is NOT serving yet.
+ * Used to gate the post-install "the stack is up" claim on real
+ * reachability instead of "the installer process exited".
+ */
+export function engineServing(
+  health: HealthSnapshot | null | undefined,
+): boolean {
+  return !!health && (health.state === "healthy" || health.state === "degraded");
+}
+
+/**
+ * Poll ``probe`` until the engine is serving (engineServing) or the
+ * attempts run out. Returns true once the engine answers, false on
+ * timeout. Pure + injectable (probe/sleep) so it's unit-testable without
+ * a real engine or wall-clock. Defaults: 45 attempts × 2s ≈ 90s, which
+ * comfortably covers a cold container start.
+ */
+export async function waitForEngineHealthy(
+  probe: () => Promise<HealthSnapshot | null>,
+  opts: {
+    attempts?: number;
+    intervalMs?: number;
+    sleep?: (ms: number) => Promise<void>;
+  } = {},
+): Promise<boolean> {
+  const attempts = Math.max(1, opts.attempts ?? 45);
+  const intervalMs = opts.intervalMs ?? 2_000;
+  const sleep =
+    opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  for (let i = 0; i < attempts; i++) {
+    let health: HealthSnapshot | null = null;
+    try {
+      health = await probe();
+    } catch {
+      health = null;
+    }
+    if (engineServing(health)) return true;
+    if (i < attempts - 1) await sleep(intervalMs);
+  }
+  return false;
+}

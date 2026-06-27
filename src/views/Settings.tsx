@@ -25,6 +25,7 @@ import {
   agentIdFromEngineProvider,
   buildAiModelPatch,
 } from "@/lib/intelligence";
+import { engineServing, waitForEngineHealthy } from "@/lib/onboarding";
 import { useSettings } from "@/lib/settings";
 import {
   cmd,
@@ -358,12 +359,37 @@ export function SystemCard() {
 
   const runInstall = async () => {
     setInstalling(true);
-    setInstallLabel("Installing…");
+    setInstallLabel("Checking…");
     try {
+      // Guard (same rule as first-run onboarding): never re-run install.sh
+      // over a stack that's already installed or already serving — a second
+      // stack collides on the shared ports (1969/5432/80/443). This is the
+      // second install entry point; without this guard it would re-install
+      // on top of a live stack.
+      const [already, health] = await Promise.all([
+        cmd.isInstalled().catch(() => false),
+        cmd.healthcheckNow().catch(() => null),
+      ]);
+      if (already || engineServing(health)) {
+        setInstalled(true);
+        setInstallLabel("Already installed — nothing to do");
+        setInstalling(false);
+        return;
+      }
+      setInstallLabel("Installing…");
       await cmd.runFirstInstall();
-      setInstallLabel("Done — restart launcher to continue");
+      // Don't claim success on installer exit — confirm the engine answers.
+      setInstallLabel("Waiting for the engine…");
+      const healthy = await waitForEngineHealthy(() => cmd.healthcheckNow());
+      setInstalled(true);
+      setInstallLabel(
+        healthy
+          ? "Done — engine is up"
+          : "Installed — engine not answering yet; give it a minute",
+      );
     } catch (err) {
       setInstallLabel("Failed: " + String(err));
+    } finally {
       setInstalling(false);
     }
   };

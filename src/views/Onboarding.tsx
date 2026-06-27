@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { engineIsUp } from "@/lib/onboarding";
+import { engineIsUp, waitForEngineHealthy } from "@/lib/onboarding";
 import {
   cmd,
   onEvent,
@@ -352,6 +352,9 @@ function Step3({
   const [alreadyRunning, setAlreadyRunning] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [finished, setFinished] = useState(false);
+  // null = not yet checked, true = engine answered health, false = the
+  // install completed but the engine hasn't answered within the window.
+  const [engineHealthy, setEngineHealthy] = useState<boolean | null>(null);
   const [progress, setProgress] = useState<InstallerProgress>({});
   const [logLines, setLogLines] = useState<string[]>([]);
   const [installError, setInstallError] = useState<string | null>(null);
@@ -428,8 +431,21 @@ function Step3({
       setProgress((prev) => ({
         ...prev,
         percent: 100,
-        message: "",
+        message: "Waiting for the engine to answer…",
       }));
+      // Don't claim "the stack is up" just because the installer process
+      // exited — the containers may still be starting (or Houston may have
+      // failed to come up). Poll the real health probe until the engine is
+      // actually serving, THEN bounce to the browser. On timeout, leave an
+      // honest "installed but not answering yet" banner instead of opening
+      // a page that won't load.
+      const healthy = await waitForEngineHealthy(() => cmd.healthcheckNow());
+      setEngineHealthy(healthy);
+      setProgress((prev) => ({ ...prev, message: "" }));
+      if (!healthy) {
+        unlisten();
+        return;
+      }
       window.setTimeout(async () => {
         try {
           // Retained first-run bootstrap: /ui/setup is allowlisted under
@@ -561,12 +577,45 @@ function Step3({
               <div style={{ transform: `scaleX(${(progress.percent ?? 0) / 100})` }} />
             </div>
           </div>
-          {finished ? (
+          {finished && engineHealthy === true ? (
             <div className="banner info">
               <strong>The stack is up.</strong> Finishing first-run setup in
               your browser at <code>localhost:1969</code> — the launcher stays
               here for engine status and updates; brokers connect in the
               workspace.
+            </div>
+          ) : finished && engineHealthy === false ? (
+            <div className="banner warn">
+              <strong>Containers installed, but the engine hasn't answered
+              yet.</strong> It can take a minute on first boot. Give it a
+              moment, then open <code>localhost:1969</code> — or check the
+              installer log below if it doesn't come up.
+              <div className="mt-2">
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    const healthy = await waitForEngineHealthy(
+                      () => cmd.healthcheckNow(),
+                      { attempts: 10 },
+                    );
+                    setEngineHealthy(healthy);
+                    if (healthy) {
+                      try {
+                        await openInBrowser("http://localhost:1969/ui/setup");
+                      } catch {
+                        // ignore
+                      }
+                      onDone();
+                    }
+                  }}
+                >
+                  Retry health check
+                </button>
+              </div>
+            </div>
+          ) : finished ? (
+            <div className="muted fs-sm" style={{ minHeight: 20 }}>
+              Waiting for the engine to answer…
             </div>
           ) : (
             <div className="muted fs-sm" style={{ minHeight: 20 }}>
