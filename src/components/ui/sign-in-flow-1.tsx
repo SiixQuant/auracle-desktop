@@ -427,7 +427,7 @@ export const SignInPage = ({
   return (
     <div
       className={cn(
-        "flex w-[100%] flex-col min-h-screen bg-black relative",
+        "auracle-signin flex w-[100%] flex-col min-h-screen bg-black relative",
         className
       )}
     >
@@ -500,7 +500,7 @@ export const SignInPage = ({
                             placeholder="you@company.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full backdrop-blur-[1px] text-white border-1 border-white/10 rounded-full py-3 px-4 focus:outline-none focus:border focus:border-white/30 text-center"
+                            className="w-full backdrop-blur-[1px] text-white border border-white/15 bg-white/5 rounded-full py-3 px-4 focus:outline-none focus:border-white/40 text-center placeholder:text-white/40"
                             required
                           />
                           <button

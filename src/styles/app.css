@@ -1919,3 +1919,17 @@ table.data-table {
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* The sign-in screen (src/components/ui/sign-in-flow-1.tsx) was authored for
+   Tailwind preflight, which we keep OFF globally. Re-supply just the two input
+   resets it needs — inherited font (not the UA Arial) and a transparent base
+   background (the UA white made white text invisible) — scoped to the sign-in
+   surface and in the base layer, so utility classes (bg-*, text-*, font-*)
+   still win. */
+@layer base {
+  .auracle-signin input,
+  .auracle-signin textarea {
+    background-color: transparent;
+    font-family: inherit;
+  }
+}
