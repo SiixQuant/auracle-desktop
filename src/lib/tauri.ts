@@ -205,10 +205,6 @@ export const cmd = {
    *  even when the stack's .env is incomplete. */
   dockerRemoveContainer: (name: string) =>
     invoke<void>("docker_remove_container", { name }),
-  /** Legacy alias for dockerRemoveContainer — retained until any
-   *  cached frontend bundle stops calling it. */
-  stackStopService: (name: string) =>
-    invoke<void>("stack_stop_service", { name }),
   /** First name from `names` that's currently a running Docker
    *  container, or null. Used by Broker Connections to detect when
    *  Houston's bundled gateway would conflict with ibeam. */
