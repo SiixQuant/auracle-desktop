@@ -1928,7 +1928,8 @@ table.data-table {
    still win. */
 @layer base {
   .auracle-signin input,
-  .auracle-signin textarea {
+  .auracle-signin textarea,
+  .auracle-signin button {
     background-color: transparent;
     font-family: inherit;
   }

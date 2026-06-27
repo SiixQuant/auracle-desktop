@@ -566,6 +566,15 @@ export const SignInPage = ({
                       </form>
                     </div>
 
+                    {onComplete && (
+                      <button
+                        onClick={() => onComplete()}
+                        className="text-white/40 hover:text-white/70 text-sm transition-colors"
+                      >
+                        Skip for now &rarr;
+                      </button>
+                    )}
+
                     <p className="text-xs text-white/40 pt-10">
                       By continuing, you agree to the{" "}
                       <a
@@ -687,6 +696,15 @@ export const SignInPage = ({
                         {verifying ? "Verifying…" : "Continue"}
                       </motion.button>
                     </div>
+
+                    {onComplete && (
+                      <button
+                        onClick={() => onComplete()}
+                        className="text-white/40 hover:text-white/70 text-sm transition-colors"
+                      >
+                        Skip for now &rarr;
+                      </button>
+                    )}
                   </motion.div>
                 ) : (
                   <motion.div
