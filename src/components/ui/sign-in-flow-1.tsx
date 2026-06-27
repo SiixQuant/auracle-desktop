@@ -375,13 +375,33 @@ export const SignInPage = ({
   const [reverseCanvasVisible, setReverseCanvasVisible] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      // Ask the engine to email the 6-digit code (best-effort) and advance.
-      Promise.resolve(onRequestCode?.(email)).catch(() => {});
+    if (!email || sending) return;
+    setEmailError(null);
+    // No requester wired (standalone demo) → just advance.
+    if (!onRequestCode) {
       setStep("code");
+      return;
+    }
+    // Only claim "we sent you a code" AFTER the engine confirms the send.
+    // Previously this fired the request fire-and-forget and advanced
+    // immediately, so a failed send (HQ down, bad address, rate-limited)
+    // still showed "we sent you a code" and the user waited forever.
+    setSending(true);
+    try {
+      await onRequestCode(email);
+      setStep("code");
+    } catch {
+      setEmailError(
+        "Couldn't send the code — check the email address and your " +
+          "connection, then try again.",
+      );
+    } finally {
+      setSending(false);
     }
   };
 
@@ -551,18 +571,28 @@ export const SignInPage = ({
                           />
                           <button
                             type="submit"
-                            className="absolute right-1.5 top-1.5 text-white w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors group overflow-hidden"
+                            disabled={sending}
+                            className="absolute right-1.5 top-1.5 text-white w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors group overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <span className="relative w-full h-full block overflow-hidden">
-                              <span className="absolute inset-0 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-full">
-                                →
+                            {sending ? (
+                              <span className="animate-spin">…</span>
+                            ) : (
+                              <span className="relative w-full h-full block overflow-hidden">
+                                <span className="absolute inset-0 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-full">
+                                  →
+                                </span>
+                                <span className="absolute inset-0 flex items-center justify-center transition-transform duration-300 -translate-x-full group-hover:translate-x-0">
+                                  →
+                                </span>
                               </span>
-                              <span className="absolute inset-0 flex items-center justify-center transition-transform duration-300 -translate-x-full group-hover:translate-x-0">
-                                →
-                              </span>
-                            </span>
+                            )}
                           </button>
                         </div>
+                        {emailError && (
+                          <p className="text-sm text-red-400/90 mt-3">
+                            {emailError}
+                          </p>
+                        )}
                       </form>
                     </div>
 
