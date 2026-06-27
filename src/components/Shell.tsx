@@ -13,6 +13,7 @@ import Coachmark, { coachSeen } from "@/components/Coachmark";
 import CommandPalette from "@/components/CommandPalette";
 import Flame from "@/components/Flame";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
+import ShellBackground from "@/components/ShellBackground";
 import StandbyHome from "@/components/StandbyHome";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
@@ -169,6 +170,7 @@ export default function Shell({
 
   return (
     <div className="shell-standby">
+      <ShellBackground />
       <header className="topbar">
         <div className="topbar__brand">
           <Flame size={20} />

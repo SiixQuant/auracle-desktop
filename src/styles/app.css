@@ -1947,3 +1947,74 @@ table.data-table {
 :where(.auracle-signin) button {
   cursor: pointer;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Home (Standby) — match the sign-in screen: pure black with the same
+   animated dot-matrix shader behind translucent-glass surfaces. Scoped
+   to .shell-standby so the rest of the app keeps the charcoal system.
+   ────────────────────────────────────────────────────────────────── */
+.shell-standby {
+  position: relative;
+  background: #000;
+}
+/* Shader canvas + gradient overlays at z-0; all chrome sits above. */
+.shell-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.shell-standby > .topbar,
+.shell-standby > .standby-stage {
+  position: relative;
+  z-index: 1;
+}
+/* Transparent chrome so the shader reads through the whole surface. */
+.shell-standby .topbar {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.shell-standby .topbar__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.shell-standby .standby-stage {
+  background: transparent;
+}
+/* Hub tiles → faint glass over the dots. */
+.shell-standby .hub-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.shell-standby .hub-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+/* Mono icons to match the sign-in's white-on-black palette. */
+.shell-standby .hub-card__icon {
+  color: var(--fg-dim);
+}
+/* Primary actuator → white pill, like the sign-in's primary buttons. */
+.shell-standby .standby__actuator {
+  background: #fff;
+  color: #000;
+}
+.shell-standby .standby__actuator:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.88);
+}
+.shell-standby .standby__actuator:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fg-muted);
+}
+/* Agent pill + lamp ring → glass; the lamp CORE keeps its semantic
+   colour (green = ready / red = needs you) — that's a functional signal,
+   not decoration, so it stays. */
+.shell-standby .standby__agent {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.shell-standby .standby__agent:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
