@@ -26,25 +26,25 @@ const SignInScreen = lazy(() =>
 );
 
 const TUTORIAL_SEEN_KEY = "auracle_tutorial_seen";
-const SIGNED_IN_KEY = "auracle_signed_in";
 
 export default function App() {
   const [bootstrapped, setBootstrapped] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [signedIn, setSignedIn] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(SIGNED_IN_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  // Gated on a real cached session credential (resolved during bootstrap),
+  // not a bare flag — see cmd.signInStatus.
+  const [signedIn, setSignedIn] = useState(false);
 
   // First-launch gate.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        // Signed in iff a session credential is cached on this machine.
+        const hasSession = await cmd.signInStatus().catch(() => false);
+        if (cancelled) return;
+        if (hasSession) setSignedIn(true);
+
         const installed = await cmd.isInstalled();
         if (cancelled) return;
         // The install marker is necessary but not sufficient: a stack can
@@ -91,12 +91,9 @@ export default function App() {
   };
 
   const completeSignIn = () => {
+    // The verify step already persisted the session token to the keychain;
+    // sign_in_status reads it on the next launch. Just reveal the app now.
     setSignedIn(true);
-    try {
-      localStorage.setItem(SIGNED_IN_KEY, "1");
-    } catch {
-      // ignore
-    }
   };
 
   if (!bootstrapped) return null;
@@ -111,9 +108,10 @@ export default function App() {
       >
         <SignInScreen
           onComplete={completeSignIn}
-          onRequestLink={(email) => {
+          onRequestCode={(email) => {
             void cmd.signInStart(email).catch(() => {});
           }}
+          onVerifyCode={(email, code) => cmd.signInVerify(email, code)}
         />
       </Suspense>
     );

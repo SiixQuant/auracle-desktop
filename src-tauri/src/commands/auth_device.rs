@@ -9,7 +9,10 @@
 //! future poll step. Treat it as a secret — never log it or put it in an
 //! error string.
 
+use tauri::AppHandle;
+
 use super::engine_auth::ENGINE_BASE;
+use super::secret_store;
 use super::to_error_string;
 
 #[derive(serde::Serialize)]
@@ -61,4 +64,97 @@ pub async fn sign_in_start(email: String) -> Result<SignInStart, String> {
         ok: parsed.ok,
         device_code: parsed.device_code,
     })
+}
+
+/// Keychain keys for the established session. The signed JWT is the engine's
+/// proof of who's signed in; the refresh token renews it without another code.
+const SESSION_JWT_KEY: &str = "auracle_session_jwt";
+const REFRESH_TOKEN_KEY: &str = "auracle_refresh_token";
+
+#[derive(serde::Serialize)]
+pub struct SignInResult {
+    /// "ready" (signed in) | "invalid" | "expired" | "locked".
+    pub status: String,
+    pub tier: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct VerifyBody<'a> {
+    email: &'a str,
+    code: &'a str,
+}
+
+#[derive(serde::Deserialize)]
+struct VerifyResponse {
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    tier: Option<String>,
+    #[serde(default)]
+    signed_jwt: Option<String>,
+    #[serde(default)]
+    refresh_token: Option<String>,
+}
+
+/// Verify the 6-digit sign-in code with the engine. On success ("ready"),
+/// persist the signed session JWT + refresh token to the OS keychain (the
+/// refresh token lets us renew silently). Non-ready outcomes are returned for
+/// the UI to surface inline; only a transport/5xx error rejects.
+#[tauri::command]
+pub async fn sign_in_verify(
+    app: AppHandle,
+    email: String,
+    code: String,
+) -> Result<SignInResult, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(to_error_string)?;
+
+    let response = client
+        .post(format!("{ENGINE_BASE}/auth/device/verify"))
+        .json(&VerifyBody {
+            email: &email,
+            code: &code,
+        })
+        .send()
+        .await
+        .map_err(to_error_string)?;
+
+    // A 400 means a malformed request (missing field); treat as a bad code
+    // for the UI rather than a hard error.
+    if response.status() == reqwest::StatusCode::BAD_REQUEST {
+        return Ok(SignInResult {
+            status: "invalid".into(),
+            tier: None,
+        });
+    }
+    if !response.status().is_success() {
+        return Err(format!("engine returned {}", response.status()));
+    }
+
+    let parsed: VerifyResponse = response.json().await.map_err(to_error_string)?;
+    if parsed.status == "ready" {
+        // Best-effort cache: a failure here doesn't undo the server-side
+        // sign-in, so don't fail the call over it.
+        if let Some(jwt) = parsed.signed_jwt.as_deref() {
+            secret_store::put(&app, SESSION_JWT_KEY, jwt).ok();
+        }
+        if let Some(refresh) = parsed.refresh_token.as_deref() {
+            secret_store::put(&app, REFRESH_TOKEN_KEY, refresh).ok();
+        }
+    }
+    Ok(SignInResult {
+        status: parsed.status,
+        tier: parsed.tier,
+    })
+}
+
+/// Whether a sign-in session is cached on this machine (a refresh token is
+/// present in the keychain). The launcher gates its sign-in screen on this so
+/// the stored credential — not a bare local flag — decides whether the user is
+/// signed in. (Full JWT-expiry validation + silent refresh is a later slice.)
+#[tauri::command]
+pub fn sign_in_status(app: AppHandle) -> Result<bool, String> {
+    Ok(secret_store::get(&app, REFRESH_TOKEN_KEY)?.is_some())
 }

@@ -332,6 +332,8 @@ pub fn run() {
             github_auth_cmd::github_device_start,
             github_auth_cmd::github_device_poll,
             auth_device_cmd::sign_in_start,
+            auth_device_cmd::sign_in_verify,
+            auth_device_cmd::sign_in_status,
             // MCP sidecar supervisor (Phase 4c foundation; the
             // actual chat tool-use loop lands in Phase 4d)
             mcp_cmd::mcp_sidecar_status,

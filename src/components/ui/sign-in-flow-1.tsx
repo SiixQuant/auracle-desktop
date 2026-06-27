@@ -27,8 +27,15 @@ interface SignInPageProps {
   className?: string;
   /** Called once the user finishes the flow ("Continue to Auracle"). */
   onComplete?: () => void;
-  /** Fired on email submit — wired to the engine's magic-link send. */
-  onRequestLink?: (email: string) => Promise<void> | void;
+  /** Email step — ask the engine to email a 6-digit sign-in code. */
+  onRequestCode?: (email: string) => Promise<void> | void;
+  /** Code step — verify the entered code. Resolve with the outcome
+   *  status ("ready" | "invalid" | "expired" | "locked"). When omitted, the
+   *  flow falls back to a local demo success (used outside the launcher). */
+  onVerifyCode?: (
+    email: string,
+    code: string
+  ) => Promise<{ status: string; tier?: string | null } | void>;
 }
 
 export const CanvasRevealEffect = ({
@@ -357,7 +364,8 @@ function AuracleMark() {
 export const SignInPage = ({
   className,
   onComplete,
-  onRequestLink,
+  onRequestCode,
+  onVerifyCode,
 }: SignInPageProps) => {
   const [email, setEmail] = useState("");
   const [step, setStep] = useState<"email" | "code" | "success">("email");
@@ -365,12 +373,14 @@ export const SignInPage = ({
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [initialCanvasVisible, setInitialCanvasVisible] = useState(true);
   const [reverseCanvasVisible, setReverseCanvasVisible] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      // Fire the real magic-link send (best-effort) and advance.
-      Promise.resolve(onRequestLink?.(email)).catch(() => {});
+      // Ask the engine to email the 6-digit code (best-effort) and advance.
+      Promise.resolve(onRequestCode?.(email)).catch(() => {});
       setStep("code");
     }
   };
@@ -383,27 +393,63 @@ export const SignInPage = ({
     }
   }, [step]);
 
+  const playSuccess = () => {
+    setReverseCanvasVisible(true);
+    setTimeout(() => {
+      setInitialCanvasVisible(false);
+    }, 50);
+    setTimeout(() => {
+      setStep("success");
+    }, 2000);
+  };
+
+  const submitCode = async (digits: string[]) => {
+    const joined = digits.join("");
+    if (joined.length !== 6 || verifying) return;
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      // No verifier wired (e.g. standalone demo) → local success.
+      if (!onVerifyCode) {
+        playSuccess();
+        return;
+      }
+      const result = await onVerifyCode(email, joined);
+      const status = (result && "status" in result && result.status) || "ready";
+      if (status === "ready") {
+        playSuccess();
+      } else {
+        setVerifyError(
+          status === "locked"
+            ? "Too many attempts — start over to get a new code."
+            : status === "expired"
+              ? "That code expired — request a new one."
+              : "That code didn't match. Try again."
+        );
+        setCode(["", "", "", "", "", ""]);
+        codeInputRefs.current[0]?.focus();
+      }
+    } catch {
+      setVerifyError("Couldn't reach Auracle. Make sure the engine is running.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleCodeChange = (index: number, value: string) => {
     if (value.length <= 1) {
       const newCode = [...code];
       newCode[index] = value;
       setCode(newCode);
+      if (verifyError) setVerifyError(null);
 
       if (value && index < 5) {
         codeInputRefs.current[index + 1]?.focus();
       }
 
-      if (index === 5 && value) {
-        const isComplete = newCode.every((digit) => digit.length === 1);
-        if (isComplete) {
-          setReverseCanvasVisible(true);
-          setTimeout(() => {
-            setInitialCanvasVisible(false);
-          }, 50);
-          setTimeout(() => {
-            setStep("success");
-          }, 2000);
-        }
+      // Auto-submit once all six are filled.
+      if (index === 5 && value && newCode.every((digit) => digit.length === 1)) {
+        void submitCode(newCode);
       }
     }
   };
@@ -597,13 +643,20 @@ export const SignInPage = ({
                       </div>
                     </div>
 
+                    {verifyError && (
+                      <p className="text-sm text-red-400/90">{verifyError}</p>
+                    )}
+
                     <div>
                       <motion.p
-                        onClick={() =>
-                          Promise.resolve(onRequestLink?.(email)).catch(
+                        onClick={() => {
+                          setVerifyError(null);
+                          setCode(["", "", "", "", "", ""]);
+                          codeInputRefs.current[0]?.focus();
+                          Promise.resolve(onRequestCode?.(email)).catch(
                             () => {}
-                          )
-                        }
+                          );
+                        }}
                         className="text-white/50 hover:text-white/70 transition-colors cursor-pointer text-sm"
                         whileHover={{ scale: 1.02 }}
                         transition={{ duration: 0.2 }}
@@ -623,14 +676,15 @@ export const SignInPage = ({
                         Back
                       </motion.button>
                       <motion.button
+                        onClick={() => void submitCode(code)}
                         className={`flex-1 rounded-full font-medium py-3 border transition-all duration-300 ${
-                          code.every((d) => d !== "")
+                          code.every((d) => d !== "") && !verifying
                             ? "bg-white text-black border-transparent hover:bg-white/90 cursor-pointer"
                             : "bg-[#111] text-white/50 border-white/10 cursor-not-allowed"
                         }`}
-                        disabled={!code.every((d) => d !== "")}
+                        disabled={!code.every((d) => d !== "") || verifying}
                       >
-                        Continue
+                        {verifying ? "Verifying…" : "Continue"}
                       </motion.button>
                     </div>
                   </motion.div>

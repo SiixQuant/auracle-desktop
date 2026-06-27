@@ -175,6 +175,12 @@ export interface SignInStart {
   device_code: string;
 }
 
+export interface SignInResult {
+  /** "ready" (signed in) | "invalid" | "expired" | "locked". */
+  status: "ready" | "invalid" | "expired" | "locked" | string;
+  tier?: string | null;
+}
+
 // ── Command bindings ────────────────────────────────────────────
 
 export const cmd = {
@@ -284,6 +290,10 @@ export const cmd = {
   // commands/auth_device.rs. The device_code is opaque (future poll).
   signInStart: (email: string) =>
     invoke<SignInStart>("sign_in_start", { email }),
+  signInVerify: (email: string, code: string) =>
+    invoke<SignInResult>("sign_in_verify", { email, code }),
+  /** Whether a session credential is cached on this machine. */
+  signInStatus: () => invoke<boolean>("sign_in_status"),
 
   // ── Data-provider API keys ───────────────────────────────────
   //
