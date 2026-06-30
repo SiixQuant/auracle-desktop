@@ -73,17 +73,24 @@ export default function InspectorHost({
   return (
     <>
       <div className="insp-scrim" onClick={onClose} aria-hidden="true" />
-      <aside className="insp" role="dialog" aria-modal="true" aria-label={TITLES[open]}>
-        <div className="insp__head">
-          <h2 className="insp__title">{TITLES[open]}</h2>
-          <button type="button" className="insp__close" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        <div className="insp__body">
-          <InspectorBody which={open} />
-        </div>
-      </aside>
+      <div className="insp-stage">
+        <aside className="insp" role="dialog" aria-modal="true" aria-label={TITLES[open]}>
+          <div className="insp__head">
+            <h2 className="insp__title">{TITLES[open]}</h2>
+            <button
+              type="button"
+              className="insp__close"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="insp__body">
+            <InspectorBody which={open} />
+          </div>
+        </aside>
+      </div>
     </>
   );
 }
