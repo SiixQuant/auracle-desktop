@@ -337,6 +337,7 @@ export function UpdatesInspector() {
   const [busy, setBusy] = useState(false);
   const [steps, setSteps] = useState<{ label: string; state: StepState }[]>([]);
   const [result, setResult] = useState("");
+  const [resultErr, setResultErr] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -375,7 +376,9 @@ export function UpdatesInspector() {
   const updateAll = useCallback(async () => {
     setBusy(true);
     setResult("");
+    setResultErr(false);
     const log: { label: string; state: StepState }[] = [];
+    const failures: string[] = [];
     const add = (label: string): number => {
       log.push({ label, state: "run" });
       setSteps([...log]);
@@ -385,52 +388,76 @@ export function UpdatesInspector() {
       log[i].state = state;
       setSteps([...log]);
     };
+    // Run one step independently. A failure is recorded and surfaced, but it
+    // never aborts the rest — so a flaky engine pull (e.g. an older launcher's
+    // Docker-PATH bug) can't block the launcher self-update that ships the very
+    // fix for it. Each piece gets as current as it can in a single pass.
+    const step = async (label: string, fn: () => Promise<unknown>) => {
+      const i = add(label);
+      try {
+        await fn();
+        mark(i, "done");
+      } catch (err) {
+        mark(i, "fail");
+        failures.push(`${label.toLowerCase()} (${String(err)})`);
+      }
+    };
     try {
       // 1. Trading-engine images (need Docker).
       if (!dockerReady) {
         mark(add("Trading engine — Docker not running"), "skip");
       } else if (engineInstalled === false) {
-        const i = add("Installing the trading engine");
-        await cmd.runFirstInstall();
-        await waitForEngineHealthy(() => cmd.healthcheckNow()).catch(() => false);
-        mark(i, "done");
+        await step("Installing the trading engine", async () => {
+          await cmd.runFirstInstall();
+          await waitForEngineHealthy(() => cmd.healthcheckNow()).catch(
+            () => false,
+          );
+        });
       } else if (engineInstalled === true) {
-        const i = add("Updating the trading engine");
-        await cmd.stackPullUpdate();
-        mark(i, "done");
+        await step("Updating the trading engine", () => cmd.stackPullUpdate());
       }
       // 2. Auracle IDE.
       if (ideUpdate && ide) {
-        const i = add("Updating the Auracle IDE");
-        await cmd.ideDownloadAndInstall(
-          ide.asset_url as string,
-          ide.asset_size ?? null,
-          ide.latest_version ?? "",
+        await step("Updating the Auracle IDE", () =>
+          cmd.ideDownloadAndInstall(
+            ide.asset_url as string,
+            ide.asset_size ?? null,
+            ide.latest_version ?? "",
+          ),
         );
-        mark(i, "done");
       }
-      // 3. Launcher — LAST: installing it restarts the app.
+      // 3. Launcher — LAST, and ALWAYS attempted even if an earlier step
+      //    failed: installing it restarts the app, and it's what delivers fixes
+      //    to those earlier steps. The restart races the IPC close, so a
+      //    connection-dropped error here is the expected success path.
       if (launcherUpdate) {
-        mark(add("Updating the launcher — restarting"), "done");
-        await cmd.installUpdate();
-        setResult("Restarting on the new version.");
-        return;
+        const i = add("Updating the launcher — restarting");
+        try {
+          await cmd.installUpdate();
+          mark(i, "done");
+          setResult("Restarting on the new version.");
+          return;
+        } catch (err) {
+          const msg = String(err);
+          if (/closed|connection|communicating|reset/i.test(msg)) {
+            mark(i, "done");
+            setResult("Restarting on the new version.");
+            return;
+          }
+          mark(i, "fail");
+          failures.push(`launcher (${msg})`);
+        }
       }
       await refresh();
-      setResult(
-        log.some((s) => s.state === "done")
-          ? "Auracle is up to date."
-          : "Already up to date.",
-      );
-    } catch (err) {
-      const msg = String(err);
-      const open = log.findIndex((s) => s.state === "run");
-      if (open >= 0) mark(open, "fail");
-      // The launcher restart races the IPC close — treat as success.
-      if (/closed|connection|communicating|reset/i.test(msg)) {
-        setResult("Restarting on the new version.");
+      if (failures.length > 0) {
+        setResultErr(true);
+        setResult("Some updates couldn't finish — " + failures.join("; "));
       } else {
-        setResult("Update failed: " + msg);
+        setResult(
+          log.some((s) => s.state === "done")
+            ? "Auracle is up to date."
+            : "Already up to date.",
+        );
       }
     } finally {
       setBusy(false);
@@ -493,13 +520,7 @@ export function UpdatesInspector() {
             </div>
           )}
           {result && (
-            <div
-              className={
-                /fail/i.test(result)
-                  ? "err-text fs-xs mt-2"
-                  : "muted fs-xs mt-2"
-              }
-            >
+            <div className={resultErr ? "err-text fs-xs mt-2" : "muted fs-xs mt-2"}>
               {result}
             </div>
           )}

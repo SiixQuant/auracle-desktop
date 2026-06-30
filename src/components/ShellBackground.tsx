@@ -25,13 +25,19 @@ export default function ShellBackground() {
           reverse={false}
         />
       </Suspense>
-      {/* Readability: a light flat veil dims the dots everywhere, a soft
-          central vignette deepens the hero column, and the top edge fades —
-          the home's hero spans more screen than the sign-in form, so it needs
-          a touch more than the sign-in's overlay. */}
-      <div className="absolute inset-0 bg-black/30" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_70%_at_50%_44%,_rgba(0,0,0,0.8)_0%,_transparent_75%)]" />
+      {/* Readability overlays — the SAME recipe as the sign-in screen so the
+          home reads as one continuous surface. A flat veil dims the dots
+          everywhere, a centered vignette that fades all the way out (to
+          transparent at the gradient's full extent) deepens the hero column,
+          and symmetric top + bottom fades anchor the edges. The earlier offset
+          ellipse (…at 50% 44%, …→transparent at a hard 75% stop) left a visible
+          elliptical seam: the abrupt stop reads as a horizontal band across the
+          field, worst in the macOS WKWebView. A full-extent radial has no such
+          edge. */}
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,0.85)_0%,_transparent_100%)]" />
       <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-black to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black to-transparent" />
     </div>
   );
 }
