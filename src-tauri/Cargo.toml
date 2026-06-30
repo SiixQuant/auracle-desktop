@@ -75,7 +75,7 @@ env_logger = "0.11"
 # OS keychain (Keychain on macOS, Credential Manager on Windows,
 # Secret Service on Linux) for license-key storage. We never write
 # the plaintext license to disk — keychain only.
-keyring = "3"
+keyring = "4"
 
 # Anyhow for ergonomic error propagation through commands. Tauri
 # commands return Result<T, String> so we map anyhow errors to
