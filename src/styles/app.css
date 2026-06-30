@@ -1410,10 +1410,15 @@ table.data-table {
   gap: 4px;
   padding: 16px;
   text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  /* Frosted glass: translucent tint + a real backdrop blur of the CSS dot
+     field behind it (works now that the background is DOM, not a WebGL canvas).
+     Reads as a luminous glass tile, not an opaque charcoal plane. */
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--r-md);
-  box-shadow: var(--elev-card), var(--hairline-top);
+  box-shadow: var(--hairline-top);
   cursor: pointer;
   transition: background 0.14s, border-color 0.14s, transform 0.06s;
 }
@@ -1421,8 +1426,8 @@ table.data-table {
   grid-column: 1 / -1;
 }
 .hub-card:hover {
-  background: var(--surface-2);
-  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 .hub-card:active { transform: scale(0.99); }
 .hub-card:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
@@ -1598,9 +1603,9 @@ table.data-table {
      rectangular shadow" behind the panel. A heavier dim closes the luminance
      gap and a wider blur dissolves their edges, so the home reads as one calm
      wash, not a stack of card-shaped shadows. */
-  background: rgba(0, 0, 0, 0.62);
-  backdrop-filter: blur(22px) saturate(115%);
-  -webkit-backdrop-filter: blur(22px) saturate(115%);
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(26px) saturate(120%);
+  -webkit-backdrop-filter: blur(26px) saturate(120%);
   z-index: 40;
   animation: insp-fade 0.18s ease-out;
 }
@@ -1626,9 +1631,16 @@ table.data-table {
   pointer-events: auto;
   width: min(460px, 92vw);
   max-height: min(78vh, 720px);
-  background: rgba(22, 25, 30, 0.72);
-  backdrop-filter: blur(30px) saturate(150%);
-  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  /* No backdrop-filter here on purpose: the scrim below already blurs the dot
+     field, and WKWebView won't let a second (stacked) backdrop-filter sample
+     through the first. Instead the panel is a translucent tint, so the scrim's
+     already-frosted dots read straight through it — real frosted glass, one
+     blur layer. */
+  background: linear-gradient(
+    180deg,
+    rgba(62, 68, 82, 0.44) 0%,
+    rgba(44, 49, 60, 0.38) 100%
+  );
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
   box-shadow:
@@ -2018,6 +2030,36 @@ table.data-table {
   inset: 0;
   z-index: 0;
   pointer-events: none;
+}
+/* CSS dot-matrix (replaces the old WebGL shader) — a DOM surface WebKit can
+   blur, so glass panels above it frost properly. A faint per-cell radial dot on
+   a near-black field, breathing slowly. */
+.shell-bg__dots {
+  position: absolute;
+  inset: 0;
+  background-color: #04050a;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.26) 1.1px,
+    transparent 1.7px
+  );
+  background-size: 23px 23px;
+  animation: shell-dots-breathe 9s ease-in-out infinite;
+}
+@keyframes shell-dots-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.82;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-bg__dots {
+    animation: none;
+    opacity: 0.68;
+  }
 }
 .shell-standby > .topbar,
 .shell-standby > .standby-stage {
