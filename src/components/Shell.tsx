@@ -188,25 +188,9 @@ export default function Shell({
             <SearchIcon />
             <span className="kbd-hint">⌘K</span>
           </button>
-          <button type="button" className="topbar__btn" onClick={() => setInspector("updates")}>
-            <DownloadIcon />
-            Updates
-          </button>
-          <button type="button" className="topbar__btn" onClick={() => setInspector("intelligence")}>
-            <BrainIcon />
-            Intelligence
-          </button>
           <button type="button" className="topbar__btn" onClick={() => setInspector("system")}>
             <GearIcon />
             System
-          </button>
-          <button
-            type="button"
-            className="topbar__btn icon-only"
-            onClick={() => setInspector("faq")}
-            aria-label="Help and FAQ"
-          >
-            <HelpIcon />
           </button>
         </div>
       </header>
@@ -264,15 +248,6 @@ function SearchIcon() {
   );
 }
 
-function BrainIcon() {
-  return (
-    <svg {...iconProps}>
-      <path d="M7.5 4.5 a2.2 2.2 0 0 0 -2.2 2.2 a2 2 0 0 0 -0.8 3.6 a2 2 0 0 0 1 3.5 a2 2 0 0 0 4 0.2 V5 a2 2 0 0 0 -2 -0.5Z" />
-      <path d="M12.5 4.5 a2.2 2.2 0 0 1 2.2 2.2 a2 2 0 0 1 0.8 3.6 a2 2 0 0 1 -1 3.5 a2 2 0 0 1 -4 0.2" />
-    </svg>
-  );
-}
-
 function GearIcon() {
   return (
     <svg {...iconProps}>
@@ -282,20 +257,3 @@ function GearIcon() {
   );
 }
 
-function HelpIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="10" cy="10" r="7.2" />
-      <path d="M8.2 8 a2 2 0 1 1 2.6 2 c-0.6 0.35 -0.8 0.8 -0.8 1.4" />
-      <circle cx="10" cy="14.3" r="0.5" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <svg {...iconProps}>
-      <path d="M10 3 v9 M6.5 8.5 L10 12 l3.5 -3.5 M4 15.5 h12" />
-    </svg>
-  );
-}
