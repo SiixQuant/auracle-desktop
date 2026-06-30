@@ -4,6 +4,13 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.23]
+
+Real frosted-glass surfaces.
+
+### Changed
+- The home backdrop is now rendered in CSS instead of WebGL. This lets macOS draw true frosted glass: the Updates / Help / System panels and the home's hub cards are now translucent and blur the dot-field behind them (iOS-style), instead of reading as dark/black rectangles.
+
 ## [0.8.22]
 
 An even home backdrop, a clean panel backdrop, and an update that always finishes.
