@@ -1417,6 +1417,9 @@ table.data-table {
   cursor: pointer;
   transition: background 0.14s, border-color 0.14s, transform 0.06s;
 }
+.hub-card--wide {
+  grid-column: 1 / -1;
+}
 .hub-card:hover {
   background: var(--surface-2);
   border-color: var(--line-strong);
@@ -1589,22 +1592,66 @@ table.data-table {
 .insp-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(10px) saturate(118%);
+  -webkit-backdrop-filter: blur(10px) saturate(118%);
   z-index: 40;
   animation: insp-fade 0.18s ease-out;
 }
-.insp {
+/* Full-screen flex stage that centers the floating card. The stage is
+ * click-through (pointer-events: none) so a click outside the card still
+ * reaches the scrim below and closes; only the card re-enables pointer events. */
+.insp-stage {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(440px, 92vw);
+  inset: 0;
   z-index: 41;
-  background: var(--bg-elev);
-  border-left: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+}
+/* Floating rectangular glass card (iOS "liquid glass" treatment): a bounded,
+ * fully-rounded translucent panel with a backdrop blur over the dimmed home.
+ * Centered by the flex stage — NOT via transform: WebKit/WKWebView paints a
+ * solid black box when backdrop-filter and transform sit on the same element. */
+.insp {
+  position: relative;
+  pointer-events: auto;
+  width: min(460px, 92vw);
+  max-height: min(78vh, 720px);
+  background: rgba(22, 25, 30, 0.72);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: insp-slide 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: insp-pop 0.2s ease-out;
+}
+@keyframes insp-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* On the glass panel, inner groups sit directly on the glass — no opaque
+ * card-on-glass nesting. Stacked groups get a hairline divider instead. */
+.insp .card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+.insp .card + .card {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
 }
 .insp__head {
   display: flex;

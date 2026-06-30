@@ -27,10 +27,8 @@ import {
   AdvancedDrawer,
   GeneralCard,
   GithubCard,
-  IdeUpdateCard,
   IntelligenceCard,
   LicenseCard,
-  SystemCard,
   UpdatesInspector,
 } from "@/views/Settings";
 
@@ -40,8 +38,7 @@ export type InspectorKey =
   | "system"
   | "updates"
   | "changelog"
-  | "faq"
-  | "support"
+  | "help"
   | "lifecycle";
 
 const TITLES: Record<InspectorKey, string> = {
@@ -50,8 +47,7 @@ const TITLES: Record<InspectorKey, string> = {
   system: "System",
   updates: "Updates",
   changelog: "Changelog",
-  faq: "FAQ",
-  support: "Support",
+  help: "Help",
   lifecycle: "Strategy lifecycle",
 };
 
@@ -77,17 +73,24 @@ export default function InspectorHost({
   return (
     <>
       <div className="insp-scrim" onClick={onClose} aria-hidden="true" />
-      <aside className="insp" role="dialog" aria-modal="true" aria-label={TITLES[open]}>
-        <div className="insp__head">
-          <h2 className="insp__title">{TITLES[open]}</h2>
-          <button type="button" className="insp__close" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        <div className="insp__body">
-          <InspectorBody which={open} />
-        </div>
-      </aside>
+      <div className="insp-stage">
+        <aside className="insp" role="dialog" aria-modal="true" aria-label={TITLES[open]}>
+          <div className="insp__head">
+            <h2 className="insp__title">{TITLES[open]}</h2>
+            <button
+              type="button"
+              className="insp__close"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="insp__body">
+            <InspectorBody which={open} />
+          </div>
+        </aside>
+      </div>
     </>
   );
 }
@@ -106,18 +109,21 @@ function InspectorBody({ which }: { which: InspectorKey }) {
       return <UpdatesInspector />;
     case "changelog":
       return <ChangelogInspector />;
-    case "faq":
-      return <FaqInspector />;
-    case "support":
-      return <SupportInspector />;
+    case "help":
+      // FAQ + Support merged into one Help surface — one fewer popup.
+      return (
+        <>
+          <FaqInspector />
+          <SupportInspector />
+        </>
+      );
     case "system":
+      // Settings only — all update controls now live in the Updates surface.
       return (
         <>
           <LicenseCard />
           <GeneralCard />
           <GithubCard />
-          <SystemCard />
-          <IdeUpdateCard />
           <AdvancedDrawer />
         </>
       );
