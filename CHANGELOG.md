@@ -4,6 +4,13 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.21]
+
+Reliable stack control from a normally-launched app.
+
+### Fixed
+- The **Update Auracle** engine step (and Start/Stop/Restart) no longer fail with "No such file or directory" when the app is opened from Finder/Dock — container tooling is now resolved by absolute path in every launch context, not just the status check.
+
 ## [0.8.20]
 
 Calmer hub surfaces, presented as glass.
