@@ -1592,9 +1592,15 @@ table.data-table {
 .insp-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(10px) saturate(118%);
-  -webkit-backdrop-filter: blur(10px) saturate(118%);
+  /* Dim + blur strong enough that the home RECEDES behind the glass. The hub
+     cards are opaque charcoal (lighter than the near-black field), so a weak
+     scrim let them read through as distinct shadowed rectangles — a "vertical
+     rectangular shadow" behind the panel. A heavier dim closes the luminance
+     gap and a wider blur dissolves their edges, so the home reads as one calm
+     wash, not a stack of card-shaped shadows. */
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(22px) saturate(115%);
+  -webkit-backdrop-filter: blur(22px) saturate(115%);
   z-index: 40;
   animation: insp-fade 0.18s ease-out;
 }
