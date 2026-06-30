@@ -1417,6 +1417,9 @@ table.data-table {
   cursor: pointer;
   transition: background 0.14s, border-color 0.14s, transform 0.06s;
 }
+.hub-card--wide {
+  grid-column: 1 / -1;
+}
 .hub-card:hover {
   background: var(--surface-2);
   border-color: var(--line-strong);
@@ -1589,22 +1592,57 @@ table.data-table {
 .insp-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(10px) saturate(118%);
+  -webkit-backdrop-filter: blur(10px) saturate(118%);
   z-index: 40;
   animation: insp-fade 0.18s ease-out;
 }
+/* Floating rectangular glass card (iOS "liquid glass" treatment): a bounded,
+ * fully-rounded panel floating over a blurred, dimmed home — not a full-height
+ * side banner. Translucent fill + backdrop blur + a lit top edge give depth. */
 .insp {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(440px, 92vw);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, 92vw);
+  max-height: min(78vh, 720px);
   z-index: 41;
-  background: var(--bg-elev);
-  border-left: 1px solid var(--line-strong);
+  background: rgba(22, 25, 30, 0.72);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: insp-slide 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: insp-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes insp-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+/* On the glass panel, inner groups sit directly on the glass — no opaque
+ * card-on-glass nesting. Stacked groups get a hairline divider instead. */
+.insp .card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+.insp .card + .card {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
 }
 .insp__head {
   display: flex;

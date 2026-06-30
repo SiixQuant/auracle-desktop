@@ -90,8 +90,9 @@ export default function StandbyHome({
 
       <div className="hub-grid" role="group" aria-label="Hub">
         <HubCard
+          wide
           title="Update Auracle"
-          desc="Update the launcher and the IDE"
+          desc="Update the launcher, IDE, and engine in one step"
           onClick={() => onCard?.("updates")}
           icon={<DownloadIcon />}
         />
@@ -102,16 +103,10 @@ export default function StandbyHome({
           icon={<ListIcon />}
         />
         <HubCard
-          title="FAQ"
-          desc="Common questions, answered"
-          onClick={() => onCard?.("faq")}
+          title="Help"
+          desc="FAQ, diagnostics, and support"
+          onClick={() => onCard?.("help")}
           icon={<HelpIcon />}
-        />
-        <HubCard
-          title="Support"
-          desc="Diagnostics + how to reach us"
-          onClick={() => onCard?.("support")}
-          icon={<LifebuoyIcon />}
         />
       </div>
 
@@ -187,14 +182,20 @@ function HubCard({
   desc,
   icon,
   onClick,
+  wide,
 }: {
   title: string;
   desc: string;
   icon: React.ReactNode;
   onClick: () => void;
+  wide?: boolean;
 }) {
   return (
-    <button type="button" className="hub-card" onClick={onClick}>
+    <button
+      type="button"
+      className={`hub-card${wide ? " hub-card--wide" : ""}`}
+      onClick={onClick}
+    >
       <span className="hub-card__icon" aria-hidden="true">
         {icon}
       </span>
@@ -284,12 +285,3 @@ function HelpIcon() {
   );
 }
 
-function LifebuoyIcon() {
-  return (
-    <svg {...cardIconProps}>
-      <circle cx="10" cy="10" r="7" />
-      <circle cx="10" cy="10" r="3" />
-      <path d="M5 5 l2.2 2.2 M12.8 12.8 L15 15 M15 5 l-2.2 2.2 M7.2 12.8 L5 15" />
-    </svg>
-  );
-}
