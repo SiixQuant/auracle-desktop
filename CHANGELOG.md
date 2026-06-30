@@ -4,6 +4,17 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.19]
+
+A calmer home and one update action.
+
+### Changed
+- The home top bar now carries only what the home itself doesn't already surface, for a quieter, less repetitive nav.
+- The home tiles are solid cards that match the rest of the launcher, instead of faint washes.
+
+### Added
+- A single **Update Auracle** action that brings the whole stack — trading engine, IDE, and launcher — current in one pass.
+
 ## [0.7.5]
 
 Connect a broker without leaving the app.
