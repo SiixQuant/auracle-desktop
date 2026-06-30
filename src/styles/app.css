@@ -1410,12 +1410,13 @@ table.data-table {
   gap: 4px;
   padding: 16px;
   text-align: left;
-  /* Frosted glass: translucent tint + a real backdrop blur of the CSS dot
-     field behind it (works now that the background is DOM, not a WebGL canvas).
-     Reads as a luminous glass tile, not an opaque charcoal plane. */
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  /* Translucent tile over the animated WebGL dot field — the sign-in screen's
+     own surface treatment. NO backdrop-filter on purpose: WKWebView can't blur
+     a WebGL canvas (a frosted panel over one paints solid black), so we read
+     the dots through a translucent tint instead. The bottom readability fade
+     dims the dots behind this row, so the low-alpha white still reads as a
+     distinct luminous tile rather than vanishing. */
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--r-md);
   box-shadow: var(--hairline-top);
@@ -1597,15 +1598,12 @@ table.data-table {
 .insp-scrim {
   position: absolute;
   inset: 0;
-  /* Dim + blur strong enough that the home RECEDES behind the glass. The hub
-     cards are opaque charcoal (lighter than the near-black field), so a weak
-     scrim let them read through as distinct shadowed rectangles — a "vertical
-     rectangular shadow" behind the panel. A heavier dim closes the luminance
-     gap and a wider blur dissolves their edges, so the home reads as one calm
-     wash, not a stack of card-shaped shadows. */
-  background: rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(26px) saturate(120%);
-  -webkit-backdrop-filter: blur(26px) saturate(120%);
+  /* Dim the home so it RECEDES behind the inspector. NO backdrop-filter: the
+     home is now a WebGL canvas, which WKWebView can't blur (a frosted scrim
+     over one paints solid black). With the blur gone, darkening alone does the
+     recede — a heavy translucent veil sinks the twinkling field and the
+     translucent hub tiles into one calm wash behind the floating panel. */
+  background: rgba(0, 0, 0, 0.62);
   z-index: 40;
   animation: insp-fade 0.18s ease-out;
 }
@@ -2031,12 +2029,18 @@ table.data-table {
   z-index: 0;
   pointer-events: none;
 }
-/* CSS dot-matrix (replaces the old WebGL shader) — a DOM surface WebKit can
-   blur, so glass panels above it frost properly, while staying alive. Three
-   layered motions stand in for the shader's twinkle: the whole grid drifts
-   diagonally, the field breathes, and a soft light sweeps across (::after),
-   twinkling the dots it passes. */
+/* Live WebGL shader wrapper — fills the surface; the <Canvas> inside is
+   absolutely positioned. This is the home's default, animated backdrop and is
+   byte-for-byte the same shader the sign-in screen runs. */
+.shell-bg__canvas {
+  position: absolute;
+  inset: 0;
+}
+/* Static CSS dot-matrix — the prefers-reduced-motion fallback only (hidden
+   while the canvas is live). Kept as a calm, motionless texture for users who
+   opt out of animation. */
 .shell-bg__dots {
+  display: none;
   position: absolute;
   inset: 0;
   background-color: #04050a;
@@ -2087,7 +2091,12 @@ table.data-table {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  /* Drop the animated WebGL canvas; show the motionless dot field instead. */
+  .shell-bg__canvas {
+    display: none;
+  }
   .shell-bg__dots {
+    display: block;
     animation: none;
     opacity: 0.7;
   }
@@ -2101,9 +2110,10 @@ table.data-table {
   z-index: 1;
   /* Promote each to its own compositing layer so WebKit (the macOS WKWebView)
      paints it ABOVE the WebGL canvas. Without this, the canvas composites over
-     the hero text/lamp/button and washes them out — the glass tiles already
-     get their own layer via backdrop-filter, which is why they stayed crisp.
-     Invisible in Chromium; required in WKWebView. */
+     the hero text/lamp/button/cards and washes them out. The hub tiles sit
+     INSIDE this promoted stage, so they ride above the canvas with it — they no
+     longer need their own backdrop-filter layer. Invisible in Chromium;
+     required in WKWebView. */
   transform: translateZ(0);
 }
 /* Transparent chrome so the shader reads through the whole surface. */
@@ -2117,9 +2127,6 @@ table.data-table {
 .shell-standby .standby-stage {
   background: transparent;
 }
-/* Hub tiles use the shared opaque Percept card recipe (.hub-card) so they read
- * as solid charcoal planes on the dark home, matching the rest of the launcher.
- * No faint-glass wash — low-alpha white vanishes on near-black. */
 /* Primary actuator → white pill, like the sign-in's primary buttons. */
 .shell-standby .standby__actuator {
   background: #fff;

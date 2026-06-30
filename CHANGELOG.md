@@ -4,6 +4,13 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.25]
+
+One backdrop, everywhere.
+
+### Changed
+- The home screen now runs the exact same animated dot-field as the sign-in screen — the same reveal-and-twinkle motion, from one shared source — so the launcher feels like one continuous surface from sign-in onward. The hub cards and the inspector panels sit over it as translucent glass (the sign-in's own surface treatment), so the dots read softly through them.
+
 ## [0.8.24]
 
 A living backdrop and a calmer update.
