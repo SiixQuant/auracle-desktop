@@ -90,7 +90,7 @@ export default function StandbyHome({
 
       <div className="hub-grid" role="group" aria-label="Hub">
         <HubCard
-          title="Updates"
+          title="Update Auracle"
           desc="Update the launcher and the IDE"
           onClick={() => onCard?.("updates")}
           icon={<DownloadIcon />}

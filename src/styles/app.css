@@ -1408,11 +1408,12 @@ table.data-table {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  padding: 14px;
+  padding: 16px;
   text-align: left;
-  background: var(--surface-1);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
+  box-shadow: var(--elev-card), var(--hairline-top);
   cursor: pointer;
   transition: background 0.14s, border-color 0.14s, transform 0.06s;
 }
@@ -1422,7 +1423,7 @@ table.data-table {
 }
 .hub-card:active { transform: scale(0.99); }
 .hub-card:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
-.hub-card__icon { color: var(--accent-text); margin-bottom: 2px; }
+.hub-card__icon { color: var(--fg-dim); margin-bottom: 2px; }
 .hub-card__title { font-size: 14px; font-weight: 500; color: var(--fg); }
 .hub-card__desc { font-size: 12px; color: var(--fg-muted); line-height: 1.4; }
 
@@ -1987,21 +1988,9 @@ table.data-table {
 .shell-standby .standby-stage {
   background: transparent;
 }
-/* Hub tiles → faint glass over the dots. */
-.shell-standby .hub-card {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-}
-.shell-standby .hub-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-/* Mono icons to match the sign-in's white-on-black palette. */
-.shell-standby .hub-card__icon {
-  color: var(--fg-dim);
-}
+/* Hub tiles use the shared opaque Percept card recipe (.hub-card) so they read
+ * as solid charcoal planes on the dark home, matching the rest of the launcher.
+ * No faint-glass wash — low-alpha white vanishes on near-black. */
 /* Primary actuator → white pill, like the sign-in's primary buttons. */
 .shell-standby .standby__actuator {
   background: #fff;

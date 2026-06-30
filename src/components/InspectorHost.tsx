@@ -31,6 +31,7 @@ import {
   IntelligenceCard,
   LicenseCard,
   SystemCard,
+  UpdatesInspector,
 } from "@/views/Settings";
 
 export type InspectorKey =
@@ -100,15 +101,9 @@ function InspectorBody({ which }: { which: InspectorKey }) {
     case "intelligence":
       return <IntelligenceCard />;
     case "updates":
-      // The hub's update home — reuses the launcher's existing update
-      // mechanism: the launcher self-update (SystemCard) + the
-      // launcher-managed Auracle IDE update (IdeUpdateCard).
-      return (
-        <>
-          <SystemCard />
-          <IdeUpdateCard />
-        </>
-      );
+      // The hub's update home — one "Update Auracle" action that brings the
+      // whole stack (engine, IDE, launcher) current in a single pass.
+      return <UpdatesInspector />;
     case "changelog":
       return <ChangelogInspector />;
     case "faq":
