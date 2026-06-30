@@ -108,9 +108,14 @@ export default function App() {
       >
         <SignInScreen
           onComplete={completeSignIn}
-          onRequestCode={(email) => {
-            void cmd.signInStart(email).catch(() => {});
-          }}
+          onRequestCode={(email) =>
+            // Return the promise (don't swallow it): if HQ can't send the
+            // code — engine unreachable, or a 503 when no email backend is
+            // configured — the rejection propagates so the sign-in screen
+            // shows its inline error instead of falsely advancing to "we
+            // sent you a code."
+            cmd.signInStart(email).then(() => {})
+          }
           onVerifyCode={(email, code) => cmd.signInVerify(email, code)}
         />
       </Suspense>
