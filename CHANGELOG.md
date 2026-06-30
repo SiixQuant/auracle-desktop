@@ -4,6 +4,14 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.24]
+
+A living backdrop and a calmer update.
+
+### Fixed
+- The home's dot-matrix backdrop is animated again — it drifts and shimmers instead of sitting still (it went static when it moved off WebGL for the frosted-glass change).
+- **Update Auracle** no longer shows an alarming red error when the trading engine simply has no newer images to fetch. If the engine is still running, it now reports "running on the current version" calmly; a red error appears only if the engine actually stopped.
+
 ## [0.8.23]
 
 Real frosted-glass surfaces.
