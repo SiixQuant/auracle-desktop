@@ -1,9 +1,11 @@
-//! Keyless sign-in — kick off the engine's magic-link device flow.
+//! Keyless sign-in — kick off HQ's magic-link device flow.
 //!
 //! The launcher's sign-in screen calls `sign_in_start(email)`, which asks
-//! the local engine to email the user a magic sign-in link
-//! (`POST /auth/device/start`). That endpoint is public (pre-auth), so no
-//! owner key is needed here.
+//! the Auracle HQ licensing server (NOT the local engine) to email the user
+//! a 6-digit code + magic sign-in link (`POST /auth/device/start`). This
+//! MUST target HQ: a first-time customer has no local engine running yet,
+//! and the signed entitlement JWT + Stripe state live only at HQ. The
+//! endpoint is public (pre-auth), so no owner key is needed here.
 //!
 //! SECRECY: the returned `device_code` is opaque and will be consumed by a
 //! future poll step. Treat it as a secret — never log it or put it in an
@@ -11,9 +13,22 @@
 
 use tauri::AppHandle;
 
-use super::engine_auth::ENGINE_BASE;
 use super::secret_store;
 use super::to_error_string;
+
+/// Base URL of the Auracle HQ licensing server — the sign-in / device-code
+/// and entitlement authority. Overridable via `AURACLE_LICENSE_SERVER_URL`
+/// (the same env the engine uses) for staging or self-host; defaults to the
+/// hosted HQ. Any trailing slash is trimmed so `{base}/auth/...` joins clean.
+fn hq_auth_base() -> String {
+    std::env::var("AURACLE_LICENSE_SERVER_URL")
+        .ok()
+        .map(|s| s.trim().trim_end_matches('/').to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            "https://amused-commitment-production-fb48.up.railway.app".to_string()
+        })
+}
 
 #[derive(serde::Serialize)]
 pub struct SignInStart {
@@ -48,7 +63,7 @@ pub async fn sign_in_start(email: String) -> Result<SignInStart, String> {
         .map_err(to_error_string)?;
 
     let response = client
-        .post(format!("{ENGINE_BASE}/auth/device/start"))
+        .post(format!("{}/auth/device/start", hq_auth_base()))
         .json(&StartBody { email: &email })
         .send()
         .await
@@ -112,7 +127,7 @@ pub async fn sign_in_verify(
         .map_err(to_error_string)?;
 
     let response = client
-        .post(format!("{ENGINE_BASE}/auth/device/verify"))
+        .post(format!("{}/auth/device/verify", hq_auth_base()))
         .json(&VerifyBody {
             email: &email,
             code: &code,
