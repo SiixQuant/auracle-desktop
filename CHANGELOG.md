@@ -4,6 +4,18 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.20]
+
+Calmer hub surfaces, presented as glass.
+
+### Changed
+- Hub inspectors (Updates, Help, System, Supervision) are now centered floating glass cards with a blurred backdrop, instead of a full-height side panel.
+- FAQ and Support are merged into one **Help** surface; the home hub shows three cards (Update Auracle, Changelog, Help) with Update Auracle given top billing.
+- The System surface no longer repeats the update controls — updates live only in the Update Auracle card.
+
+### Fixed
+- Inspector cards no longer paint a dark full-height banner behind them on macOS.
+
 ## [0.8.19]
 
 A calmer home and one update action.
