@@ -4,6 +4,14 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.22]
+
+An even home backdrop and an update that always finishes.
+
+### Fixed
+- The home backdrop now darkens evenly behind the hero. The faint horizontal band across the dot field is gone — the hard-edged vignette was replaced with a smooth, full-extent one that matches the sign-in screen.
+- **Update Auracle** now updates each piece of the stack independently. If one step can't finish (for example, the trading-engine images), the launcher still updates itself and restarts — a single hiccup no longer blocks the rest of the update. Anything that didn't finish is reported plainly instead of stopping the whole run.
+
 ## [0.8.21]
 
 Reliable stack control from a normally-launched app.
