@@ -84,6 +84,22 @@ pub(crate) async fn resolve_docker_bin() -> Option<String> {
     None
 }
 
+/// Resolve docker for a stack command, mapping a missing CLI to a
+/// user-facing error. Stack mutation/inspection commands run in the
+/// Finder-launched app context, whose minimal PATH
+/// (`/usr/bin:/bin:/usr/sbin:/sbin`) omits Docker's CLI dir — so they
+/// must resolve the absolute docker path the same way the status
+/// probe does. Spawning a bare `docker` there fails before it can run
+/// with "No such file or directory (os error 2)", which is exactly
+/// what surfaced on the in-app "Update Auracle" button.
+async fn docker_bin_or_err() -> Result<String, String> {
+    resolve_docker_bin().await.ok_or_else(|| {
+        "Docker CLI not found. Make sure Docker Desktop is installed and running, \
+         then try again."
+            .to_string()
+    })
+}
+
 #[tauri::command]
 pub async fn docker_status() -> Result<DockerStatus, String> {
     let Some(bin) = resolve_docker_bin().await else {
@@ -237,7 +253,8 @@ pub async fn stack_status() -> Result<StackStatus, String> {
     // line (NDJSON). Parse line-by-line so a malformed entry
     // doesn't drop the whole status — we'd rather show 5 healthy
     // containers + 1 "?" than a blank dashboard.
-    let raw = run_capture_in("docker", &["compose", "ps", "--format", "json"], &dir)
+    let bin = docker_bin_or_err().await?;
+    let raw = run_capture_in(&bin, &["compose", "ps", "--format", "json"], &dir)
         .await
         .map_err(to_error_string)?;
 
@@ -329,7 +346,8 @@ fn derive_overall(containers: &[StackContainer]) -> String {
 #[tauri::command]
 pub async fn stack_start() -> Result<(), String> {
     let dir = installer::resolve_install_path().map_err(to_error_string)?;
-    run_in("docker", &["compose", "up", "-d"], &dir)
+    let bin = docker_bin_or_err().await?;
+    run_in(&bin, &["compose", "up", "-d"], &dir)
         .await
         .map_err(to_error_string)?;
     Ok(())
@@ -338,7 +356,8 @@ pub async fn stack_start() -> Result<(), String> {
 #[tauri::command]
 pub async fn stack_stop() -> Result<(), String> {
     let dir = installer::resolve_install_path().map_err(to_error_string)?;
-    run_in("docker", &["compose", "down"], &dir)
+    let bin = docker_bin_or_err().await?;
+    run_in(&bin, &["compose", "down"], &dir)
         .await
         .map_err(to_error_string)?;
     Ok(())
@@ -349,10 +368,11 @@ pub async fn stack_pull_update() -> Result<(), String> {
     // The "update" UX in §4.5 of the launcher plan: pull new
     // images then `up -d` to recreate only changed containers.
     let dir = installer::resolve_install_path().map_err(to_error_string)?;
-    run_in("docker", &["compose", "pull"], &dir)
+    let bin = docker_bin_or_err().await?;
+    run_in(&bin, &["compose", "pull"], &dir)
         .await
         .map_err(to_error_string)?;
-    run_in("docker", &["compose", "up", "-d"], &dir)
+    run_in(&bin, &["compose", "up", "-d"], &dir)
         .await
         .map_err(to_error_string)?;
     Ok(())
@@ -369,7 +389,8 @@ pub async fn stack_restart_container(name: String) -> Result<(), String> {
     if !ALLOWED.contains(&name.as_str()) {
         return Err(format!("unknown container: {name}"));
     }
-    run_in("docker", &["compose", "restart", &name], &dir)
+    let bin = docker_bin_or_err().await?;
+    run_in(&bin, &["compose", "restart", &name], &dir)
         .await
         .map_err(to_error_string)?;
     Ok(())
