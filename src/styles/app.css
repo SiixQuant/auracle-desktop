@@ -2032,8 +2032,10 @@ table.data-table {
   pointer-events: none;
 }
 /* CSS dot-matrix (replaces the old WebGL shader) — a DOM surface WebKit can
-   blur, so glass panels above it frost properly. A faint per-cell radial dot on
-   a near-black field, breathing slowly. */
+   blur, so glass panels above it frost properly, while staying alive. Three
+   layered motions stand in for the shader's twinkle: the whole grid drifts
+   diagonally, the field breathes, and a soft light sweeps across (::after),
+   twinkling the dots it passes. */
 .shell-bg__dots {
   position: absolute;
   inset: 0;
@@ -2044,21 +2046,53 @@ table.data-table {
     transparent 1.7px
   );
   background-size: 23px 23px;
-  animation: shell-dots-breathe 9s ease-in-out infinite;
+  animation:
+    shell-dots-drift 26s linear infinite,
+    shell-dots-breathe 9s ease-in-out infinite;
+}
+/* A travelling glow that brightens the dots it passes — the localized shimmer
+   the static grid was missing. */
+.shell-bg__dots::after {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background:
+    radial-gradient(38% 38% at 30% 28%, rgba(120, 150, 255, 0.1), transparent 72%),
+    radial-gradient(34% 34% at 72% 66%, rgba(255, 255, 255, 0.06), transparent 72%);
+  animation: shell-dots-shimmer 19s ease-in-out infinite alternate;
+}
+@keyframes shell-dots-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 69px 46px;
+  }
 }
 @keyframes shell-dots-breathe {
   0%,
   100% {
-    opacity: 0.5;
+    opacity: 0.55;
   }
   50% {
-    opacity: 0.82;
+    opacity: 0.85;
+  }
+}
+@keyframes shell-dots-shimmer {
+  from {
+    transform: translate3d(-7%, -5%, 0) scale(1.05);
+  }
+  to {
+    transform: translate3d(7%, 5%, 0) scale(1.05);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .shell-bg__dots {
     animation: none;
-    opacity: 0.68;
+    opacity: 0.7;
+  }
+  .shell-bg__dots::after {
+    animation: none;
   }
 }
 .shell-standby > .topbar,

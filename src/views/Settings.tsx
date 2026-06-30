@@ -414,7 +414,28 @@ export function UpdatesInspector() {
           );
         });
       } else if (engineInstalled === true) {
-        await step("Updating the trading engine", () => cmd.stackPullUpdate());
+        // The engine was already installed and running. A failed image refresh
+        // (no newer images, a registry hiccup) does NOT take a running engine
+        // down — so don't alarm with a red error. Only treat it as a real
+        // failure if the engine actually stopped serving; otherwise report it
+        // calmly: nothing is broken.
+        const i = add("Updating the trading engine");
+        try {
+          await cmd.stackPullUpdate();
+          mark(i, "done");
+        } catch (err) {
+          const stillUp = await waitForEngineHealthy(
+            () => cmd.healthcheckNow(),
+            { attempts: 1 },
+          ).catch(() => false);
+          if (stillUp) {
+            log[i].label = "Trading engine — running on the current version";
+            mark(i, "skip");
+          } else {
+            mark(i, "fail");
+            failures.push(`trading engine (${String(err)})`);
+          }
+        }
       }
       // 2. Auracle IDE.
       if (ideUpdate && ide) {
