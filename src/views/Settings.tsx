@@ -317,6 +317,247 @@ function PrefToggle({
   );
 }
 
+// ── Update Auracle — one action for the whole stack ─────────────────
+//
+// The hub's Updates home. A SINGLE "Update Auracle" button brings every
+// piece of the local stack current in one pass: the trading-engine images,
+// the Auracle IDE, and the launcher itself (applied LAST, because the
+// launcher self-update restarts the app). The rows beneath are read-only
+// status — the one button drives all of them, so the panel never shows more
+// than one update control.
+
+type StepState = "run" | "done" | "skip" | "fail";
+
+export function UpdatesInspector() {
+  const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
+  const [engineInstalled, setEngineInstalled] = useState<boolean | null>(null);
+  const [docker, setDocker] = useState<DockerStatus | null | "error">(null);
+  const [launcherVersion, setLauncherVersion] = useState("?");
+  const [launcher, setLauncher] = useState<UpdateInfo | null>(null);
+  const [ide, setIde] = useState<IdeUpdateInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [steps, setSteps] = useState<{ label: string; state: StepState }[]>([]);
+  const [result, setResult] = useState("");
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const [inst, dock, ver, lInfo, iInfo] = await Promise.all([
+      cmd.isInstalled().catch(() => null),
+      cmd.dockerStatus().catch(() => "error" as const),
+      cmd.currentVersion().catch(() => "?"),
+      cmd.checkForUpdate().catch(() => null),
+      cmd.ideCheckUpdate().catch(() => null),
+    ]);
+    setEngineInstalled(inst);
+    setDocker(dock);
+    setLauncherVersion(ver);
+    setLauncher(lInfo);
+    setIde(iInfo);
+    // Every probe failing means there's no Tauri backend — we're running
+    // outside the launcher. Say so plainly instead of faking status.
+    setUnavailable(
+      inst === null && lInfo === null && iInfo === null && dock === "error",
+    );
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const dockerReady =
+    docker !== null && docker !== "error" && docker.installed && docker.running;
+  const launcherUpdate = !!launcher?.available && !!launcher.version;
+  const ideUpdate =
+    !!ide?.update_available && !!ide.asset_url && !ide.unsupported_platform;
+  const engineNeedsInstall = engineInstalled === false;
+  const updateAvailable = launcherUpdate || ideUpdate || engineNeedsInstall;
+
+  const updateAll = useCallback(async () => {
+    setBusy(true);
+    setResult("");
+    const log: { label: string; state: StepState }[] = [];
+    const add = (label: string): number => {
+      log.push({ label, state: "run" });
+      setSteps([...log]);
+      return log.length - 1;
+    };
+    const mark = (i: number, state: StepState) => {
+      log[i].state = state;
+      setSteps([...log]);
+    };
+    try {
+      // 1. Trading-engine images (need Docker).
+      if (!dockerReady) {
+        mark(add("Trading engine — Docker not running"), "skip");
+      } else if (engineInstalled === false) {
+        const i = add("Installing the trading engine");
+        await cmd.runFirstInstall();
+        await waitForEngineHealthy(() => cmd.healthcheckNow()).catch(() => false);
+        mark(i, "done");
+      } else if (engineInstalled === true) {
+        const i = add("Updating the trading engine");
+        await cmd.stackPullUpdate();
+        mark(i, "done");
+      }
+      // 2. Auracle IDE.
+      if (ideUpdate && ide) {
+        const i = add("Updating the Auracle IDE");
+        await cmd.ideDownloadAndInstall(
+          ide.asset_url as string,
+          ide.asset_size ?? null,
+          ide.latest_version ?? "",
+        );
+        mark(i, "done");
+      }
+      // 3. Launcher — LAST: installing it restarts the app.
+      if (launcherUpdate) {
+        mark(add("Updating the launcher — restarting"), "done");
+        await cmd.installUpdate();
+        setResult("Restarting on the new version.");
+        return;
+      }
+      await refresh();
+      setResult(
+        log.some((s) => s.state === "done")
+          ? "Auracle is up to date."
+          : "Already up to date.",
+      );
+    } catch (err) {
+      const msg = String(err);
+      const open = log.findIndex((s) => s.state === "run");
+      if (open >= 0) mark(open, "fail");
+      // The launcher restart races the IPC close — treat as success.
+      if (/closed|connection|communicating|reset/i.test(msg)) {
+        setResult("Restarting on the new version.");
+      } else {
+        setResult("Update failed: " + msg);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [docker, dockerReady, engineInstalled, ide, ideUpdate, launcherUpdate, refresh]);
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Update Auracle</span>
+        {!loading &&
+          !unavailable &&
+          (updateAvailable ? (
+            <span className="chip warn">update available</span>
+          ) : (
+            <span className="chip ok">up to date</span>
+          ))}
+      </div>
+
+      {unavailable ? (
+        <div className="muted fs-xs">
+          Updates are managed by the launcher. Open Auracle from the launcher
+          app to check for and install updates.
+        </div>
+      ) : (
+        <>
+          <div className="muted fs-xs mb-2">
+            One action brings the whole stack current — trading engine, IDE,
+            and launcher.
+          </div>
+
+          <button
+            type="button"
+            className="primary"
+            style={{ width: "100%" }}
+            disabled={loading || busy}
+            onClick={() => void updateAll()}
+          >
+            {busy ? "Updating…" : loading ? "Checking…" : "Update Auracle"}
+          </button>
+
+          {steps.length > 0 && (
+            <div className="mt-2">
+              {steps.map((s, i) => (
+                <div key={i} className="row fs-xs">
+                  <span className="muted">{s.label}</span>
+                  <span
+                    className={s.state === "fail" ? "err-text" : "muted mono"}
+                  >
+                    {s.state === "run"
+                      ? "…"
+                      : s.state === "done"
+                        ? "done"
+                        : s.state === "fail"
+                          ? "failed"
+                          : "skipped"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {result && (
+            <div
+              className={
+                /fail/i.test(result)
+                  ? "err-text fs-xs mt-2"
+                  : "muted fs-xs mt-2"
+              }
+            >
+              {result}
+            </div>
+          )}
+
+          <div style={{ marginTop: 14 }}>
+            <div className="row">
+              <span>Trading engine</span>
+              <span className={`chip ${engineInstalled ? "ok" : "neutral"}`}>
+                {engineInstalled === null
+                  ? "checking"
+                  : engineInstalled
+                    ? "installed"
+                    : "will install"}
+              </span>
+            </div>
+            <div className="row">
+              <span>Docker</span>
+              <DockerChip status={docker} />
+            </div>
+            <div className="row">
+              <span className="hstack">
+                <span>Launcher</span>
+                <span className="muted mono fs-xs">v{launcherVersion}</span>
+              </span>
+              {launcherUpdate ? (
+                <span className="chip warn">v{launcher!.version}</span>
+              ) : (
+                <span className="chip ok">current</span>
+              )}
+            </div>
+            <div className="row">
+              <span className="hstack">
+                <span>Auracle IDE</span>
+                <span className="muted mono fs-xs">
+                  {ide?.installed
+                    ? ide.version_tracked
+                      ? `v${ide.installed_version}`
+                      : "installed"
+                    : "not installed"}
+                </span>
+              </span>
+              {ideUpdate ? (
+                <span className="chip warn">
+                  {ide?.installed ? `v${ide.latest_version}` : "install"}
+                </span>
+              ) : ide?.installed ? (
+                <span className="chip ok">current</span>
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── System (install · docker · launcher updates) ────────────────
 //
 // A slim maintenance strip: install state, the Docker glance chip,
