@@ -563,7 +563,10 @@ mod tests {
 
     #[test]
     fn checksums_match_case_and_whitespace_insensitive() {
-        assert!(checksums_match(SHA256_ABC, &SHA256_ABC.to_ascii_uppercase()));
+        assert!(checksums_match(
+            SHA256_ABC,
+            &SHA256_ABC.to_ascii_uppercase()
+        ));
         assert!(checksums_match(&format!("  {SHA256_ABC}  "), SHA256_ABC));
         let wrong = format!("0{}", &SHA256_ABC[1..]);
         assert!(!checksums_match(SHA256_ABC, &wrong));
@@ -572,14 +575,23 @@ mod tests {
     #[test]
     fn parse_sha256_accepts_bare_sidecar_and_named_line() {
         // Bare digest.
-        assert_eq!(parse_sha256(SHA256_ABC, "install.sh").as_deref(), Some(SHA256_ABC));
+        assert_eq!(
+            parse_sha256(SHA256_ABC, "install.sh").as_deref(),
+            Some(SHA256_ABC)
+        );
         // `sha256sum` style: `<digest>  <file>`.
         let line = format!("{SHA256_ABC}  install.sh\n");
-        assert_eq!(parse_sha256(&line, "install.sh").as_deref(), Some(SHA256_ABC));
+        assert_eq!(
+            parse_sha256(&line, "install.sh").as_deref(),
+            Some(SHA256_ABC)
+        );
         // Combined checksums.txt: prefer the line naming our file.
         let other = "0".repeat(64);
         let combined = format!("{other}  uninstall.sh\n{SHA256_ABC}  install.sh\n");
-        assert_eq!(parse_sha256(&combined, "install.sh").as_deref(), Some(SHA256_ABC));
+        assert_eq!(
+            parse_sha256(&combined, "install.sh").as_deref(),
+            Some(SHA256_ABC)
+        );
     }
 
     #[test]
@@ -600,8 +612,14 @@ mod tests {
         // A sibling whose name merely starts with ours (`install.sh.bak`)
         // must not shadow the genuine `install.sh` line — filename match is
         // whole-token, not substring.
-        let combined = format!("{}  install.sh.bak\n{SHA256_ABC}  install.sh\n", "0".repeat(64));
-        assert_eq!(parse_sha256(&combined, "install.sh").as_deref(), Some(SHA256_ABC));
+        let combined = format!(
+            "{}  install.sh.bak\n{SHA256_ABC}  install.sh\n",
+            "0".repeat(64)
+        );
+        assert_eq!(
+            parse_sha256(&combined, "install.sh").as_deref(),
+            Some(SHA256_ABC)
+        );
     }
 
     // ── Integrity decision: verify-if-available / warn-if-absent / fail-on-mismatch ──
@@ -610,7 +628,10 @@ mod tests {
     fn integrity_no_digest_proceeds_unverified() {
         // No published digest (env unset + sidecars 404) must NOT abort —
         // it preserves today's behavior. The caller logs a warning on this.
-        assert_eq!(integrity_decision(None, b"abc"), IntegrityOutcome::Unverified);
+        assert_eq!(
+            integrity_decision(None, b"abc"),
+            IntegrityOutcome::Unverified
+        );
     }
 
     #[test]
@@ -622,7 +643,10 @@ mod tests {
         );
         // Case/whitespace tolerance carries through.
         assert_eq!(
-            integrity_decision(Some(&format!("  {}  ", SHA256_ABC.to_ascii_uppercase())), b"abc"),
+            integrity_decision(
+                Some(&format!("  {}  ", SHA256_ABC.to_ascii_uppercase())),
+                b"abc"
+            ),
             IntegrityOutcome::Verified
         );
     }

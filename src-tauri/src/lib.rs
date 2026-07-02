@@ -66,11 +66,11 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    auth_device as auth_device_cmd, docker as docker_cmd,
-    engine_auth as engine_auth_cmd, github_auth as github_auth_cmd, healthcheck as health_cmd,
-    ide_update as ide_update_cmd, installer as installer_cmd, keychain as keychain_cmd,
-    preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, settings as settings_cmd,
-    strategy as strategy_cmd, tray as tray_cmd, update as update_cmd, view as view_cmd,
+    auth_device as auth_device_cmd, docker as docker_cmd, engine_auth as engine_auth_cmd,
+    github_auth as github_auth_cmd, healthcheck as health_cmd, ide_update as ide_update_cmd,
+    installer as installer_cmd, keychain as keychain_cmd, preflight as preflight_cmd,
+    scheduled_update as scheduled_update_cmd, settings as settings_cmd, strategy as strategy_cmd,
+    tray as tray_cmd, update as update_cmd, view as view_cmd,
 };
 
 static PANIC_HOOK_INIT: Once = Once::new();
