@@ -30,7 +30,7 @@ jobs:
       # which only exists after `npm run build`. Set up Node + build
       # the frontend so the macro can resolve.
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
@@ -61,7 +61,7 @@ jobs:
       # Same generate_context! constraint as rust-lint — need a
       # frontend dist on disk before the lib test target compiles.
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
