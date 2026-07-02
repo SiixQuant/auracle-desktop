@@ -107,4 +107,12 @@ jobs:
         # without failing the build. Add `--ignore RUSTSEC-XXXX-YYYY`
         # (with rationale) here for any actual CVE we've consciously
         # accepted as not-applicable.
-        run: cargo audit
+        #
+        # RUSTSEC-2026-0194 / RUSTSEC-2026-0195 (quick-xml, 2026-07-02):
+        # attacker-controlled-XML DoS vectors in a crate we only reach
+        # transitively through the tauri toolchain, which pins quick-xml
+        # minors (0.37.x / 0.39.x) below the patched releases — no
+        # semver-compatible fix exists from this repo (`cargo update -p`
+        # locks 0 packages). The launcher never parses untrusted XML.
+        # Remove both ignores when the tauri chain bumps quick-xml.
+        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195
