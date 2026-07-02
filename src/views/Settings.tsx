@@ -30,10 +30,12 @@ import { useSettings } from "@/lib/settings";
 import {
   cmd,
   needsOwnerSetup,
+  onEvent,
   openInBrowser,
   type DockerStatus,
   type HealthSnapshot,
   type IdeUpdateInfo,
+  type IdeUpdateProgressEvent,
   type PreflightReport,
   type UpdateInfo,
 } from "@/lib/tauri";
@@ -437,15 +439,37 @@ export function UpdatesInspector() {
           }
         }
       }
-      // 2. Auracle IDE.
+      // 2. Auracle IDE. The Rust side streams `ide-update-progress`
+      // while the .dmg downloads/installs — surface it live on the row
+      // so a multi-minute download never looks hung.
       if (ideUpdate && ide) {
-        await step("Updating the Auracle IDE", () =>
-          cmd.ideDownloadAndInstall(
+        const i = add("Updating the Auracle IDE");
+        let unlisten: (() => void) | undefined;
+        try {
+          unlisten = await onEvent<IdeUpdateProgressEvent>(
+            "ide-update-progress",
+            (p) => {
+              const pct =
+                p.percent > 0 && p.percent < 100
+                  ? ` (${Math.round(p.percent)}%)`
+                  : "";
+              log[i].label = `Updating the Auracle IDE — ${p.message}${pct}`;
+              setSteps([...log]);
+            },
+          );
+          await cmd.ideDownloadAndInstall(
             ide.asset_url as string,
             ide.asset_size ?? null,
             ide.latest_version ?? "",
-          ),
-        );
+          );
+          log[i].label = "Updating the Auracle IDE";
+          mark(i, "done");
+        } catch (err) {
+          mark(i, "fail");
+          failures.push(`updating the auracle ide (${String(err)})`);
+        } finally {
+          unlisten?.();
+        }
       }
       // 3. Launcher — LAST, and ALWAYS attempted even if an earlier step
       //    failed: installing it restarts the app, and it's what delivers fixes

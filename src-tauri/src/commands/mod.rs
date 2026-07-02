@@ -11,7 +11,6 @@
 //! `log::error!` first.
 
 pub mod auth_device;
-pub mod data_keys;
 pub mod docker;
 pub mod engine_auth;
 pub mod github_auth;

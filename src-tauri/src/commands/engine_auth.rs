@@ -130,9 +130,9 @@ pub async fn engine_needs_setup() -> Result<Option<bool>, String> {
     };
 
     Ok(match resp.status().as_u16() {
-        409 => Some(true),                            // healthy, no owner → needs setup
-        s if (200..300).contains(&s) => Some(false),  // owner exists → ready
-        _ => None,                                    // unexpected → don't block
+        409 => Some(true),                           // healthy, no owner → needs setup
+        s if (200..300).contains(&s) => Some(false), // owner exists → ready
+        _ => None,                                   // unexpected → don't block
     })
 }
 

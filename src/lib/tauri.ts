@@ -200,21 +200,10 @@ export const cmd = {
   stackPullUpdate: () => invoke<void>("stack_pull_update"),
   stackRestartContainer: (name: string) =>
     invoke<void>("stack_restart_container", { name }),
-  /** Force-remove a Docker container by name (whitelisted to the
-   *  bundled IBKR gateway containers). Bypasses compose, so works
-   *  even when the stack's .env is incomplete. */
-  dockerRemoveContainer: (name: string) =>
-    invoke<void>("docker_remove_container", { name }),
-  /** First name from `names` that's currently a running Docker
-   *  container, or null. Used by Broker Connections to detect when
-   *  Houston's bundled gateway would conflict with ibeam. */
-  dockerContainerRunning: (names: string[]) =>
-    invoke<string | null>("docker_container_running", { names }),
 
   // Installer
   isInstalled: () => invoke<boolean>("is_installed"),
   runFirstInstall: () => invoke<void>("run_first_install"),
-  installPath: () => invoke<string>("install_path"),
   preflightCheck: (expectPortsInUse?: boolean) =>
     invoke<PreflightReport>("preflight_check", { expectPortsInUse }),
 
@@ -290,21 +279,6 @@ export const cmd = {
     invoke<SignInResult>("sign_in_verify", { email, code }),
   /** Whether a session credential is cached on this machine. */
   signInStatus: () => invoke<boolean>("sign_in_status"),
-
-  // ── Data-provider API keys ───────────────────────────────────
-  //
-  // Native door for entering third-party DATA keys (Polygon, EODHD,
-  // ...). Both call the engine's keys surface over loopback with the
-  // owner key (on-box handoff) + double-submit CSRF. The key value
-  // rides in the request body only — never a URL, never a log line.
-  /** Save a data-provider key. Rejects with a plain message when the
-   *  engine isn't connected, or when a paid install needs a vault key. */
-  dataKeySave: (provider: string, key: string) =>
-    invoke<void>("data_key_save", { provider, key }),
-  /** Best-effort test of the saved key against the provider's real API.
-   *  Resolves true only when the engine's test actually passed. */
-  dataKeyTest: (provider: string) =>
-    invoke<boolean>("data_key_test", { provider }),
 
   // ── Shared global settings ───────────────────────────────────
   //
