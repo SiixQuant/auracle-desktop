@@ -87,13 +87,6 @@ pub async fn is_installed() -> Result<bool, String> {
     Ok(path.join("docker-compose.yml").exists())
 }
 
-#[tauri::command]
-pub fn install_path() -> Result<String, String> {
-    resolve_install_path()
-        .map(|p| p.to_string_lossy().to_string())
-        .map_err(to_error_string)
-}
-
 /// Per-phase progress event emitted to the frontend during install.
 /// The frontend's onboarding view subscribes via window.__TAURI__.
 /// event.listen('installer-progress', ...) and renders a stepper.

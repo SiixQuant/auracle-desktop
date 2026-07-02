@@ -66,7 +66,7 @@ use std::sync::Once;
 use tauri::Builder;
 
 use commands::{
-    auth_device as auth_device_cmd, data_keys as data_keys_cmd, docker as docker_cmd,
+    auth_device as auth_device_cmd, docker as docker_cmd,
     engine_auth as engine_auth_cmd, github_auth as github_auth_cmd, healthcheck as health_cmd,
     ide_update as ide_update_cmd, installer as installer_cmd, keychain as keychain_cmd,
     preflight as preflight_cmd, scheduled_update as scheduled_update_cmd, settings as settings_cmd,
@@ -281,7 +281,6 @@ pub fn run() {
             // Installer
             installer_cmd::is_installed,
             installer_cmd::run_first_install,
-            installer_cmd::install_path,
             // Pre-flight (T-02): port / disk / Docker / network
             // gates run before run_first_install. Frontend
             // surfaces results and only enables Install when
@@ -325,8 +324,6 @@ pub fn run() {
             // door for saving + testing data-source keys over loopback
             // (owner key handoff + double-submit CSRF). Powers the
             // Settings Data sources card.
-            data_keys_cmd::data_key_save,
-            data_keys_cmd::data_key_test,
             // Shared global settings — one coherent read/write of the
             // engine's owner-gated aggregate (AI model, prefs, tier,
             // configured flags). Keeps the launcher + IDE in sync.
@@ -338,8 +335,6 @@ pub fn run() {
             // Force-remove a bundled IBKR gateway container off port 5000
             // (bypasses compose so it works even when the stack's .env is
             // incomplete), and a lightweight running-container probe.
-            docker_cmd::docker_remove_container,
-            docker_cmd::docker_container_running,
         ]);
 
     // STEP 3: run the event loop. If this panics, the panic hook
