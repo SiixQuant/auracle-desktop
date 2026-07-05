@@ -293,6 +293,11 @@ export const cmd = {
     invoke<SignInResult>("sign_in_verify", { email, code }),
   /** Whether a session credential is cached on this machine. */
   signInStatus: () => invoke<boolean>("sign_in_status"),
+  /** The engine's shared hosted-sign-in session — read by both apps. */
+  clerkSession: () =>
+    invoke<{ signed_in: boolean; email: string | null; tier: string | null }>(
+      "clerk_session",
+    ),
 
   // ── Shared global settings ───────────────────────────────────
   //
@@ -584,6 +589,15 @@ export const ENGINE_SETUP_URL = "http://127.0.0.1:1969/ui/setup";
 
 export async function openEngineSetup(): Promise<void> {
   return openInBrowser(ENGINE_SETUP_URL);
+}
+
+/** The engine's hosted sign-in. Opening this runs the whole OAuth+PKCE dance
+ *  in the browser and persists the shared session; the app then polls
+ *  cmd.clerkSession(). */
+export const ENGINE_CLERK_START_URL = "http://127.0.0.1:1969/auth/clerk/start";
+
+export async function openClerkSignIn(): Promise<void> {
+  return openInBrowser(ENGINE_CLERK_START_URL);
 }
 
 /** True when an error is the "no on-box owner account" / "connect-sign-in"

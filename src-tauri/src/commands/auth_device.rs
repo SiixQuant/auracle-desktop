@@ -217,6 +217,45 @@ pub fn sign_in_status(app: AppHandle) -> Result<bool, String> {
     Ok(secret_store::get(&app, REFRESH_TOKEN_KEY)?.is_some())
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ClerkSession {
+    #[serde(default)]
+    pub signed_in: bool,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub tier: Option<String>,
+}
+
+/// Read the engine's shared hosted-sign-in session — the one BOTH the IDE and
+/// the launcher read (sign in on either, and the other reflects it). The
+/// browser runs the sign-in against `GET /auth/clerk/start`; here we just poll
+/// the resulting session. Returns signed-out on any transport error so the
+/// screen degrades rather than blocks.
+#[tauri::command]
+pub async fn clerk_session() -> Result<ClerkSession, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(to_error_string)?;
+
+    let response = client
+        .get(format!("{ENGINE_BASE}/auth/session"))
+        .send()
+        .await
+        .map_err(to_error_string)?;
+
+    if !response.status().is_success() {
+        return Ok(ClerkSession {
+            signed_in: false,
+            email: None,
+            tier: None,
+        });
+    }
+
+    response.json().await.map_err(to_error_string)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
