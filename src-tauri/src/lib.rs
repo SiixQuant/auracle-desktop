@@ -321,6 +321,7 @@ pub fn run() {
             auth_device_cmd::sign_in_start,
             auth_device_cmd::sign_in_verify,
             auth_device_cmd::sign_in_status,
+            auth_device_cmd::clerk_session,
             // Data-provider API keys (Polygon, EODHD, ...). Native
             // door for saving + testing data-source keys over loopback
             // (owner key handoff + double-submit CSRF). Powers the
