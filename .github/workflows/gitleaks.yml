@@ -26,6 +26,10 @@ on:
 
 permissions:
   contents: read
+  # gitleaks-action lists the PR's commits to pick its scan range and
+  # (with GITLEAKS_ENABLE_COMMENTS) comments findings on the PR; without
+  # this the action 403s on pull_request events before scanning.
+  pull-requests: write
 
 jobs:
   scan:
