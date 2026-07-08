@@ -4,6 +4,13 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.27]
+
+Sign in comes home.
+
+### Fixed
+- **Continue with Google is back.** The hosted sign-in (via the shared engine session both the launcher and the IDE read) had never reached a released build; it does now.
+
 ## [0.8.26]
 
 The update waits its turn.
