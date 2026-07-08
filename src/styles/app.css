@@ -1570,6 +1570,13 @@ table.data-table {
   font-weight: 500;
   letter-spacing: 0.02em;
 }
+/* The orbital brand mark — bright so it reads over the dimmed wordmark. */
+.topbar__mark {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--fg);
+}
 .topbar__actions { display: flex; align-items: center; gap: 4px; }
 .topbar__btn {
   display: inline-flex;
