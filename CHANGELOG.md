@@ -4,6 +4,10 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.26]
+
+The update waits its turn.
+
 ### Fixed
 - **Update Auracle** never replaces the IDE while the IDE is open anymore. If it's running when an update pass starts, the launcher asks first — then closes it cleanly right before the swap and reopens it on the new version once the update lands. If it can't be closed, the update stops with the installed app untouched. (A running app loads pieces of its bundle as it goes; swapping the bundle underneath it corrupts what it loads next.)
 
