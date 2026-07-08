@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { AuracleGlyph } from "@/components/AuracleGlyph";
 import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect";
 
 // The animated dot-matrix backdrop lives in canvas-reveal-effect.tsx so the
@@ -21,12 +22,7 @@ interface SignInPageProps {
 function AuracleMark() {
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5">
-      <div className="relative w-5 h-5 flex items-center justify-center">
-        <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 top-0 left-1/2 -translate-x-1/2 opacity-80" />
-        <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 left-0 top-1/2 -translate-y-1/2 opacity-80" />
-        <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 right-0 top-1/2 -translate-y-1/2 opacity-80" />
-        <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 bottom-0 left-1/2 -translate-x-1/2 opacity-80" />
-      </div>
+      <AuracleGlyph className="w-6 h-6 text-white/90" />
       <span className="text-sm font-semibold tracking-wide text-white/90">
         Auracle
       </span>
