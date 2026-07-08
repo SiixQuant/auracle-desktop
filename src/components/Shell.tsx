@@ -9,9 +9,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { AuracleGlyph } from "@/components/AuracleGlyph";
 import Coachmark, { coachSeen } from "@/components/Coachmark";
 import CommandPalette from "@/components/CommandPalette";
-import Flame from "@/components/Flame";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
 import ShellBackground from "@/components/ShellBackground";
 import StandbyHome from "@/components/StandbyHome";
@@ -173,7 +173,7 @@ export default function Shell({
       <ShellBackground />
       <header className="topbar">
         <div className="topbar__brand">
-          <Flame size={20} />
+          <AuracleGlyph className="topbar__mark" />
           <strong>Auracle</strong>
         </div>
         <div className="topbar__actions">
