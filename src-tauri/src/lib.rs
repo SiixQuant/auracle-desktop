@@ -305,10 +305,13 @@ pub fn run() {
             // single update conduit (the IDE no longer self-updates). The
             // check is an unauthenticated GitHub Releases query; the install
             // streams the .dmg, mounts it, and swaps the .app into
-            // /Applications. macOS aarch64 only; other platforms report
-            // honestly. See commands/ide_update.rs.
+            // /Applications — never under a live IDE process (`ide_running`
+            // backs the UI's close-the-IDE consent prompt). macOS aarch64
+            // only; other platforms report honestly. See
+            // commands/ide_update.rs.
             ide_update_cmd::ide_check_update,
             ide_update_cmd::ide_download_and_install,
+            ide_update_cmd::ide_running,
             // "Sign in with GitHub" via the OAuth device flow — the
             // user's own GitHub for git push/pull, stored in the system
             // git credential helper. See commands/github_auth.rs. The

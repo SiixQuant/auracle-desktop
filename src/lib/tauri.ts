@@ -247,17 +247,31 @@ export const cmd = {
    *  and rejects on a mismatch. Returns the installed version on success;
    *  rejects with a plain message (incl. a drag-install hint on
    *  permission-denied). Subscribe to 'ide-update-progress' for progress
-   *  while this runs. */
+   *  while this runs.
+   *
+   *  The bundle is NEVER swapped underneath a running IDE: `quitRunning`
+   *  is the user's consent (gathered via `ideRunning` + the Updates
+   *  card's banner) for the installer to close a live IDE right before
+   *  the swap and reopen the new bundle after. Without it, an install
+   *  that finds the IDE open at swap time rejects with a plain message
+   *  and leaves the installed app untouched. */
   ideDownloadAndInstall: (
     assetUrl: string,
     expectedSize: number | null | undefined,
     version: string,
+    quitRunning: boolean,
   ) =>
     invoke<string>("ide_download_and_install", {
       assetUrl,
       expectedSize: expectedSize ?? null,
       version,
+      quitRunning,
     }),
+  /** True iff a process is currently running out of the installed IDE
+   *  bundle. Matched by executable path on the Rust side — never by app
+   *  name, which another bundle can share. Advisory (ask before the
+   *  pass); the installer re-checks at swap time regardless. */
+  ideRunning: () => invoke<boolean>("ide_running"),
 
   // ── GitHub device-flow sign-in ────────────────────────────────
   //
