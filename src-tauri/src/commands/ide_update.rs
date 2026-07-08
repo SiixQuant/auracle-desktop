@@ -25,19 +25,33 @@
 //!      mounted. A missing/unfetchable checksum is treated as a failure,
 //!      not a skip: we never install something we can't verify.
 //!   3. `hdiutil attach -nobrowse` to mount it read-only.
-//!   4. Copy the `.app` into `/Applications`, replacing the old one —
-//!      and only AFTER the copy succeeds is the old bundle gone (we
-//!      copy to a staging name, swap, then remove). We never delete
-//!      the running app before the replacement is in place.
-//!   5. `hdiutil detach` to unmount, regardless of copy result.
+//!   4. Copy the `.app` to a staging name inside `/Applications`.
+//!   5. Gate on a quiet bundle, then swap: no process may be running
+//!      out of the installed app at the moment it's replaced (see the
+//!      running-instance guard below). Without consent to close a
+//!      running IDE the install stops here — old bundle untouched.
+//!      With consent, the IDE is closed first, then staging swaps into
+//!      place and the old bundle is removed.
+//!   6. `hdiutil detach` to unmount, regardless of copy result.
 //!
 //! NO SUDO: copying into `/Applications` works for the common
 //! user-writable install. If the OS denies the write (a locked-down
 //! `/Applications`), we return a plain message telling the user to
 //! drag-install — we never silently fail and never fabricate success.
 //!
-//! WE NEVER AUTO-LAUNCH THE IDE from here. Installing is the whole job;
-//! opening the IDE stays an explicit user action (see `view.rs`).
+//! THE SWAP NEVER HAPPENS UNDER A LIVE IDE. The app loads pieces of its
+//! bundle lazily while it runs, so replacing the bundle underneath a
+//! running instance corrupts what that instance loads next. Detection is
+//! strictly by executable path under the installed bundle — never by
+//! process or display name, which an unrelated bundle elsewhere on the
+//! disk can share.
+//!
+//! WE NEVER AUTO-LAUNCH THE IDE from here, with one deliberate
+//! exception: when the updater itself closed a running IDE (with the
+//! user's consent) to apply the swap, it reopens the new bundle after —
+//! restoring what the user already had, never opening something new.
+//! Fresh installs still leave opening the IDE to an explicit user
+//! action (see `view.rs`).
 
 // `Path` is used on every platform (the download dest + the non-macOS
 // install stub); `PathBuf` is only needed in the macOS install path, so
@@ -72,6 +86,17 @@ const TAG_PREFIX: &str = "auracle-v";
 /// dead-code warning on other targets.
 #[cfg(target_os = "macos")]
 const INSTALLED_APP: &str = "/Applications/Auracle IDE.app";
+
+/// How long a running IDE gets to quit cleanly (flush state, close its
+/// windows) after a TERM before the updater escalates. Electron-family
+/// apps treat TERM as a normal quit, so this is usually over in well
+/// under a second.
+#[cfg(target_os = "macos")]
+const GRACEFUL_QUIT_TIMEOUT_SECS: u64 = 10;
+/// How long to wait after a KILL for the process table to show the
+/// bundle quiet before giving up (and aborting the swap).
+#[cfg(target_os = "macos")]
+const FORCE_QUIT_TIMEOUT_SECS: u64 = 3;
 
 const HTTP_TIMEOUT_SECS: u64 = 20;
 /// Generous ceiling for the streamed download — the asset is ~90 MB;
@@ -274,6 +299,178 @@ fn bundle_present() -> bool {
     false
 }
 
+// ── Running-instance guard ──────────────────────────────────────────
+//
+// The installed bundle must be QUIET (no process running out of it)
+// at the moment it's replaced. Matching is by executable path under
+// the bundle, never by process/app display name — another bundle on
+// the same disk can carry an identical name, and killing (or sparing)
+// by name would hit the wrong app.
+
+/// Parse `ps -axo pid=,comm=` output into the processes whose
+/// executable lives inside `bundle`. Returns `(pid, is_main)` pairs;
+/// `is_main` is true for the bundle's top-level executable (directly in
+/// `Contents/MacOS/`), false for helpers nested deeper inside it.
+/// Tolerates ps's right-aligned pid column and paths with spaces.
+#[cfg(any(target_os = "macos", test))]
+fn parse_bundle_pids(ps_output: &str, bundle: &str) -> Vec<(u32, bool)> {
+    let bundle = bundle.trim_end_matches('/');
+    let prefix = format!("{bundle}/");
+    let main_dir = format!("{bundle}/Contents/MacOS/");
+    let mut pids = Vec::new();
+    for line in ps_output.lines() {
+        let Some((pid_str, comm)) = line.trim_start().split_once(char::is_whitespace) else {
+            continue;
+        };
+        let Ok(pid) = pid_str.parse::<u32>() else {
+            continue;
+        };
+        let comm = comm.trim();
+        if !comm.starts_with(prefix.as_str()) {
+            continue;
+        }
+        let is_main = comm
+            .strip_prefix(main_dir.as_str())
+            .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'));
+        pids.push((pid, is_main));
+    }
+    pids
+}
+
+/// Enumerate live processes running out of the installed IDE bundle.
+/// Errors when the process table itself can't be read — callers must
+/// treat that as "unknown", never as "not running".
+#[cfg(target_os = "macos")]
+fn running_ide_processes() -> Result<Vec<(u32, bool)>, String> {
+    // Absolute binary path: the launcher can be spawned from Finder
+    // with a minimal PATH, so never rely on lookup.
+    let out = std::process::Command::new("/bin/ps")
+        .args(["-axo", "pid=,comm="])
+        .output()
+        .map_err(|e| format!("Couldn't inspect running processes: {e}"))?;
+    if !out.status.success() {
+        return Err("Couldn't inspect running processes.".to_string());
+    }
+    Ok(parse_bundle_pids(
+        &String::from_utf8_lossy(&out.stdout),
+        INSTALLED_APP,
+    ))
+}
+
+/// Poll until no process is left running out of the installed bundle,
+/// up to `timeout`. True = proven quiet. A process-table read error
+/// keeps waiting — only a clean empty read counts as quiet.
+#[cfg(target_os = "macos")]
+fn wait_for_ide_exit(timeout: std::time::Duration) -> bool {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        if matches!(running_ide_processes(), Ok(p) if p.is_empty()) {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+}
+
+/// Send one signal to each pid. `/bin/kill` by absolute path, argv only
+/// — the pids are integers we parsed ourselves, and nothing shells out.
+#[cfg(target_os = "macos")]
+fn signal_pids(pids: &[u32], sig: &str) {
+    for pid in pids {
+        let _ = std::process::Command::new("/bin/kill")
+            .arg(sig)
+            .arg(pid.to_string())
+            .output();
+    }
+}
+
+/// Gate the bundle swap on the IDE being closed.
+///
+/// `Ok(false)` — nothing was running; swap freely. `Ok(true)` — a
+/// running instance was closed under `quit_running` consent (the caller
+/// reopens the new bundle after the swap). `Err` — the IDE is, or may
+/// still be, live: the caller must NOT touch the installed bundle.
+///
+/// Closing is TERM first (a normal quit, so the app runs its shutdown),
+/// a bounded wait, then KILL for anything that ignored it — the user's
+/// consent was to "close the IDE", and leaving a half-alive process to
+/// read a swapped bundle is the one outcome this module exists to
+/// prevent. No clean "bundle is quiet" read → no swap, ever.
+#[cfg(target_os = "macos")]
+fn ensure_ide_not_running(app: &AppHandle, quit_running: bool) -> Result<bool, String> {
+    let procs = running_ide_processes()?;
+    if procs.is_empty() {
+        return Ok(false);
+    }
+    if !quit_running {
+        return Err(
+            "The Auracle IDE is open, so the update stopped before touching \
+             it. Close the IDE (or let the updater close it) and update \
+             again."
+                .to_string(),
+        );
+    }
+    emit(app, "installing", "Closing the Auracle IDE…", 97);
+    // Signal the top-level process(es); helpers exit with their parent.
+    // If only helpers are left (a torn-down instance), signal those.
+    let mains: Vec<u32> = procs
+        .iter()
+        .filter(|(_, is_main)| *is_main)
+        .map(|(pid, _)| *pid)
+        .collect();
+    let targets: Vec<u32> = if mains.is_empty() {
+        procs.iter().map(|(pid, _)| *pid).collect()
+    } else {
+        mains
+    };
+    signal_pids(&targets, "-TERM");
+    if wait_for_ide_exit(std::time::Duration::from_secs(GRACEFUL_QUIT_TIMEOUT_SECS)) {
+        return Ok(true);
+    }
+    // Past the gracious window — force-quit whatever is left rather than
+    // swap underneath it.
+    if let Ok(remaining) = running_ide_processes() {
+        let leftover: Vec<u32> = remaining.iter().map(|(pid, _)| *pid).collect();
+        signal_pids(&leftover, "-KILL");
+    }
+    if wait_for_ide_exit(std::time::Duration::from_secs(FORCE_QUIT_TIMEOUT_SECS)) {
+        return Ok(true);
+    }
+    Err(
+        "Couldn't close the running Auracle IDE, so the installed app was \
+         left untouched. Quit the IDE manually and run the update again."
+            .to_string(),
+    )
+}
+
+/// Reopen the installed bundle after a swap that had to close a running
+/// instance — the user was in the app, so put them back into the new
+/// one. By absolute bundle path (the mirror of the detection rule:
+/// never by app name). Best-effort: the install already succeeded, so a
+/// failed reopen only logs.
+#[cfg(target_os = "macos")]
+fn relaunch_ide(app: &AppHandle) {
+    emit(app, "installing", "Reopening the Auracle IDE…", 99);
+    match std::process::Command::new("/usr/bin/open")
+        .arg(INSTALLED_APP)
+        .output()
+    {
+        Ok(out) if out.status.success() => {}
+        Ok(out) => log::warn!(
+            "IDE relaunch after update failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        ),
+        Err(e) => log::warn!("IDE relaunch after update failed: {e}"),
+    }
+}
+
+/// Non-macOS stub — the platform guard keeps the install path (and so a
+/// relaunch) from ever being reached, but the call site must compile.
+#[cfg(not(target_os = "macos"))]
+fn relaunch_ide(_app: &AppHandle) {}
+
 // ── HTTP ────────────────────────────────────────────────────────────
 
 fn http_client(timeout_secs: u64) -> Result<reqwest::Client, String> {
@@ -440,12 +637,20 @@ pub async fn ide_check_update() -> Result<IdeUpdateInfo, String> {
 /// Returns the installed version string on success. On any failure
 /// returns a plain message — and on a permission-denied copy into
 /// `/Applications` the message tells the user to drag-install instead.
+///
+/// `quit_running` is the UI's consent to close a running IDE: when true
+/// and a process is running out of the installed bundle at swap time,
+/// the installer closes it (TERM, bounded wait, KILL as the last
+/// resort), swaps, then reopens the new bundle. When absent/false the
+/// install REFUSES to swap under a live IDE and returns a plain message
+/// — the bundle is never replaced underneath a running instance.
 #[tauri::command]
 pub async fn ide_download_and_install(
     app: AppHandle,
     asset_url: String,
     expected_size: Option<u64>,
     version: String,
+    quit_running: Option<bool>,
 ) -> Result<String, String> {
     if !is_supported_platform() {
         return Err(
@@ -474,7 +679,7 @@ pub async fn ide_download_and_install(
     // tampered image must never reach hdiutil or `/Applications`.
     let result = match downloaded {
         Ok(()) => match verify_checksum(&app, &asset_url, &dmg_path).await {
-            Ok(()) => install_dmg(&app, &dmg_path).await,
+            Ok(()) => install_dmg(&app, &dmg_path, quit_running.unwrap_or(false)).await,
             Err(e) => Err(e),
         },
         Err(e) => Err(e),
@@ -485,14 +690,23 @@ pub async fn ide_download_and_install(
     let _ = std::fs::remove_file(&dmg_path);
 
     match result {
-        Ok(_bundle_ver) => {
+        Ok((_bundle_ver, was_running)) => {
             // Record the Auracle release we installed — the source of truth
             // for future checks (the bundle's own version is upstream's).
             write_version_marker(&version);
+            // Put the user back where they were: reopen the (new) IDE iff
+            // the updater itself closed a running one to do the swap.
+            if was_running {
+                relaunch_ide(&app);
+            }
             emit(
                 &app,
                 "done",
-                &format!("Auracle IDE {version} installed."),
+                &if was_running {
+                    format!("Auracle IDE {version} installed — reopening it.")
+                } else {
+                    format!("Auracle IDE {version} installed.")
+                },
                 100,
             );
             Ok(version)
@@ -501,6 +715,27 @@ pub async fn ide_download_and_install(
             emit(&app, "error", &e, 0);
             Err(e)
         }
+    }
+}
+
+/// True iff a process is currently running out of the installed IDE
+/// bundle — matched strictly by executable path, never by name. The UI
+/// asks for consent BEFORE an update pass that will replace the bundle;
+/// the install re-checks at swap time regardless, so this is advisory
+/// (a race here fails the install honestly, it can't corrupt anything).
+/// A process-table read error reads as `false` for the same reason: the
+/// swap-time guard is the enforcement point.
+#[tauri::command]
+pub async fn ide_running() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        running_ide_processes()
+            .map(|procs| !procs.is_empty())
+            .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
     }
 }
 
@@ -807,10 +1042,17 @@ fn to_hex(bytes: &[u8]) -> String {
 }
 
 /// Mount the `.dmg`, copy the `.app` into `/Applications` (swapping the
-/// old one in place — never deleting it before the new one is staged),
-/// then unmount. macOS-only — the caller guards the platform.
+/// old one in place — never deleting it before the new one is staged,
+/// and never swapping under a live IDE process), then unmount. Returns
+/// the new bundle's version plus whether a running IDE was closed for
+/// the swap (→ the caller relaunches it). macOS-only — the caller
+/// guards the platform.
 #[cfg(target_os = "macos")]
-async fn install_dmg(app: &AppHandle, dmg_path: &Path) -> Result<String, String> {
+async fn install_dmg(
+    app: &AppHandle,
+    dmg_path: &Path,
+    quit_running: bool,
+) -> Result<(String, bool), String> {
     use std::process::Command;
 
     emit(app, "installing", "Mounting the disk image…", 92);
@@ -844,7 +1086,7 @@ async fn install_dmg(app: &AppHandle, dmg_path: &Path) -> Result<String, String>
     }
 
     // Everything after a successful attach must detach on the way out.
-    let install_result = copy_app_from_mount(app, &mount_point);
+    let install_result = copy_app_from_mount(app, &mount_point, quit_running);
 
     // 2. Always detach, even if the copy failed.
     emit(app, "installing", "Cleaning up…", 98);
@@ -860,10 +1102,16 @@ async fn install_dmg(app: &AppHandle, dmg_path: &Path) -> Result<String, String>
 
 /// Find the `.app` inside the mounted image and place it in
 /// `/Applications`. Copies to a staging path first, then atomically
-/// swaps so the running app is never deleted before its replacement is
-/// fully in place.
+/// swaps — and the swap itself is gated on no process running out of
+/// the installed bundle (closing one first only under `quit_running`
+/// consent). Returns the new bundle's version and whether a running IDE
+/// was closed to make way (the caller reopens it after).
 #[cfg(target_os = "macos")]
-fn copy_app_from_mount(app: &AppHandle, mount_point: &Path) -> Result<String, String> {
+fn copy_app_from_mount(
+    app: &AppHandle,
+    mount_point: &Path,
+    quit_running: bool,
+) -> Result<(String, bool), String> {
     use std::path::PathBuf;
     use std::process::Command;
 
@@ -915,6 +1163,19 @@ fn copy_app_from_mount(app: &AppHandle, mount_point: &Path) -> Result<String, St
         return Err("Couldn't copy the IDE into Applications. Try again.".to_string());
     }
 
+    // Gate the swap on a quiet bundle: never rename the installed app
+    // while a process is still running out of it (the app loads pieces
+    // of its bundle lazily at runtime — swapping underneath a live
+    // instance corrupts what it loads next). This is the last moment we
+    // can stop with nothing at the destination touched.
+    let was_running = match ensure_ide_not_running(app, quit_running) {
+        Ok(closed) => closed,
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(e);
+        }
+    };
+
     // Swap: move the old app aside, move staging into place, then remove
     // the old one. The destination is only ever empty for the instant
     // between the two renames — and if the second rename fails we
@@ -949,7 +1210,7 @@ fn copy_app_from_mount(app: &AppHandle, mount_point: &Path) -> Result<String, St
     // New app is in place — remove the old one (best-effort).
     let _ = std::fs::remove_dir_all(&backup);
 
-    Ok(new_version)
+    Ok((new_version, was_running))
 }
 
 /// Find the single `.app` bundle at the top level of a mounted image.
@@ -1004,7 +1265,11 @@ fn is_permission_error(msg: &str) -> bool {
 /// `ide_download_and_install` prevents this from being reached, but the
 /// function must exist for the code to compile on other targets.
 #[cfg(not(target_os = "macos"))]
-async fn install_dmg(_app: &AppHandle, _dmg_path: &Path) -> Result<String, String> {
+async fn install_dmg(
+    _app: &AppHandle,
+    _dmg_path: &Path,
+    _quit_running: bool,
+) -> Result<(String, bool), String> {
     Err("Automatic IDE install is only available on macOS.".to_string())
 }
 
@@ -1386,5 +1651,53 @@ mod tests {
         let actual_bad = compute_file_sha256(&bad).expect("hash");
         let _ = std::fs::remove_file(&bad);
         assert!(!checksums_match(&expected, &actual_bad));
+    }
+
+    // ── Running-instance guard ──────────────────────────────────────
+
+    const BUNDLE: &str = "/Applications/Auracle IDE.app";
+
+    #[test]
+    fn bundle_pids_match_by_executable_path_only() {
+        // Real-world shape of `ps -axo pid=,comm=`: right-aligned pids,
+        // full executable paths (with spaces), one per line. Includes
+        // the two lookalikes that MUST NOT match: a different bundle
+        // whose executable carries the same display name, and a
+        // same-named bundle under another directory tree.
+        let ps = "  101 /usr/libexec/trustd\n\
+                  912 /Applications/Auracle IDE.app/Contents/MacOS/Auracle IDE\n\
+                  913 /Applications/Auracle IDE.app/Contents/Frameworks/Auracle IDE Helper (Renderer).app/Contents/MacOS/Auracle IDE Helper (Renderer)\n\
+                 1201 /Applications/Zed.app/Contents/MacOS/Auracle IDE\n\
+                 1300 /Users/u/Applications/Auracle IDE.app/Contents/MacOS/Auracle IDE\n";
+        assert_eq!(
+            parse_bundle_pids(ps, BUNDLE),
+            vec![(912, true), (913, false)]
+        );
+    }
+
+    #[test]
+    fn bundle_pids_flag_only_top_level_executables_as_main() {
+        // Helpers live deeper than Contents/MacOS — never "main", so
+        // TERM targets the parent and lets it take its helpers down.
+        let ps = "  10 /Applications/Auracle IDE.app/Contents/Frameworks/Auracle IDE Helper (GPU).app/Contents/MacOS/Auracle IDE Helper (GPU)\n\
+                  11 /Applications/Auracle IDE.app/Contents/MacOS/Auracle IDE\n";
+        assert_eq!(parse_bundle_pids(ps, BUNDLE), vec![(10, false), (11, true)]);
+    }
+
+    #[test]
+    fn bundle_pids_skip_garbage_and_near_misses() {
+        // Unparseable lines, a bare-bundle-path comm (no inner
+        // executable), and a path that merely shares the prefix string
+        // without the directory separator are all ignored.
+        let ps = "not-a-pid /Applications/Auracle IDE.app/Contents/MacOS/Auracle IDE\n\
+                  \n\
+                  55 /Applications/Auracle IDE.app\n\
+                  56 /Applications/Auracle IDE.appendix/bin/tool\n";
+        assert_eq!(parse_bundle_pids(ps, BUNDLE), vec![]);
+    }
+
+    #[test]
+    fn bundle_pids_empty_input_is_quiet() {
+        assert_eq!(parse_bundle_pids("", BUNDLE), vec![]);
     }
 }

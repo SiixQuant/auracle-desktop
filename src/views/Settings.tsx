@@ -340,6 +340,10 @@ export function UpdatesInspector() {
   const [steps, setSteps] = useState<{ label: string; state: StepState }[]>([]);
   const [result, setResult] = useState("");
   const [resultErr, setResultErr] = useState(false);
+  // Armed consent banner: the pending pass would replace the IDE bundle
+  // while the IDE is OPEN, so it may only proceed once the user okays
+  // closing (and reopening) it. See startUpdate.
+  const [ideConsent, setIdeConsent] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -375,7 +379,11 @@ export function UpdatesInspector() {
   const engineNeedsInstall = engineInstalled === false;
   const updateAvailable = launcherUpdate || ideUpdate || engineNeedsInstall;
 
-  const updateAll = useCallback(async () => {
+  // `quitIde` is the user's consent (gathered by startUpdate's banner)
+  // for the IDE step to close a running IDE right before the bundle
+  // swap and reopen it after. It is never inferred — only the banner's
+  // explicit confirm passes true.
+  const updateAll = useCallback(async (quitIde: boolean) => {
     setBusy(true);
     setResult("");
     setResultErr(false);
@@ -461,6 +469,7 @@ export function UpdatesInspector() {
             ide.asset_url as string,
             ide.asset_size ?? null,
             ide.latest_version ?? "",
+            quitIde,
           );
           log[i].label = "Updating the Auracle IDE";
           mark(i, "done");
@@ -509,6 +518,20 @@ export function UpdatesInspector() {
     }
   }, [docker, dockerReady, engineInstalled, ide, ideUpdate, launcherUpdate, refresh]);
 
+  // The IDE step replaces the app bundle in /Applications — never under
+  // a live process. If the IDE is open right now, arm an explicit
+  // consent banner instead of starting; the pass runs with quit consent
+  // only from the banner's confirm. (The Rust side re-checks at swap
+  // time regardless, so a race here fails that step honestly instead of
+  // swapping under a running IDE.)
+  const startUpdate = useCallback(async () => {
+    if (ideUpdate && (await cmd.ideRunning().catch(() => false))) {
+      setIdeConsent(true);
+      return;
+    }
+    await updateAll(false);
+  }, [ideUpdate, updateAll]);
+
   return (
     <div className="card">
       <div className="card-head">
@@ -538,11 +561,37 @@ export function UpdatesInspector() {
             type="button"
             className="primary"
             style={{ width: "100%" }}
-            disabled={loading || busy}
-            onClick={() => void updateAll()}
+            disabled={loading || busy || ideConsent}
+            onClick={() => void startUpdate()}
           >
             {busy ? "Updating…" : loading ? "Checking…" : "Update Auracle"}
           </button>
+
+          {ideConsent && (
+            <div className="banner warn hstack mt-2">
+              <span style={{ flex: 1 }}>
+                <strong>The Auracle IDE is open.</strong> Updating closes it,
+                installs the new version, then reopens it.
+              </span>
+              <button
+                type="button"
+                className="ghost danger btn-sm"
+                onClick={() => {
+                  setIdeConsent(false);
+                  void updateAll(true);
+                }}
+              >
+                Close IDE &amp; update
+              </button>
+              <button
+                type="button"
+                className="ghost btn-sm"
+                onClick={() => setIdeConsent(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
 
           {steps.length > 0 && (
             <div className="mt-2">
