@@ -12,6 +12,10 @@ interface SignInPageProps {
   className?: string;
   /** Called once the user finishes the flow ("Continue to Auracle"). */
   onComplete?: () => void;
+  /** Continue with Google — open the engine's hosted sign-in in the browser. */
+  onGoogleSignIn?: () => void;
+  /** True while waiting for the browser sign-in to complete. */
+  googleWaiting?: boolean;
   /** Email step — ask the engine to email a 6-digit sign-in code. */
   onRequestCode?: (email: string) => Promise<void> | void;
   /** Code step — verify the entered code. Resolve with the outcome
@@ -43,6 +47,8 @@ function AuracleMark() {
 export const SignInPage = ({
   className,
   onComplete,
+  onGoogleSignIn,
+  googleWaiting,
   onRequestCode,
   onVerifyCode,
 }: SignInPageProps) => {
@@ -238,6 +244,30 @@ export const SignInPage = ({
                     </div>
 
                     <div className="space-y-4">
+                      {onGoogleSignIn && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onGoogleSignIn()}
+                            disabled={googleWaiting}
+                            className="w-full backdrop-blur-[1px] text-white border border-white/15 bg-white/10 hover:bg-white/20 rounded-full py-3 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {googleWaiting
+                              ? "Waiting for browser sign-in…"
+                              : "Continue with Google"}
+                          </button>
+                          {googleWaiting && (
+                            <p className="text-xs text-white/50">
+                              Finish signing in in your browser, then return here.
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 text-white/40">
+                            <span className="h-px flex-1 bg-white/15" />
+                            <span className="text-xs">or with email</span>
+                            <span className="h-px flex-1 bg-white/15" />
+                          </div>
+                        </>
+                      )}
                       <form onSubmit={handleEmailSubmit}>
                         <div className="relative">
                           <input

@@ -8,13 +8,13 @@
 //   3. Drive the first-run Tutorial (once, gated on localStorage),
 //      re-openable from the Shell's Help control.
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import Shell from "@/components/Shell";
 import Tutorial from "@/components/Tutorial";
 import { needsOnboarding as shouldOnboard } from "@/lib/onboarding";
 import { SettingsProvider } from "@/lib/settings";
-import { cmd } from "@/lib/tauri";
+import { cmd, openClerkSignIn } from "@/lib/tauri";
 import Onboarding from "@/views/Onboarding";
 
 // Lazy so the WebGL/animation deps (three, @react-three/fiber, framer-motion)
@@ -40,10 +40,12 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        // Signed in iff a session credential is cached on this machine.
+        // Signed in iff a session credential is cached on this machine, OR the
+        // engine already holds a hosted sign-in session (e.g. done in the IDE).
         const hasSession = await cmd.signInStatus().catch(() => false);
+        const clerk = hasSession ? null : await cmd.clerkSession().catch(() => null);
         if (cancelled) return;
-        if (hasSession) setSignedIn(true);
+        if (hasSession || clerk?.signed_in) setSignedIn(true);
 
         const installed = await cmd.isInstalled();
         if (cancelled) return;
@@ -96,6 +98,50 @@ export default function App() {
     setSignedIn(true);
   };
 
+  // Continue with Google: the engine opens its hosted sign-in in the browser
+  // and persists the shared session; we poll it until it appears, then reveal
+  // the app. The engine (or the IDE) may complete it — either way we see it.
+  const [googleWaiting, setGoogleWaiting] = useState(false);
+  const googlePoll = useRef<number | null>(null);
+
+  const startGoogleSignIn = async () => {
+    setGoogleWaiting(true);
+    try {
+      await openClerkSignIn();
+    } catch {
+      setGoogleWaiting(false);
+      return;
+    }
+    if (googlePoll.current) window.clearInterval(googlePoll.current);
+    let ticks = 0;
+    googlePoll.current = window.setInterval(() => {
+      void (async () => {
+        ticks += 1;
+        const done = () => {
+          if (googlePoll.current) window.clearInterval(googlePoll.current);
+          googlePoll.current = null;
+          setGoogleWaiting(false);
+        };
+        if (ticks > 100) {
+          done();
+          return;
+        }
+        const s = await cmd.clerkSession().catch(() => null);
+        if (s?.signed_in) {
+          done();
+          completeSignIn();
+        }
+      })();
+    }, 3000);
+  };
+
+  useEffect(
+    () => () => {
+      if (googlePoll.current) window.clearInterval(googlePoll.current);
+    },
+    [],
+  );
+
   if (!bootstrapped) return null;
 
   // Sign-in is the first screen until completed once. The flow resolves
@@ -108,6 +154,8 @@ export default function App() {
       >
         <SignInScreen
           onComplete={completeSignIn}
+          onGoogleSignIn={startGoogleSignIn}
+          googleWaiting={googleWaiting}
           onRequestCode={(email) => {
             void cmd.signInStart(email).catch(() => {});
           }}
