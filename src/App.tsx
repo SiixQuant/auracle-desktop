@@ -144,29 +144,32 @@ export default function App() {
 
   if (!bootstrapped) return null;
 
-  // Sign-in is the first screen until completed once. The flow resolves
-  // client-side (the email step also fires the engine's magic-link send),
-  // so a user is never locked out of the launcher if the engine is down.
+  // Sign-in is the first screen until completed once. The only way in is
+  // "Continue with Google" — it opens the engine's hosted Clerk sign-in in
+  // the browser and we poll the shared session until it appears. A sign-in
+  // done on the IDE (or the browser) resolves here too, so the two apps
+  // stay in step.
   if (!signedIn) {
     return (
       <Suspense
         fallback={<div style={{ minHeight: "100vh", background: "#000" }} />}
       >
         <SignInScreen
-          onComplete={completeSignIn}
           onGoogleSignIn={startGoogleSignIn}
           googleWaiting={googleWaiting}
-          onRequestCode={(email) => {
-            void cmd.signInStart(email).catch(() => {});
-          }}
-          onVerifyCode={(email, code) => cmd.signInVerify(email, code)}
         />
       </Suspense>
     );
   }
 
   if (needsOnboarding) {
-    return <Onboarding onDone={() => setNeedsOnboarding(false)} />;
+    return (
+      <Onboarding
+        onDone={() => setNeedsOnboarding(false)}
+        onGoogleSignIn={startGoogleSignIn}
+        googleWaiting={googleWaiting}
+      />
+    );
   }
 
   return (
