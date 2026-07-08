@@ -27,11 +27,17 @@ import {
 
 interface OnboardingProps {
   onDone: () => void;
+  onGoogleSignIn?: () => void;
+  googleWaiting?: boolean;
 }
 
-const STEPS = ["Environment", "License", "Install"] as const;
+const STEPS = ["Environment", "Sign in", "Install"] as const;
 
-export default function Onboarding({ onDone }: OnboardingProps) {
+export default function Onboarding({
+  onDone,
+  onGoogleSignIn,
+  googleWaiting,
+}: OnboardingProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [licenseKey, setLicenseKey] = useState("");
 
@@ -72,6 +78,8 @@ export default function Onboarding({ onDone }: OnboardingProps) {
               setStep(3);
             }}
             onNext={() => setStep(3)}
+            onGoogleSignIn={onGoogleSignIn}
+            googleWaiting={googleWaiting}
           />
         )}
         {step === 3 && (
@@ -290,12 +298,16 @@ function Step2({
   onBack,
   onSkip,
   onNext,
+  onGoogleSignIn,
+  googleWaiting,
 }: {
   licenseKey: string;
   setLicenseKey: (v: string) => void;
   onBack: () => void;
   onSkip: () => void;
   onNext: () => void;
+  onGoogleSignIn?: () => void;
+  googleWaiting?: boolean;
 }) {
   return (
     <Actions
@@ -306,13 +318,63 @@ function Step2({
       nextLabel="Next →"
       skipLabel="Skip for Community tier"
     >
-      <div className="step-head">License key</div>
+      <div className="step-head">Sign in</div>
       <p className="muted">
-        Paste your license key from your Auracle purchase email — accepts{" "}
-        <code>akey_…</code> (Stripe), <code>polar_…</code> (legacy Polar), or a
-        JWT starting with <code>eyJ…</code> (enterprise / offline). Stored
-        securely in your OS keychain — never on disk.
+        Sign in with your Auracle account and your subscription is your license
+        — there&apos;s no key to paste. Have an enterprise or offline key
+        instead? Add it below.
       </p>
+      {onGoogleSignIn && (
+        <>
+          <button
+            type="button"
+            onClick={() => onGoogleSignIn()}
+            disabled={googleWaiting}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              background: "#fff",
+              color: "#111",
+              fontWeight: 500,
+              border: "none",
+              borderRadius: 8,
+              padding: "11px 16px",
+              cursor: googleWaiting ? "default" : "pointer",
+              opacity: googleWaiting ? 0.6 : 1,
+            }}
+          >
+            {!googleWaiting && (
+              <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+              </svg>
+            )}
+            {googleWaiting ? "Waiting for browser sign-in…" : "Continue with Google"}
+          </button>
+          {googleWaiting && (
+            <p className="muted fs-xs mt-2">
+              Finish signing in in your browser, then return here.
+            </p>
+          )}
+          <div
+            className="hstack"
+            style={{ gap: 12, margin: "18px 0", alignItems: "center" }}
+          >
+            <span
+              style={{ height: 1, flex: 1, background: "var(--line, rgba(255,255,255,0.12))" }}
+            />
+            <span className="muted fs-xs">or with a license key</span>
+            <span
+              style={{ height: 1, flex: 1, background: "var(--line, rgba(255,255,255,0.12))" }}
+            />
+          </div>
+        </>
+      )}
       <input
         type="password"
         placeholder="akey_… or polar_… or eyJ…"
