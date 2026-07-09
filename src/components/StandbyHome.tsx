@@ -23,6 +23,18 @@ import { useSettings } from "@/lib/settings";
 import type { EngineStateHook } from "@/lib/useEngineState";
 import type { InspectorKey } from "@/components/InspectorHost";
 
+// Plain-English reading of the engine lamp for the Help card's diagnostics dot.
+const LAMP_TEXT: Record<LampTone, string> = {
+  ok: "Engine healthy",
+  warn: "Engine degraded",
+  err: "Engine down",
+  accent: "Engine active",
+  checking: "Checking engine…",
+};
+
+/** A live status pip + label shown at the bottom of a hub card. */
+type CardStatus = { tone: string; text: string };
+
 export default function StandbyHome({
   eng,
   onActuator,
@@ -57,6 +69,21 @@ export default function StandbyHome({
   const keyOnFile = ai?.configured ?? false;
 
   const asOf = stamp(eng.lastOkAt, eng.now);
+
+  // Live card statuses — derived from real update/version/engine truth only,
+  // omitted (never faked) when the underlying probe hasn't answered.
+  const upd = eng.update;
+  const ver = eng.version;
+  const updateStatus: CardStatus | undefined = upd?.available
+    ? { tone: "accent", text: `Update available${upd.version ? ` · v${upd.version}` : ""}` }
+    : upd
+      ? { tone: "", text: `Up to date${ver ? ` · v${ver}` : ""}` }
+      : undefined;
+  const changelogStatus: CardStatus | undefined = ver ? { tone: "", text: `v${ver}` } : undefined;
+  const helpStatus: CardStatus = {
+    tone: board.lamp === "checking" ? "" : board.lamp,
+    text: LAMP_TEXT[board.lamp],
+  };
 
   return (
     <div className="standby">
@@ -93,18 +120,21 @@ export default function StandbyHome({
           wide
           title="Update Auracle"
           desc="Update the launcher, IDE, and engine in one step"
+          status={updateStatus}
           onClick={() => onCard?.("updates")}
           icon={<DownloadIcon />}
         />
         <HubCard
           title="Changelog"
           desc="What changed in each release"
+          status={changelogStatus}
           onClick={() => onCard?.("changelog")}
           icon={<ListIcon />}
         />
         <HubCard
           title="Help"
           desc="FAQ, diagnostics, and support"
+          status={helpStatus}
           onClick={() => onCard?.("help")}
           icon={<HelpIcon />}
         />
@@ -183,12 +213,14 @@ function HubCard({
   icon,
   onClick,
   wide,
+  status,
 }: {
   title: string;
   desc: string;
   icon: React.ReactNode;
   onClick: () => void;
   wide?: boolean;
+  status?: CardStatus;
 }) {
   return (
     <button
@@ -201,6 +233,12 @@ function HubCard({
       </span>
       <span className="hub-card__title">{title}</span>
       <span className="hub-card__desc">{desc}</span>
+      {status && (
+        <span className="hub-card__status">
+          <span className={`vital__dot ${status.tone}`} />
+          <span className="hub-card__status-text">{status.text}</span>
+        </span>
+      )}
     </button>
   );
 }

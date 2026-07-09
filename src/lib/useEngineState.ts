@@ -25,6 +25,8 @@ export interface EngineStateHook {
   lastOkAt: number | null;
   /** Launcher self-update info (for the System inspector / Maintenance). */
   update: UpdateInfo | null;
+  /** Installed launcher version, for the home's update/changelog cards. */
+  version: string | null;
   launching: boolean;
   ideError: string | null;
   engineErr: string | null;
@@ -40,6 +42,7 @@ export function useEngineState(): EngineStateHook {
   const [health, setHealth] = useState<HealthSnapshot | null>(null);
   const [lastOkAt, setLastOkAt] = useState<number | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [starting, setStarting] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -109,6 +112,11 @@ export function useEngineState(): EngineStateHook {
     cmd.checkForUpdate().then(setUpdate).catch(() => setUpdate(null));
   }, []);
 
+  // Installed launcher version (best-effort, once) — for the home cards.
+  useEffect(() => {
+    cmd.currentVersion().then(setVersion).catch(() => setVersion(null));
+  }, []);
+
   // Relative-age clock for the "as of" stamp.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -164,6 +172,7 @@ export function useEngineState(): EngineStateHook {
     now,
     lastOkAt,
     update,
+    version,
     launching,
     ideError,
     engineErr,
