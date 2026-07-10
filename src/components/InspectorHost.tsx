@@ -17,6 +17,7 @@
 import { useEffect } from "react";
 
 import LifecycleInspector from "@/components/LifecycleInspector";
+import PairPhoneInspector from "@/components/PairPhoneInspector";
 import SupervisionInspector from "@/components/SupervisionInspector";
 import {
   ChangelogInspector,
@@ -39,7 +40,8 @@ export type InspectorKey =
   | "updates"
   | "changelog"
   | "help"
-  | "lifecycle";
+  | "lifecycle"
+  | "pair";
 
 const TITLES: Record<InspectorKey, string> = {
   supervision: "Supervision",
@@ -49,6 +51,7 @@ const TITLES: Record<InspectorKey, string> = {
   changelog: "Changelog",
   help: "Help",
   lifecycle: "Strategy lifecycle",
+  pair: "Pair a phone",
 };
 
 export default function InspectorHost({
@@ -101,6 +104,10 @@ function InspectorBody({ which }: { which: InspectorKey }) {
       return <SupervisionInspector />;
     case "lifecycle":
       return <LifecycleInspector />;
+    case "pair":
+      // Phone pairing (Auracle iOS spine, M5) — palette-reachable while
+      // the iOS app is pre-release.
+      return <PairPhoneInspector />;
     case "intelligence":
       return <IntelligenceCard />;
     case "updates":

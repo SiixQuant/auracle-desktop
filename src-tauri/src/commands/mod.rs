@@ -18,6 +18,7 @@ pub mod healthcheck;
 pub mod ide_update;
 pub mod installer;
 pub mod keychain;
+pub mod pair;
 pub mod preflight;
 pub mod scheduled_update;
 pub mod secret_store;
