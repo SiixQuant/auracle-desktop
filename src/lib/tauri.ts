@@ -322,7 +322,25 @@ export const cmd = {
   // degrades to labels-only and never fabricates a count. `from_houston`
   // is false when the engine served a cache rather than fresh truth.
   strategyStates: () => invoke<StrategyStates>("strategy_states"),
+
+  // ── Phone pairing (Auracle iOS spine, M5) ────────────────────
+  //
+  // Mint a single-use 5-minute pairing code from the engine (owner key
+  // over loopback) + this Mac's LAN address + an honest reachability
+  // probe. `reachable: false` means the engine port is loopback-bound
+  // (the compose default) or a firewall is in the way — the UI shows
+  // the opt-in instructions instead of a QR that can't work.
+  mobilePairInfo: () => invoke<PairInfo>("mobile_pair_info"),
 };
+
+/** Result of `mobile_pair_info` — see the pairing inspector. */
+export interface PairInfo {
+  lan_ip: string | null;
+  reachable: boolean;
+  url: string | null;
+  token: string;
+  expires_in: number;
+}
 
 export interface ToolInvocationResult {
   result: string;
