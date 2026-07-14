@@ -1,8 +1,8 @@
 # Auracle Desktop
 
-Native launcher for the [Auracle](https://github.com/SiixQuant/Auracle) algorithmic-trading platform. Wraps the Docker Compose stack so installing, updating, and managing your local Auracle install is one click instead of six terminal commands.
+Native launcher for the [Auracle](https://github.com/SiixQuant/Auracle) algorithmic-trading platform. It wraps the engine's Docker Compose stack and keeps the [Auracle IDE](https://github.com/SiixQuant/auracle-ide) up to date, so installing, running, and updating your local Auracle is one click instead of six terminal commands. This is the front door: most people install Auracle by installing the launcher.
 
-> Status: **scaffolding** — Phase 1 MVP per [`auracle_desktop_launcher_plan.md`](https://github.com/SiixQuant/Auracle/blob/main/docs/launcher-plan.md). Not yet a release — clone, build locally to try it.
+> Status: **shipping.** The launcher installs and supervises the engine, delivers IDE updates, surfaces health and diagnostics, and opens the workbench from a single Standby screen.
 
 ---
 
@@ -192,12 +192,12 @@ auracle-desktop/
 
 ## Roadmap
 
-Per [`auracle_desktop_launcher_plan.md`](https://github.com/SiixQuant/Auracle/blob/main/docs/launcher-plan.md):
-
-- [x] **Phase 0 (this commit)** — scaffolding: Tauri shell + Rust commands + vanilla frontend + CI workflows
-- [ ] **Phase 1 MVP** (~80 hours) — macOS only, manual update, basic onboarding
-- [ ] **Phase 2 V1** (~160 hours) — Windows + Linux + auto-update + code-signing + diagnostics polish
-- [ ] **Phase 3** (post-launch) — embedded PostgreSQL for Community tier, multi-install management, cloud-deploy wizards
+- [x] **Scaffolding**: Tauri shell + Rust commands + frontend + CI workflows
+- [x] **MVP**: one-click install, engine supervision, logs, and diagnostics
+- [x] **Standby workbench**: single-screen status, health, and a command palette
+- [x] **IDE delivery**: checks the release feed and installs IDE updates, with a running-app quit guard
+- [ ] **Broader platforms**: Windows and Linux parity, plus code-signing
+- [ ] **Post-launch**: multi-install management and cloud-deploy wizards
 
 ---
 
