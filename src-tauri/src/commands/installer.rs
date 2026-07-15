@@ -101,6 +101,13 @@ pub struct InstallerProgress {
 #[tauri::command]
 pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     let path = resolve_install_path().map_err(to_error_string)?;
+    // install.sh runs `docker compose up` from `path`, under the project name
+    // Compose derives from its basename (`auracle`). If a different working_dir
+    // already owns that name — a dev checkout at ~/Downloads/auracle — that
+    // `up` would recreate the dev stack's containers with our compose file +
+    // `.env` and down a running engine. Refuse before touching disk; adopt the
+    // running stack instead. No-op on a clean machine (nothing owns the name).
+    crate::commands::docker::ensure_engine_home_unclaimed(&path).await?;
     if !path.exists() {
         std::fs::create_dir_all(&path).map_err(to_error_string)?;
     }

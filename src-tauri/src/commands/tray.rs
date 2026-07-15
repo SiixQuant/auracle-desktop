@@ -51,6 +51,15 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
                             return;
                         }
                     };
+                    // Don't recreate a stack a different working_dir owns under
+                    // our project name (a dev checkout at ~/Downloads/auracle).
+                    // No UI to surface an error here, so log + skip.
+                    if let Err(e) =
+                        crate::commands::docker::ensure_engine_home_unclaimed(&dir).await
+                    {
+                        log::warn!("tray restart skipped: {e}");
+                        return;
+                    }
                     // `up -d` rather than `restart`: restart only touches
                     // containers that still exist, so it can't recover a
                     // stack that was brought down or had its containers
