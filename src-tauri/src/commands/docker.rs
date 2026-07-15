@@ -691,7 +691,8 @@ mod tests {
     fn mixed_rows_reports_first_foreign() {
         // Ours first, then a foreign row → still flags the foreign one.
         let home = Path::new("/nonexistent-auracle-test/home/auracle");
-        let ps = "/nonexistent-auracle-test/home/auracle\n/nonexistent-auracle-test/elsewhere/auracle\n";
+        let ps =
+            "/nonexistent-auracle-test/home/auracle\n/nonexistent-auracle-test/elsewhere/auracle\n";
         assert_eq!(
             first_foreign_working_dir(ps, home).as_deref(),
             Some("/nonexistent-auracle-test/elsewhere/auracle"),
