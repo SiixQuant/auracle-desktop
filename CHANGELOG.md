@@ -4,6 +4,11 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.33]
+
+### Fixed
+- **The setup-hint button is readable again.** It kept white text after the palette went white, so its label vanished.
+
 ## [0.8.32]
 
 One look, everywhere.

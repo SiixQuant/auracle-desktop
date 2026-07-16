@@ -394,7 +394,7 @@ h2 {
 .setup-hint__btn {
   align-self: flex-start;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   border: none;
   border-radius: var(--r-sm);
   font-size: 12.5px;
