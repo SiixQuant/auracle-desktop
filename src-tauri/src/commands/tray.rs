@@ -60,13 +60,24 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
                         log::warn!("tray restart skipped: {e}");
                         return;
                     }
+                    // Resolve the Docker CLI the same way every other stack
+                    // command does. A Finder-launched macOS app inherits a
+                    // minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin) that omits
+                    // Docker's bin dir, so a bare `docker` fails to spawn here
+                    // even when Docker is installed — resolve_docker_bin()
+                    // probes the known install locations.
+                    let Some(bin) = crate::commands::docker::resolve_docker_bin().await
+                    else {
+                        log::warn!("tray restart: Docker CLI not found on PATH");
+                        return;
+                    };
                     // `up -d` rather than `restart`: restart only touches
                     // containers that still exist, so it can't recover a
                     // stack that was brought down or had its containers
                     // removed — exactly the "engine not running" case. `up
                     // -d` recreates whatever is missing and is a no-op for
                     // what's already healthy.
-                    let _ = tokio::process::Command::new("docker")
+                    let _ = tokio::process::Command::new(&bin)
                         .args(["compose", "up", "-d"])
                         .current_dir(&dir)
                         .status()
