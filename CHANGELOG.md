@@ -4,6 +4,10 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.32]
+
+One look, everywhere.
+
 ### Changed
 - **The launcher is black and white.** The white primary button the home screen already used is now the palette everywhere, so every screen matches it and the IDE. Status lamps keep their own colours — green still means ready, red still means it needs you.
 
