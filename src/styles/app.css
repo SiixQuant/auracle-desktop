@@ -46,18 +46,25 @@
   --elev-card:    0 1px 2px rgba(0, 0, 0, 0.45);
   --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 
-  /* Accent — Nous-blue (Hermes DNA). Primary + active/live/connected, on the
-     charcoal base. Replaces the prior surgical emerald wholesale. */
-  --accent:      #0053fd;                      /* Nous-blue */
-  --accent-2:    #0042cc;                      /* hover/pressed tier */
-  --accent-soft: rgba(0, 83, 253, 0.16);       /* a touch stronger than emerald was — blue reads quieter on dark */
-  --accent-dim:  rgba(0, 83, 253, 0.34);
-  --accent-ink:  #ffffff;                      /* text ON a filled accent — blue is dark, needs white not black */
-  /* Accent as TEXT/glyph on dark soft-fills. #0053fd is a dark blue (~0.13
-     luma) so it fails AA as small text on charcoal; this brightened blue
-     clears 4.5:1 on accent-soft over every surface. Use for ink/icons;
-     keep --accent for fills, borders, dots, and the filled-button bg. */
-  --accent-text: #7aa2ff;
+  /* Accent — WHITE on the charcoal base. The Standby home already rendered
+     its primary as a white pill by hand (see .standby__actuator below); this
+     promotes that value into the token so every accent usage follows it and
+     the launcher, IDE, and website read as one black-and-white product.
+     Retired: Nous-blue #0053fd.
+
+     BRAND ONLY. Status stays chromatic — a lamp core "keeps its semantic
+     colour (green = ready / red = needs you) ... a functional signal, not
+     decoration". Never point --ok/--warn/--danger at --accent; a white
+     health dot conveys nothing. */
+  --accent:      #ffffff;
+  --accent-2:    rgba(255, 255, 255, 0.88);    /* hover/pressed tier */
+  --accent-soft: rgba(255, 255, 255, 0.10);
+  --accent-dim:  rgba(255, 255, 255, 0.24);
+  --accent-ink:  #000000;                      /* text ON a filled accent — white is light, needs black not white */
+  /* Accent as TEXT/glyph on dark soft-fills. The retired blue needed a
+     separate brightened tier because #0053fd (~0.13 luma) failed AA as small
+     text on charcoal. White does not, so this is simply the accent. */
+  --accent-text: #ffffff;
   --ok:          #34d399;                       /* desaturated success */
   --warn:        #fbbf24;                       /* desaturated amber */
   --err:         #f87171;                       /* desaturated red */
@@ -92,9 +99,15 @@
   --t-lg: 18px;
   --t-xl: 24px;
 
-  /* Fonts — Inter sans; SF Mono leads for data/labels (Percept). tabular-nums on data. */
-  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-               "Helvetica Neue", Arial, sans-serif;
+  /* Fonts — the IDE's UI stack, so the launcher and the IDE resolve to the
+     same face on the same machine; SF Mono leads for data/labels (Percept).
+     tabular-nums on data. Inter used to lead here, but it is not bundled and
+     not a system font, so on a machine without it this silently fell through
+     to -apple-system anyway — while the IDE started from -apple-system. The
+     two surfaces were only ever identical by accident. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+               Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue",
+               Arial, sans-serif;
   --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Monaco,
                "Cascadia Mono", Consolas, "Courier New", monospace;
   /* Display serif (Hermes DNA) — big dramatic headline faces for heroes +
@@ -151,7 +164,12 @@ html, body {
   transition: background-color 0.3s, box-shadow 0.3s;
 }
 
-.logo-dot.healthy  { background: var(--accent); }
+/* healthy/degraded/down is a STATUS family, so healthy takes the success hue,
+   not the brand accent. It rode --accent only because the accent used to be
+   blue and so happened to look distinct; against a white accent it would be
+   an unreadable white dot beside amber and red. `starting` stays on the
+   accent deliberately — it is a neutral "no verdict yet", not a health state. */
+.logo-dot.healthy  { background: var(--ok); }
 .logo-dot.degraded { background: var(--warn); }
 .logo-dot.down     { background: var(--err); }
 .logo-dot.starting { background: var(--accent); animation: pulse 1.5s infinite; }
@@ -479,7 +497,8 @@ input[type="text"]:focus, input[type="password"]:focus {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.badge.ok   { background: var(--accent-soft);            color: var(--accent-text); }
+/* ok/warn/err is a status family — each takes its own hue. */
+.badge.ok   { background: var(--ok-soft);        color: var(--ok); }
 .badge.warn { background: var(--warn-soft);      color: var(--warn); }
 .badge.err  { background: var(--err-soft);       color: var(--err); }
 
@@ -1140,9 +1159,11 @@ table.data-table {
 
 .statusline { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--fg-dim); margin-top: 15px; }
 .sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--fg-muted); }
-/* OK = a healthy/live capability — the one place emerald is surgical here.
+/* OK = a healthy/live capability — a semantic signal, so it carries the
+ * success hue rather than the brand accent (it was swept onto --accent when
+ * emerald was retired; against a white accent that reads as no signal at all).
  * No glow (rubric): the dot is the signal, not a halo. */
-.sdot.ok     { background: var(--accent); }
+.sdot.ok     { background: var(--ok); }
 .sdot.warn   { background: var(--warn); }
 .sdot.err    { background: var(--err); }
 .sdot.hollow { background: transparent; border: 1.5px solid var(--fg-muted); box-sizing: border-box; }
@@ -2147,14 +2168,13 @@ table.data-table {
 .shell-standby .standby-stage {
   background: transparent;
 }
-/* Primary actuator → white pill, like the sign-in's primary buttons. */
-.shell-standby .standby__actuator {
-  background: #fff;
-  color: #000;
-}
-.shell-standby .standby__actuator:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.88);
-}
+/* The white pill is now the --accent token itself, so the base
+   .standby__actuator rule (background: var(--accent); color: var(--accent-ink))
+   already renders it — this screen no longer needs to force it by hand. That
+   hand-forced white was the ONLY place the launcher actually looked white
+   while every other surface stayed blue, which is how the IDE came to "match
+   the launcher" by adopting a blue the launcher's own front door didn't use.
+   Only the disabled treatment is still specific to this control. */
 .shell-standby .standby__actuator:disabled {
   background: rgba(255, 255, 255, 0.1);
   color: var(--fg-muted);
