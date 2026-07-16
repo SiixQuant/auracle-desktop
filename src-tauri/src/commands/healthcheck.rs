@@ -1,10 +1,10 @@
 //! Houston /healthz polling — drives the tray icon color.
 //!
 //! A background tokio task started in `lib.rs::run()` polls every
-//! 30 s. Result lives in a `tokio::sync::Mutex<HealthSnapshot>`
-//! so both the frontend (via `current_health` command) and the
-//! tray-icon updater can read the latest state without coupling
-//! their cadences.
+//! 30 s. Each result is pushed straight onto the tray icon + tooltip
+//! (see `tray::apply_health`) and also stored in a
+//! `tokio::sync::Mutex<HealthSnapshot>` that the frontend reads via
+//! the `current_health` command.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,8 +15,9 @@ use tokio::sync::Mutex;
 
 use super::to_error_string;
 
-/// Latest health snapshot. The tray icon and frontend Dashboard
-/// both consume this; renderers compute their own visual state.
+/// Latest health snapshot, read by the frontend Dashboard via the
+/// `current_health` command. (The tray is updated directly by the
+/// poller, not through this snapshot.)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HealthSnapshot {
     /// "healthy" | "degraded" | "down" | "unknown"
@@ -53,6 +54,7 @@ pub fn start_background_poll(app: AppHandle) {
     let state = Arc::new(HealthState::default());
     app.manage(state.clone());
 
+    let tray_app = app.clone();
     tauri::async_runtime::spawn(async move {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
@@ -61,6 +63,8 @@ pub fn start_background_poll(app: AppHandle) {
 
         loop {
             let snapshot = poll_once(&client).await;
+            // Reflect the new state on the tray icon + tooltip.
+            crate::commands::tray::apply_health(&tray_app, &snapshot.state);
             {
                 let mut guard = state.0.lock().await;
                 *guard = snapshot;
