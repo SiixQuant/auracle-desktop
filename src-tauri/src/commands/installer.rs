@@ -277,6 +277,13 @@ pub async fn run_first_install(app: AppHandle) -> Result<(), String> {
     while std::time::Instant::now() < deadline {
         if let Ok(resp) = client.get("http://localhost:1969/healthz").send().await {
             if resp.status().is_success() {
+                // Best-effort Workspace bridge, now that the engine home exists
+                // and the stack is healthy: seed the canonical Workspace, write
+                // the launcher-owned compose override into the engine home, and
+                // record the Workspace path in the provisioning config. None of
+                // this can fail the install — it logs and continues, the same
+                // way other post-install best-effort steps (tray / health) do.
+                crate::commands::workspace::provision_on_first_install(&path);
                 emit_progress(&app, "wait_healthy", "Auracle is up.", 100, None);
                 return Ok(());
             }

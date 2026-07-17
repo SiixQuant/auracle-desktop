@@ -4,6 +4,9 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Added
+- **Your strategy workspace is set up for you.** A fresh install creates an "Auracle Strategies" folder, organizes it into places for drafts, live strategies, tearsheets, and analysis scripts, and connects it to the engine so anything you save there is ready to backtest. A workspace you already set up by hand is left untouched.
+
 ## [0.8.33]
 
 ### Fixed

@@ -350,6 +350,17 @@ pub async fn stack_start() -> Result<(), String> {
     // Never recreate a stack a different working_dir already owns under our
     // project name (a dev checkout at ~/Downloads/auracle). Adopt it instead.
     ensure_home_unclaimed(&bin, &dir).await?;
+    // Heal the launcher-owned Workspace override if we know where the Workspace
+    // is (persisted at first install). `write_override` no-ops on a foreign /
+    // hand-built override, so this never clobbers a bespoke setup. Best-effort:
+    // a heal failure must not block starting the stack. User content (the
+    // seeded folders) is deliberately NOT healed here.
+    if let Some(workspace) = crate::commands::workspace::persisted_workspace_path() {
+        match crate::commands::workspace::write_override(&dir, &workspace) {
+            Ok(status) => log::debug!("workspace override heal: {status:?}"),
+            Err(e) => log::warn!("workspace override heal skipped: {e}"),
+        }
+    }
     run_in(&bin, &["compose", "up", "-d"], &dir)
         .await
         .map_err(to_error_string)?;
