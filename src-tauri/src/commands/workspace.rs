@@ -197,7 +197,8 @@ fn write_if_absent(path: &Path, contents: &str) -> anyhow::Result<()> {
 /// Root README: the workspace headline plus one line per Canonical folder.
 fn render_root_readme() -> String {
     use std::fmt::Write;
-    let mut s = String::from("# Auracle Strategies\n\nThis is your Auracle strategy workspace.\n\n");
+    let mut s =
+        String::from("# Auracle Strategies\n\nThis is your Auracle strategy workspace.\n\n");
     for (name, desc) in CANONICAL_FOLDERS {
         let _ = writeln!(s, "- {name}/ - {desc}");
     }
@@ -240,7 +241,10 @@ pub fn is_launcher_owned(content: &str) -> bool {
 /// Returns `None` when the present services include no read-write consumer
 /// (neither houston nor mcp) — an unknown / degenerate compose we refuse to
 /// write a mount into rather than emit a broken override.
-pub fn render_override(services_present: &BTreeSet<String>, workspace_path: &Path) -> Option<String> {
+pub fn render_override(
+    services_present: &BTreeSet<String>,
+    workspace_path: &Path,
+) -> Option<String> {
     use std::fmt::Write;
 
     let mounts: Vec<(&str, &str)> = DESIRED_MOUNTS
@@ -474,7 +478,10 @@ pub fn provision_on_first_install(engine_home: &Path) {
         }
     };
     match seed_workspace(&workspace) {
-        Ok(()) => log::info!("workspace bridge: seeded Workspace at {}", workspace.display()),
+        Ok(()) => log::info!(
+            "workspace bridge: seeded Workspace at {}",
+            workspace.display()
+        ),
         Err(e) => log::warn!("workspace bridge: seeding failed ({e}); continuing"),
     }
     match write_override(engine_home, &workspace) {
@@ -508,10 +515,8 @@ mod tests {
     /// home / documents / config dir.
     fn scratch() -> PathBuf {
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "auracle-workspace-test-{}-{n}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("auracle-workspace-test-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("scratch dir");
         dir
@@ -569,7 +574,10 @@ mod tests {
         let mtime_after = std::fs::metadata(&readme).unwrap().modified().unwrap();
         let listing_after = walk(&root);
         assert_eq!(mtime_before, mtime_after, "existing file mtime untouched");
-        assert_eq!(listing_before, listing_after, "tree identical after re-seed");
+        assert_eq!(
+            listing_before, listing_after,
+            "tree identical after re-seed"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -584,7 +592,11 @@ mod tests {
 
         seed_workspace(&root).expect("seed");
 
-        assert_eq!(read(&readme), "MY OWN NOTES - keep me\n", "user content preserved");
+        assert_eq!(
+            read(&readme),
+            "MY OWN NOTES - keep me\n",
+            "user content preserved"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -607,32 +619,37 @@ mod tests {
         let services = services_set(&["houston", "mcp"]);
         let owned = render_override(&services, Path::new("/tmp/ws")).expect("render");
         assert!(is_launcher_owned(&owned), "our own render is owned");
-        assert!(is_launcher_owned(&format!("{OWNERSHIP_MARKER}\nservices:\n")));
+        assert!(is_launcher_owned(&format!(
+            "{OWNERSHIP_MARKER}\nservices:\n"
+        )));
         // Hand-built files and empties are not ours.
         assert!(!is_launcher_owned("services:\n  houston:\n"));
         assert!(!is_launcher_owned(""));
         // Marker present but NOT on the first line → not owned.
-        assert!(!is_launcher_owned(&format!("services:\n{OWNERSHIP_MARKER}\n")));
+        assert!(!is_launcher_owned(&format!(
+            "services:\n{OWNERSHIP_MARKER}\n"
+        )));
     }
 
     #[test]
     fn render_marker_desk_target_and_rw_ro_split() {
         // A base that has every desired consumer EXCEPT live-supervisor.
         let services = services_set(&["houston", "mcp", "scheduler", "jupyter", "db"]);
-        let content = render_override(&services, Path::new("/Users/x/Documents/Auracle Strategies"))
-            .expect("render");
+        let content = render_override(
+            &services,
+            Path::new("/Users/x/Documents/Auracle Strategies"),
+        )
+        .expect("render");
         assert_eq!(
             content.lines().next().map(str::trim),
             Some(OWNERSHIP_MARKER),
             "marker is the first line"
         );
         // All mounts land at the desk target; rw for authors, ro for readers.
-        assert!(content.contains(
-            "\"/Users/x/Documents/Auracle Strategies:/opt/auracle/strategies/desk:rw\""
-        ));
-        assert!(content.contains(
-            "\"/Users/x/Documents/Auracle Strategies:/opt/auracle/strategies/desk:ro\""
-        ));
+        assert!(content
+            .contains("\"/Users/x/Documents/Auracle Strategies:/opt/auracle/strategies/desk:rw\""));
+        assert!(content
+            .contains("\"/Users/x/Documents/Auracle Strategies:/opt/auracle/strategies/desk:ro\""));
         assert_eq!(mode_for(&content, "houston"), "rw", "houston rw");
         assert_eq!(mode_for(&content, "mcp"), "rw", "mcp rw");
         assert_eq!(mode_for(&content, "scheduler"), "ro", "scheduler ro");
@@ -653,7 +670,10 @@ mod tests {
             "absent service must not be mounted"
         );
         // db is present in the base but not a desired consumer → not mounted.
-        assert!(!content.contains("  db:"), "non-consumer service not mounted");
+        assert!(
+            !content.contains("  db:"),
+            "non-consumer service not mounted"
+        );
     }
 
     #[test]
@@ -712,7 +732,10 @@ networks:
         assert!(is_launcher_owned(&content), "written file is owned");
         // Mounts reflect the base compose — no live-supervisor (absent there).
         assert!(content.contains("  houston:") && content.contains("  jupyter:"));
-        assert!(!content.contains("live-supervisor"), "absent service not mounted");
+        assert!(
+            !content.contains("live-supervisor"),
+            "absent service not mounted"
+        );
         let _ = std::fs::remove_dir_all(&home);
     }
 
@@ -725,7 +748,10 @@ networks:
         let status = write_override(&home, Path::new("/new/ws")).expect("rewrite");
         assert_eq!(status, OverrideStatus::Rewritten);
         let content = read(&home.join("docker-compose.override.yml"));
-        assert!(content.contains("/new/ws:"), "content updated to new workspace");
+        assert!(
+            content.contains("/new/ws:"),
+            "content updated to new workspace"
+        );
         assert!(!content.contains("/old/ws:"), "old workspace gone");
         let _ = std::fs::remove_dir_all(&home);
     }
@@ -741,7 +767,10 @@ networks:
         let status = write_override(&home, Path::new("/ws")).expect("second write");
         assert_eq!(status, OverrideStatus::Unchanged);
         let mtime_after = std::fs::metadata(&path).unwrap().modified().unwrap();
-        assert_eq!(mtime_before, mtime_after, "identical override not rewritten");
+        assert_eq!(
+            mtime_before, mtime_after,
+            "identical override not rewritten"
+        );
         let _ = std::fs::remove_dir_all(&home);
     }
 
@@ -756,7 +785,11 @@ networks:
 
         let status = write_override(&home, Path::new("/ws")).expect("adopt");
         assert_eq!(status, OverrideStatus::ForeignPreserved);
-        assert_eq!(read(&path), handmade, "foreign file left byte-for-byte untouched");
+        assert_eq!(
+            read(&path),
+            handmade,
+            "foreign file left byte-for-byte untouched"
+        );
         let _ = std::fs::remove_dir_all(&home);
     }
 
@@ -793,7 +826,10 @@ networks:
         let merged = merge_provisioning_config(Some(existing), None, None, Some("/ws")).unwrap();
         let v: Value = serde_json::from_str(&merged).unwrap();
         assert_eq!(v["workspace_path"], "/ws");
-        assert_eq!(v["engine_url"], "http://127.0.0.1:1969", "engine_url preserved");
+        assert_eq!(
+            v["engine_url"], "http://127.0.0.1:1969",
+            "engine_url preserved"
+        );
         assert_eq!(v["api_key"], "secret", "api_key preserved");
     }
 
@@ -801,7 +837,8 @@ networks:
     fn merge_config_never_overwrites_existing_workspace_path() {
         let existing = r#"{"workspace_path":"/user/custom","api_key":"k"}"#;
         // Even though we pass a different path, the existing one wins.
-        let merged = merge_provisioning_config(Some(existing), None, None, Some("/default")).unwrap();
+        let merged =
+            merge_provisioning_config(Some(existing), None, None, Some("/default")).unwrap();
         let v: Value = serde_json::from_str(&merged).unwrap();
         assert_eq!(v["workspace_path"], "/user/custom", "user value untouched");
         assert_eq!(v["api_key"], "k");
@@ -823,7 +860,8 @@ networks:
         assert_eq!(v["workspace_path"], "/ws");
 
         // Corrupt existing content is replaced, not fatal.
-        let merged = merge_provisioning_config(Some("}{ not json"), None, None, Some("/ws")).unwrap();
+        let merged =
+            merge_provisioning_config(Some("}{ not json"), None, None, Some("/ws")).unwrap();
         let v: Value = serde_json::from_str(&merged).unwrap();
         assert_eq!(v["workspace_path"], "/ws");
     }
@@ -856,13 +894,19 @@ networks:
         let dir = home.join(".config").join("auracle");
         std::fs::create_dir_all(&dir).unwrap();
         let config = dir.join("auracle.json");
-        std::fs::write(&config, r#"{"engine_url":"http://127.0.0.1:1969","api_key":"secret"}"#)
-            .unwrap();
+        std::fs::write(
+            &config,
+            r#"{"engine_url":"http://127.0.0.1:1969","api_key":"secret"}"#,
+        )
+        .unwrap();
 
         persist_workspace_path_to(&config, Path::new("/ws")).expect("persist");
 
         let v: Value = serde_json::from_str(&read(&config)).unwrap();
-        assert_eq!(v["engine_url"], "http://127.0.0.1:1969", "engine_url survives");
+        assert_eq!(
+            v["engine_url"], "http://127.0.0.1:1969",
+            "engine_url survives"
+        );
         assert_eq!(v["api_key"], "secret", "api_key survives");
         assert_eq!(v["workspace_path"], "/ws");
         let _ = std::fs::remove_dir_all(&home);

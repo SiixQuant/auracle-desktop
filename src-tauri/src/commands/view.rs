@@ -277,13 +277,16 @@ fn write_ide_config(engine_url: &str, api_key: &str) -> Result<(), String> {
 
     let config = std::path::Path::new(&home).join(".config");
     // Primary: the renamed Auracle config dir the current IDE reads from.
-    write_ide_handoff(&config.join("auracle"), engine_url, api_key, workspace.as_deref())?;
+    write_ide_handoff(
+        &config.join("auracle"),
+        engine_url,
+        api_key,
+        workspace.as_deref(),
+    )?;
     // Transitional mirror for a not-yet-updated IDE; never created fresh.
     let legacy = config.join("zed");
     if legacy.exists() {
-        if let Err(error) =
-            write_ide_handoff(&legacy, engine_url, api_key, workspace.as_deref())
-        {
+        if let Err(error) = write_ide_handoff(&legacy, engine_url, api_key, workspace.as_deref()) {
             eprintln!("auracle launcher: legacy IDE handoff write skipped: {error}");
         }
     }
