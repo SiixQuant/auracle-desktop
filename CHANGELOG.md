@@ -7,6 +7,10 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 ### Added
 - **Your strategy workspace is set up for you.** A fresh install creates an "Auracle Strategies" folder, organizes it into places for drafts, live strategies, tearsheets, and analysis scripts, and connects it to the engine so anything you save there is ready to backtest. A workspace you already set up by hand is left untouched.
 
+### Fixed
+- **The menu-bar Restart works when the app is opened from Finder or the Dock.** It was looking for Docker in a way that isn't found in that launch context, so it silently did nothing.
+- **The menu-bar icon now shows engine health at a glance** — green when the engine is healthy, amber when it is degraded, red when it is down — instead of never changing.
+
 ## [0.8.33]
 
 ### Fixed
