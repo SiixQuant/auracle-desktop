@@ -73,8 +73,7 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
                     // Docker's bin dir, so a bare `docker` fails to spawn here
                     // even when Docker is installed — resolve_docker_bin()
                     // probes the known install locations.
-                    let Some(bin) = crate::commands::docker::resolve_docker_bin().await
-                    else {
+                    let Some(bin) = crate::commands::docker::resolve_docker_bin().await else {
                         log::warn!("tray restart: Docker CLI not found on PATH");
                         return;
                     };
