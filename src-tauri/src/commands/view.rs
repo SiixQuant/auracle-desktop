@@ -249,11 +249,13 @@ pub async fn license_activate_engine(value: String) -> Result<Option<String>, St
     Ok(body.tier)
 }
 
-/// Write `{engine_url, api_key}` to the IDE's config file
-/// (`~/.config/auracle/auracle.json`), creating the directory if needed.
-/// Mirrors exactly what the IDE's own Connect modal would save, so the
-/// IDE's startup auto-connect picks it up. The file is chmod 0600 — it
-/// carries the per-user API key.
+/// Write the IDE's config file (`~/.config/auracle/auracle.json`), creating
+/// the directory if needed. `engine_url` + `api_key` are refreshed from this
+/// handoff; the canonical `workspace_path` is merged in only when the config
+/// doesn't already carry one (the launcher is the single writer of that field
+/// and never overwrites a user-set / first-install value). Every other
+/// existing key is preserved, so the JSON shape stays backward-compatible.
+/// The file is chmod 0600 — it carries the per-user API key.
 ///
 /// Transition note (Zed→Auracle config-dir rename): if a pre-rename IDE's
 /// `~/.config/zed` directory still exists, the handoff is mirrored there
@@ -265,31 +267,50 @@ pub async fn license_activate_engine(value: String) -> Result<Option<String>, St
 fn write_ide_config(engine_url: &str, api_key: &str) -> Result<(), String> {
     let home = std::env::var_os("HOME")
         .ok_or_else(|| "HOME not set; can't locate the IDE config dir".to_string())?;
-    let text = serde_json::to_string_pretty(&serde_json::json!({
-        "engine_url": engine_url,
-        "api_key": api_key,
-    }))
-    .map_err(to_error_string)?;
+
+    // The launcher is the single writer of `workspace_path`. Resolve the
+    // canonical Workspace so it can be inserted when absent; best-effort — if
+    // it can't be resolved we still write the engine_url + api_key handoff.
+    let workspace = crate::commands::workspace::canonical_workspace_path()
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned());
 
     let config = std::path::Path::new(&home).join(".config");
     // Primary: the renamed Auracle config dir the current IDE reads from.
-    write_ide_handoff(&config.join("auracle"), &text)?;
+    write_ide_handoff(&config.join("auracle"), engine_url, api_key, workspace.as_deref())?;
     // Transitional mirror for a not-yet-updated IDE; never created fresh.
     let legacy = config.join("zed");
     if legacy.exists() {
-        if let Err(error) = write_ide_handoff(&legacy, &text) {
+        if let Err(error) =
+            write_ide_handoff(&legacy, engine_url, api_key, workspace.as_deref())
+        {
             eprintln!("auracle launcher: legacy IDE handoff write skipped: {error}");
         }
     }
     Ok(())
 }
 
-/// Write the handoff JSON to `<dir>/auracle.json` (chmod 0600), creating
-/// `dir` if needed.
-fn write_ide_handoff(dir: &std::path::Path, text: &str) -> Result<(), String> {
+/// Merge the handoff JSON into `<dir>/auracle.json` (chmod 0600), creating
+/// `dir` if needed. Reads any existing config first so a previously-persisted
+/// `workspace_path` (or other keys) survives — `engine_url` + `api_key` are
+/// refreshed, `workspace_path` is inserted only when absent.
+fn write_ide_handoff(
+    dir: &std::path::Path,
+    engine_url: &str,
+    api_key: &str,
+    workspace_path: Option<&str>,
+) -> Result<(), String> {
     use std::fs;
     fs::create_dir_all(dir).map_err(to_error_string)?;
     let path = dir.join("auracle.json");
+    let existing = fs::read_to_string(&path).ok();
+    let text = crate::commands::workspace::merge_provisioning_config(
+        existing.as_deref(),
+        Some(engine_url),
+        Some(api_key),
+        workspace_path,
+    )
+    .map_err(to_error_string)?;
     fs::write(&path, text).map_err(to_error_string)?;
     #[cfg(unix)]
     {

@@ -27,6 +27,7 @@ pub mod strategy;
 pub mod tray;
 pub mod update;
 pub mod view;
+pub mod workspace;
 
 /// Map any error type to a string suitable for returning across
 /// the Tauri IPC boundary. Logs the full debug representation so
