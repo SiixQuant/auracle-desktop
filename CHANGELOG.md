@@ -4,6 +4,11 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.35]
+
+### Changed
+- The Updates, Changelog, and Help cards, the command palette, and the tutorial now sit on solid dark panels that match the website's look, so their content is fully readable over the home screen.
+
 ## [0.8.34]
 
 Your workspace, ready on arrival.
