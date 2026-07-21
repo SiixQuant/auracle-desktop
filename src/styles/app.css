@@ -1635,6 +1635,22 @@ table.data-table {
 }
 .standby-stage .standby { min-height: 100%; }
 
+/* ── Floating surfaces adopt the website theme ─────────────────────
+ * Every surface the launcher floats over its home board — the inspector
+ * card, the ⌘K palette, the tutorial overlay, and the coachmark — takes
+ * the website's emerald accent and its 0.10 / 0.20 white-alpha hairlines.
+ * Scoped to these roots ONLY (never :root): the home board keeps its white
+ * accent and renders identically outside the floating surfaces. */
+.insp-scrim, .insp-stage, .insp,
+.cmdk-scrim, .cmdk,
+.tut-overlay, .coach-scrim {
+  --accent:      #10b981;
+  --accent-soft: rgba(16, 185, 129, 0.12);
+  --accent-text: #10b981;
+  --line:        rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.2);
+}
+
 /* Right-docked inspector — slides OVER a dimmed-but-still-live home. */
 .insp-scrim {
   position: absolute;
@@ -1661,30 +1677,21 @@ table.data-table {
   padding: 24px;
   pointer-events: none;
 }
-/* Floating rectangular glass card (iOS "liquid glass" treatment): a bounded,
- * fully-rounded translucent panel with a backdrop blur over the dimmed home.
- * Centered by the flex stage — NOT via transform: WebKit/WKWebView paints a
- * solid black box when backdrop-filter and transform sit on the same element. */
+/* Floating rectangular card (website theme): a bounded, fully-opaque
+ * near-black panel over the dimmed home. Centered by the flex stage — NOT
+ * via transform, which keeps the pop animation opacity-only. */
 .insp {
   position: relative;
   pointer-events: auto;
   width: min(460px, 92vw);
   max-height: min(78vh, 720px);
-  /* No backdrop-filter here on purpose: the scrim below already blurs the dot
-     field, and WKWebView won't let a second (stacked) backdrop-filter sample
-     through the first. Instead the panel is a translucent tint, so the scrim's
-     already-frosted dots read straight through it — real frosted glass, one
-     blur layer. */
-  background: linear-gradient(
-    180deg,
-    rgba(62, 68, 82, 0.44) 0%,
-    rgba(44, 49, 60, 0.38) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* Fully opaque near-black — no gradient, no glass, no backdrop-filter (the
+     home is a WebGL canvas WKWebView can't blur). The dimmed home never
+     bleeds through the card's content. */
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1698,8 +1705,8 @@ table.data-table {
     opacity: 1;
   }
 }
-/* On the glass panel, inner groups sit directly on the glass — no opaque
- * card-on-glass nesting. Stacked groups get a hairline divider instead. */
+/* On the opaque panel, inner groups sit directly on the card — no nested
+ * card-on-card fill. Stacked groups get a hairline divider instead. */
 .insp .card {
   background: transparent;
   border: none;
@@ -1707,7 +1714,7 @@ table.data-table {
   padding: 0;
 }
 .insp .card + .card {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--line);
   padding-top: 14px;
 }
 .insp__head {
@@ -1718,7 +1725,17 @@ table.data-table {
   border-bottom: 1px solid var(--line);
   flex: none;
 }
-.insp__title { font-size: 16px; font-weight: 500; margin: 0; color: var(--fg); }
+/* Mono-uppercase label treatment (matches .card-title) — the inspector
+ * header reads in the website's quiet label language. */
+.insp__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin: 0;
+}
 .insp__close {
   background: transparent;
   border: 0;
@@ -1838,8 +1855,9 @@ table.data-table {
   font: 500 9px/1 ui-monospace, "SF Mono", Menlo, monospace;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--err);
-  border: 1px solid var(--err-dim);
+  /* Website danger red (#ef4444) for parity. */
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 4px;
   padding: 3px 5px;
 }
