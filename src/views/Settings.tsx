@@ -821,7 +821,7 @@ export function IntelligenceCard() {
       <p className="muted fs-sm m-0 mb-3 lh-relaxed">
         The agent the IDE uses. The Auracle Agent is the default — it wraps
         DeepSeek over your own engine on <span className="mono">127.0.0.1</span>,
-        so your prompts and key stay on your machine. Frontier models are
+        so your data and key stay on your machine. Frontier models are
         bring-your-own-key alternatives.
       </p>
 
