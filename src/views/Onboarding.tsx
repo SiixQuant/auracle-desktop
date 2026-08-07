@@ -162,7 +162,7 @@ function Step1({ onNext }: { onNext: () => void }) {
               : undefined
       }
     >
-      <div className="step-head">Let&apos;s get you set up</div>
+      <div className="step-head">Set up Auracle</div>
       <p className="muted">
         Auracle Desktop manages a self-hosted algorithmic-trading platform
         that runs locally on your machine. The first thing it needs is a
@@ -184,8 +184,7 @@ function Step1({ onNext }: { onNext: () => void }) {
           drafts, edits, and backtests strategies with you
         </li>
         <li>
-          <strong>MCP server</strong> so Claude / Cursor can drive Auracle as
-          an agent
+          <strong>MCP server</strong> so Claude / Cursor can drive Auracle
         </li>
         <li>
           <strong>TimescaleDB</strong> for tick-level price storage

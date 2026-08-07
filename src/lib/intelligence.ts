@@ -71,9 +71,9 @@ export const AGENTS: AgentOption[] = [
     id: AURACLE_AGENT_ID,
     label: "Auracle Agent (DeepSeek)",
     blurb:
-      "The self-hosted default. Your engine wraps DeepSeek over loopback " +
-      "with your own key — your prompts and key stay on your machine, and " +
-      "you pay the token costs directly.",
+      "The self-hosted default. Your engine wraps DeepSeek with your own " +
+      "key — your data and key stay on your machine, and you pay for " +
+      "usage directly.",
     isDefault: true,
     // Persisted as the engine's whitelisted DeepSeek provider so the key
     // vaults correctly and `configured` reflects engine truth. The IDE
