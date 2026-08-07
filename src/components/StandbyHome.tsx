@@ -1,14 +1,13 @@
 // StandbyHome — the launcher home, "The Standby".
 //
-// The calm panel of an already-running machine: a single status lamp, one
-// plain-English System Line, and one adaptive verb. The launcher is a
-// global hub now — connections (brokers / data sources) live in the IDE —
-// so the home's verb is only "Open workspace" (engine ready) or "Start
-// engine" (engine down), never "connect a broker". Below the verb sits a
-// 2x2 hub-card grid (Updates / Changelog / FAQ / Support) and a quiet
-// "Re-run setup". The lamp + System Line + verb are pure derivations of one
-// engine snapshot (deriveBoard), so what the home says is, by construction,
-// what the engine reports.
+// The calm panel of an already-running machine: one orbital status lamp, one
+// plain-English System Line, and one adaptive verb ("Open workspace" when the
+// engine is ready, "Start engine" when it's down). The screen stays quiet by
+// default — a footer of small links (update status / What's new / Help) — and
+// only raises a card when something needs attention (the engine down). The
+// lamp, line, and verb are pure derivations of one engine snapshot
+// (deriveBoard), so what the home says is, by construction, what the engine
+// reports.
 
 import IncidentCard from "@/components/IncidentCard";
 import {
@@ -18,22 +17,8 @@ import {
   type LampTone,
   type Vital,
 } from "@/lib/aggregator";
-import { agentById, agentIdFromEngineProvider } from "@/lib/intelligence";
-import { useSettings } from "@/lib/settings";
 import type { EngineStateHook } from "@/lib/useEngineState";
 import type { InspectorKey } from "@/components/InspectorHost";
-
-// Plain-English reading of the engine lamp for the Help card's diagnostics dot.
-const LAMP_TEXT: Record<LampTone, string> = {
-  ok: "Engine healthy",
-  warn: "Engine degraded",
-  err: "Engine down",
-  accent: "Engine active",
-  checking: "Checking engine…",
-};
-
-/** A live status pip + label shown at the bottom of a hub card. */
-type CardStatus = { tone: string; text: string };
 
 export default function StandbyHome({
   eng,
@@ -41,7 +26,6 @@ export default function StandbyHome({
   onDoor,
   onCard,
   onRerunSetup,
-  onAgent,
 }: {
   /** Shared live engine read (owned by the Shell, so the home keeps
    *  polling behind an open inspector). */
@@ -51,54 +35,37 @@ export default function StandbyHome({
   onActuator: () => void;
   /** Open an inspector for a pressed status (status-is-the-door). */
   onDoor?: (door: Exclude<Door, null>) => void;
-  /** Open one of the hub cards (Updates / Changelog / FAQ / Support). */
+  /** Open one of the footer destinations (Updates / Changelog / Help). */
   onCard?: (key: InspectorKey) => void;
   /** Re-run the first-run stack setup (Docker + engine + IDE). */
   onRerunSetup?: () => void;
-  /** Open the Intelligence inspector (the agent on-ramp). */
+  /** Retained so the Shell/palette can still reach the agent inspector even
+   *  though the home no longer shows an agent chip. */
   onAgent?: () => void;
 }) {
-  const { settings } = useSettings();
   const board = deriveBoard(eng.state);
   const { actuator } = board;
 
-  const ai = settings?.ai_model;
-  const agentName = ai
-    ? agentById(agentIdFromEngineProvider(ai.provider))?.label ?? "Agent"
-    : "Auracle Agent";
-  const keyOnFile = ai?.configured ?? false;
-
-  const asOf = stamp(eng.lastOkAt, eng.now);
-
-  // Live card statuses — derived from real update/version/engine truth only,
-  // omitted (never faked) when the underlying probe hasn't answered.
+  // Footer update status — derived from real update/version truth only, and
+  // never claims "Up to date" until the update probe has actually answered.
   const upd = eng.update;
   const ver = eng.version;
-  const updateStatus: CardStatus | undefined = upd?.available
-    ? { tone: "accent", text: `Update available${upd.version ? ` · v${upd.version}` : ""}` }
+  const updateReady = !!upd?.available;
+  const updateLabel = updateReady
+    ? `Update available${upd?.version ? ` · v${upd.version}` : ""}`
     : upd
-      ? { tone: "", text: `Up to date${ver ? ` · v${ver}` : ""}` }
-      : undefined;
-  const changelogStatus: CardStatus | undefined = ver ? { tone: "", text: `v${ver}` } : undefined;
-  const helpStatus: CardStatus = {
-    tone: board.lamp === "checking" ? "" : board.lamp,
-    text: LAMP_TEXT[board.lamp],
-  };
+      ? `Up to date${ver ? ` · v${ver}` : ""}`
+      : ver
+        ? `v${ver}`
+        : "Auracle";
 
   return (
     <div className="standby">
       <Lamp tone={board.lamp} pulse={board.pulse} onClick={() => onDoor?.("supervision")} />
 
       <h1 className="standby__line">{board.systemLine}</h1>
-      {asOf && <div className="standby__stamp">{asOf}</div>}
 
       <Actuator actuator={actuator} onClick={onActuator} />
-
-      <button type="button" className="standby__agent" onClick={onAgent}>
-        <span className="standby__agent-label">agent</span>
-        <span className="standby__agent-name">{agentName}</span>
-        <span className={`vital__dot ${keyOnFile ? "ok" : ""}`} />
-      </button>
 
       {(eng.engineErr || eng.ideError) && (
         <div className="standby__err">{eng.engineErr || eng.ideError}</div>
@@ -115,29 +82,22 @@ export default function StandbyHome({
         </div>
       )}
 
-      <div className="hub-grid" role="group" aria-label="Hub">
-        <HubCard
-          wide
-          title="Update Auracle"
-          desc="Update the launcher, IDE, and engine in one step"
-          status={updateStatus}
+      <div className="standby__footer">
+        <button
+          type="button"
+          className={`standby__link${updateReady ? " is-accent" : ""}`}
           onClick={() => onCard?.("updates")}
-          icon={<DownloadIcon />}
-        />
-        <HubCard
-          title="Changelog"
-          desc="What changed in each release"
-          status={changelogStatus}
-          onClick={() => onCard?.("changelog")}
-          icon={<ListIcon />}
-        />
-        <HubCard
-          title="Help"
-          desc="FAQ, diagnostics, and support"
-          status={helpStatus}
-          onClick={() => onCard?.("help")}
-          icon={<HelpIcon />}
-        />
+        >
+          {updateLabel}
+        </button>
+        <span className="standby__dot" aria-hidden="true">·</span>
+        <button type="button" className="standby__link" onClick={() => onCard?.("changelog")}>
+          What&rsquo;s new
+        </button>
+        <span className="standby__dot" aria-hidden="true">·</span>
+        <button type="button" className="standby__link" onClick={() => onCard?.("help")}>
+          Help
+        </button>
       </div>
 
       {onRerunSetup && (
@@ -155,7 +115,12 @@ export default function StandbyHome({
   );
 }
 
-// ── Lamp ────────────────────────────────────────────────────────────
+// ── Lamp — an orbital that echoes the Auracle mark ──────────────────
+//
+// A glowing core with a comet-trail satellite tracing a tilted orbit. Colour
+// follows the engine tone (green ready, amber degraded, red down, white
+// active) through `currentColor`, so it reads as "alive and in orbit" rather
+// than a plain dot. On `err` the orbit halts and the ring goes dashed.
 
 function Lamp({
   tone,
@@ -173,7 +138,39 @@ function Lamp({
       onClick={onClick}
       aria-label="Engine status — open Supervision"
     >
-      <span className="standby__lamp-core" />
+      <svg
+        className="standby__orbital"
+        viewBox="0 0 140 140"
+        width="108"
+        height="108"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        xmlnsXlink="http://www.w3.org/1999/xlink"
+      >
+        <circle className="orb-halo" cx="70" cy="70" r="41" />
+        <g transform="rotate(-24 70 70)">
+          <ellipse className="orb-ring" cx="70" cy="70" rx="49" ry="18" />
+          <path id="standbyOrb" d="M21,70 A49,18 0 1 1 119,70 A49,18 0 1 1 21,70" fill="none" />
+          <circle className="orb-glow" cx="70" cy="70" r="18" opacity="0.13" />
+          <circle className="orb-core" cx="70" cy="70" r="6.4" />
+          <circle className="orb-bright" cx="70" cy="70" r="3.4" />
+          <circle className="orb-sat orb-sat--t2" r="1.5">
+            <animateMotion dur="6.5s" begin="-0.36s" repeatCount="indefinite">
+              <mpath href="#standbyOrb" xlinkHref="#standbyOrb" />
+            </animateMotion>
+          </circle>
+          <circle className="orb-sat orb-sat--t1" r="2.2">
+            <animateMotion dur="6.5s" begin="-0.18s" repeatCount="indefinite">
+              <mpath href="#standbyOrb" xlinkHref="#standbyOrb" />
+            </animateMotion>
+          </circle>
+          <circle className="orb-sat orb-sat--head" r="3.3">
+            <animateMotion dur="6.5s" repeatCount="indefinite">
+              <mpath href="#standbyOrb" xlinkHref="#standbyOrb" />
+            </animateMotion>
+          </circle>
+        </g>
+      </svg>
     </button>
   );
 }
@@ -205,44 +202,6 @@ function Actuator({
   );
 }
 
-// ── Hub card ────────────────────────────────────────────────────────
-
-function HubCard({
-  title,
-  desc,
-  icon,
-  onClick,
-  wide,
-  status,
-}: {
-  title: string;
-  desc: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-  wide?: boolean;
-  status?: CardStatus;
-}) {
-  return (
-    <button
-      type="button"
-      className={`hub-card${wide ? " hub-card--wide" : ""}`}
-      onClick={onClick}
-    >
-      <span className="hub-card__icon" aria-hidden="true">
-        {icon}
-      </span>
-      <span className="hub-card__title">{title}</span>
-      <span className="hub-card__desc">{desc}</span>
-      {status && (
-        <span className="hub-card__status">
-          <span className={`vital__dot ${status.tone}`} />
-          <span className="hub-card__status-text">{status.text}</span>
-        </span>
-      )}
-    </button>
-  );
-}
-
 // ── Vitals (status-is-the-door) ─────────────────────────────────────
 
 function VitalButton({ v, onClick }: { v: Vital; onClick: () => void }) {
@@ -262,64 +221,3 @@ function VitalButton({ v, onClick }: { v: Vital; onClick: () => void }) {
     </button>
   );
 }
-
-// ── Stamp helpers ───────────────────────────────────────────────────
-
-function stamp(lastOkAt: number | null, now: number): string {
-  if (!lastOkAt) return "";
-  const age = now - lastOkAt;
-  return `as of ${clock(lastOkAt)}${age >= 60_000 ? ` · ${relAge(lastOkAt, now)}` : ""}`;
-}
-
-function clock(ms: number): string {
-  return new Date(ms).toLocaleTimeString("en-US", { hour12: false });
-}
-
-function relAge(ms: number, now: number): string {
-  const s = Math.max(0, Math.floor((now - ms) / 1000));
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  return `${Math.floor(m / 60)}h ago`;
-}
-
-// ── Hub-card icons (inline, currentColor) ───────────────────────────
-
-const cardIconProps = {
-  width: 18,
-  height: 18,
-  viewBox: "0 0 20 20",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.6,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-function DownloadIcon() {
-  return (
-    <svg {...cardIconProps}>
-      <path d="M10 3 v9 M6.5 8.5 L10 12 l3.5 -3.5 M4 15.5 h12" />
-    </svg>
-  );
-}
-
-function ListIcon() {
-  return (
-    <svg {...cardIconProps}>
-      <path d="M7 6 h9 M7 10 h9 M7 14 h9 M4 6 h0.01 M4 10 h0.01 M4 14 h0.01" />
-    </svg>
-  );
-}
-
-function HelpIcon() {
-  return (
-    <svg {...cardIconProps}>
-      <circle cx="10" cy="10" r="7.2" />
-      <path d="M8.2 8 a2 2 0 1 1 2.6 2 c-0.6 0.35 -0.8 0.8 -0.8 1.4" />
-      <circle cx="10" cy="14.3" r="0.5" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-

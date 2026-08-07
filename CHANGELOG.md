@@ -4,6 +4,13 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.8.37]
+
+A calmer home.
+
+### Changed
+- **The home screen is simpler and quieter.** The status light is now an orbital that glows green when everything's ready, and the screen shows just that plus one button. The timestamp, the model chip, and the wordy update/changelog/help cards are gone — folded into a small footer that only speaks up when an update is waiting.
+
 ## [0.8.35]
 
 ### Changed

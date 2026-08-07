@@ -1303,34 +1303,56 @@ table.data-table {
 /* Lamp — the aggregate status light (brand mark). Ring + core, both
  * tinted by tone; pulses only while in-flight (checking / starting). */
 .standby__lamp {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--lamp-color, var(--fg-faint));
+  width: 108px;
+  height: 108px;
+  display: grid;
+  place-items: center;
   background: transparent;
-  border: 1.5px solid var(--lamp-ring, var(--line-strong));
+  border: none;
   cursor: pointer;
-  margin-bottom: 30px;
-  transition: border-color 0.18s ease-out;
+  margin-bottom: 24px;
+  transition: color 0.2s ease-out;
 }
-.standby__lamp-core {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--lamp-color, var(--fg-faint));
-  transition: background-color 0.18s ease-out;
+.standby__orbital { display: block; overflow: visible; }
+.standby__orbital .orb-halo {
+  fill: none;
+  stroke: var(--lamp-ring, var(--line-strong));
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orb-halo 5s ease-in-out infinite;
 }
+@keyframes orb-halo { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.09); opacity: 0.8; } }
+.standby__orbital .orb-ring { fill: none; stroke: var(--lamp-ring, var(--line-strong)); stroke-width: 1.1; }
+.standby__orbital .orb-glow { fill: currentColor; }
+.standby__orbital .orb-core { fill: currentColor; filter: drop-shadow(0 0 8px currentColor); }
+.standby__orbital .orb-bright {
+  fill: var(--fg, #fff);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orb-core 5s ease-in-out infinite;
+}
+@keyframes orb-core { 0%, 100% { opacity: 0.68; transform: scale(0.86); } 50% { opacity: 1; transform: scale(1); } }
+.standby__orbital .orb-sat { fill: currentColor; filter: drop-shadow(0 0 4px currentColor); }
+.standby__orbital .orb-sat--t1 { opacity: 0.5; }
+.standby__orbital .orb-sat--t2 { opacity: 0.25; }
 .standby__lamp.tone-ok       { --lamp-ring: var(--ok-dim);      --lamp-color: var(--ok); }
 .standby__lamp.tone-warn     { --lamp-ring: var(--warn-dim);    --lamp-color: var(--warn); }
 .standby__lamp.tone-err      { --lamp-ring: var(--err-dim);     --lamp-color: var(--err); }
 .standby__lamp.tone-accent   { --lamp-ring: var(--accent-dim);  --lamp-color: var(--accent); }
 .standby__lamp.tone-checking { --lamp-ring: var(--line-strong); --lamp-color: var(--fg-faint); }
-.standby__lamp.is-pulsing .standby__lamp-core {
-  animation: standby-pulse 2.4s ease-in-out infinite;
+/* engine down: the orbit halts, the ring dashes */
+.standby__lamp.tone-err .orb-sat { display: none; }
+.standby__lamp.tone-err .orb-ring { stroke-dasharray: 3 6; opacity: 0.6; }
+/* in-flight (checking / starting): quicken the core's breath */
+.standby__lamp.is-pulsing .orb-bright { animation-duration: 1.4s; }
+.standby__lamp:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 50%; }
+@media (prefers-reduced-motion: reduce) {
+  .standby__orbital .orb-sat { display: none; }
+  .standby__orbital .orb-halo,
+  .standby__orbital .orb-bright { animation: none; }
 }
-.standby__lamp:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .standby__line {
   font-family: var(--font-display);
@@ -1412,6 +1434,30 @@ table.data-table {
 }
 .standby__rerun:hover { color: var(--fg); text-decoration: underline; }
 .standby__err { margin-top: 14px; color: var(--err); font-size: 12.5px; max-width: 46ch; }
+
+/* Quiet footer — one row of small links; goes bright only when an update
+ * is waiting. Replaces the old 2x2 hub-card grid. */
+.standby__footer {
+  margin-top: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.standby__link {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--fg-faint);
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s ease;
+}
+.standby__link:hover { color: var(--fg-muted); }
+.standby__link.is-accent { color: var(--fg); font-weight: 500; }
+.standby__link:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.standby__dot { color: var(--fg-faint); opacity: 0.5; }
 
 /* ── Hub card grid (Updates / Changelog / FAQ / Support) ──────────────
  * The launcher's hub destinations, below the primary verb. 2x2 grid of
