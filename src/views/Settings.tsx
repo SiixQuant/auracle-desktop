@@ -559,8 +559,7 @@ export function UpdatesInspector() {
 
           <button
             type="button"
-            className="primary"
-            style={{ width: "100%" }}
+            className="primary btn-block"
             disabled={loading || busy || ideConsent}
             onClick={() => void startUpdate()}
           >
@@ -619,7 +618,7 @@ export function UpdatesInspector() {
             </div>
           )}
 
-          <div style={{ marginTop: 14 }}>
+          <div className="mt-4">
             <div className="row">
               <span>Trading engine</span>
               <span className={`chip ${engineInstalled ? "ok" : "neutral"}`}>

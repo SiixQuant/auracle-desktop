@@ -15,6 +15,7 @@ import CommandPalette from "@/components/CommandPalette";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
 import StandbyHome from "@/components/StandbyHome";
 import DotField from "@/fx/DotField";
+import { frameFor } from "@/fx/orrery";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
 import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/tauri";
@@ -226,7 +227,14 @@ export default function Shell({
           onRerunSetup={onRerunSetup}
           onAgent={() => setInspector("intelligence")}
         />
-        <InspectorHost open={inspector} onClose={() => setInspector(null)} />
+        {/* The tray's Supervision echo draws the SAME instrument as the home
+            (§3.4). Derived once here and handed down rather than rebuilt
+            inside the tray, so the miniature and the board cannot disagree. */}
+        <InspectorHost
+          open={inspector}
+          instrument={frameFor(board, containers)}
+          onClose={() => setInspector(null)}
+        />
         {echo && (
           <div className="echo-line" role="status" aria-live="polite">
             ran <span className="mono">{echo}</span>

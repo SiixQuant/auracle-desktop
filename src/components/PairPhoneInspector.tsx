@@ -136,9 +136,20 @@ function PairBody({ phase, now }: { phase: Phase; now: number }) {
             </ol>
             <p className="pair-url m-0">{phase.info.url}</p>
             <p className="muted fs-xs m-0 mt-2">
-              {remaining > 0
-                ? `Code expires in ${mm}:${ss}`
-                : "This code expired — press New code."}
+              {remaining > 0 ? (
+                // The countdown is data, so it reads as data: mono + tabular,
+                // so the digits don't shimmy as the clock ticks. It SNAPS
+                // second to second and is never tweened (§2.4) — a smoothed
+                // countdown would show times the code was never at.
+                <>
+                  Code expires in{" "}
+                  <span className="mono">
+                    {mm}:{ss}
+                  </span>
+                </>
+              ) : (
+                "This code expired — press New code."
+              )}
             </p>
           </div>
         </div>

@@ -444,3 +444,119 @@ export const CHROME_DOTS = MARK.directions.map((direction, i) => {
     r: fmt(GEOM.body * scale),
   };
 });
+
+// ── The echo (§3.4 — the miniature at the top of Supervision) ─────
+//
+// Opening Supervision is opening the back of the instrument, so the tray leads
+// with the instrument itself: the same frame, the same ink, the same seats —
+// drawn small and STILL. It is the legend for the mapping the container list
+// underneath then spells out in words, which is the whole reason §3.4 puts it
+// there ("same encoding as home — teaches the mapping").
+//
+// Still, not slowed: a second turning orbit in a tray would be an animation
+// competing with the one on the board behind it, and the echo has nothing to
+// say that the home isn't already saying continuously. So it renders as plain
+// SVG with no tween of any kind, which also keeps §4's ticker budget where it
+// was — the tray adds zero animated nodes.
+
+/** The echo's scale and its parts.
+ *
+ *  Why the radii are re-picked rather than scaled: the echo draws the same
+ *  300-unit box at `size` CSS pixels, so one unit is ~0.39px. Scaling the
+ *  home's 8/20/5px parts down with the drawing would put a body under 2px,
+ *  which is not a drawing, it is dust. These land at ≈5/13/3.5px on screen —
+ *  the same proportions, legible at a third of the size. The ring's hairline
+ *  scales not at all (`non-scaling-stroke`), which is exactly right: chrome is
+ *  chrome at every size. */
+/** Vertical half-extent of the tilted ring, in drawing units — the standard
+ *  bound of an ellipse rotated by `tilt`. The instrument's square box is mostly
+ *  empty above and below a foreshortened orbit; a tray has no room to spend on
+ *  that, so the echo draws through a window cropped to this instead. */
+const RING_HALF_HEIGHT = Math.hypot(
+  GEOM.rx * Math.sin(GEOM.tilt * RAD),
+  GEOM.ry * Math.cos(GEOM.tilt * RAD),
+);
+
+/** Room left around the ring inside that window: a body, its stroke, and air. */
+const ECHO_PAD = 8;
+
+const ECHO_VIEW_Y = fmt(GEOM.cy - RING_HALF_HEIGHT - ECHO_PAD);
+const ECHO_VIEW_H = fmt(2 * (RING_HALF_HEIGHT + ECHO_PAD));
+const ECHO_WIDTH = 116;
+
+export const ECHO = {
+  /** CSS pixels across. */
+  size: ECHO_WIDTH,
+  /** …and down: the window's own aspect, so the orbit stays circular. */
+  height: fmt((ECHO_WIDTH * ECHO_VIEW_H) / GEOM.size),
+  /** The cropped window on the instrument's drawing. Full width, ring height. */
+  viewBox: `0 ${ECHO_VIEW_Y} ${GEOM.size} ${ECHO_VIEW_H}`,
+  /** ≈5px core dot. */
+  core: 6.5,
+  /** ≈13px soft ring. */
+  halo: 16.5,
+  /** ≈3.5px bodies. */
+  body: 4.5,
+} as const;
+
+/** The mark's two dots at echo scale — same bearings, same depths, same size
+ *  ratio, so the resting echo quotes the mark exactly like the instrument. */
+export const ECHO_CHROME_DOTS = CHROME_DOTS.map((dot) => ({
+  ...dot,
+  r: fmt(dot.r * (ECHO.body / GEOM.body)),
+}));
+
+/** How finely the ring is sampled to build its arc-length table. Measured
+ *  against GSAP's own parameterisation of RING_PATH, 2048 chords put every
+ *  seat within a fifth of a pixel of where MotionPath would carry a body at
+ *  the same progress — which is what makes the still echo a true freeze-frame
+ *  of the live instrument rather than a lookalike. */
+const SEAT_SAMPLES = 2048;
+
+/** Built on first use, then kept: the table is ~2k hypots, and a launcher that
+ *  never opens Supervision should not pay for it at import. */
+let seatTable: { theta: number[]; cum: number[] } | null = null;
+
+function ringTable(): { theta: number[]; cum: number[] } {
+  if (seatTable) return seatTable;
+  const theta: number[] = [];
+  const cum: number[] = [0];
+  for (let i = 0; i <= SEAT_SAMPLES; i++) {
+    theta.push(180 + (360 * i) / SEAT_SAMPLES);
+  }
+  for (let i = 1; i <= SEAT_SAMPLES; i++) {
+    const a = ringPoint(theta[i - 1]);
+    const b = ringPoint(theta[i]);
+    cum.push(cum[i - 1] + Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  seatTable = { theta, cum };
+  return seatTable;
+}
+
+/** Where a body seeded at path progress `p` SITS on the ring.
+ *
+ *  The live instrument hands `seed` to GSAP MotionPath, which walks RING_PATH
+ *  by ARC LENGTH — not by the ellipse parameter, which runs fast at the ends
+ *  of a foreshortened orbit and slow at its sides. So the echo may not simply
+ *  evaluate `ringPoint(360·p)`: that would seat a body in a visibly different
+ *  place from the one the home is carrying at the same progress. This walks the
+ *  same path the same way: cumulative chord lengths from the path's own start
+ *  (`ringPoint(180)`), inverted by binary search.
+ *
+ *  Progress wraps, so seeds at or beyond 1 are as valid as any other. */
+export function seatPoint(progress: number): { x: number; y: number } {
+  const { theta, cum } = ringTable();
+  const total = cum[SEAT_SAMPLES];
+  const wrapped = ((progress % 1) + 1) % 1;
+  const target = wrapped * total;
+  let lo = 1;
+  let hi = SEAT_SAMPLES;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cum[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  const span = cum[lo] - cum[lo - 1];
+  const f = span === 0 ? 0 : (target - cum[lo - 1]) / span;
+  return ringPoint(theta[lo - 1] + (theta[lo] - theta[lo - 1]) * f);
+}

@@ -4,7 +4,7 @@
 // dark-theme conventions. No dead controls: every button here resolves to
 // a concrete action (open a URL, copy a real diagnostics blob, send mail).
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 // Bundled at build time from the repo's CHANGELOG.md — real release notes,
 // shown in-app with no network dependency. (vite/client types the ?raw
@@ -44,7 +44,8 @@ export function ChangelogInspector() {
       <p className="muted fs-sm m-0 mb-3 lh-relaxed">
         What changed in each release of Auracle Desktop.
       </p>
-      <pre className="changelog-text">{changelogText}</pre>
+      <ChangelogText text={changelogText} />
+
       <p className="muted fs-xs mt-3 m-0 lh-relaxed">
         Older entries and downloads live on the{" "}
         <button type="button" className="linklike" onClick={() => void openReleases()}>
@@ -53,6 +54,36 @@ export function ChangelogInspector() {
         .
       </p>
     </div>
+  );
+}
+
+/** A release header in the bundled markdown: `## [0.8.37]`, `## [Unreleased]`.
+ *  The only line the reader scans for. */
+const RELEASE_HEADING = /^##\s/;
+
+/** The changelog, still verbatim and still plain text — the release headers
+ *  merely picked out of the ramp so the file can be SCANNED (§3.4).
+ *
+ *  Every character of the source survives, newlines included; the headers are
+ *  wrapped in a span, not parsed, so nothing here is ever interpreted as
+ *  markup. That distinction is the whole reason this panel renders a `pre`
+ *  instead of rendering markdown: release notes are text we ship, not a
+ *  document we execute. */
+function ChangelogText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <pre className="changelog-text">
+      {lines.map((line, i) => (
+        <Fragment key={i}>
+          {RELEASE_HEADING.test(line) ? (
+            <span className="changelog-text__release">{line}</span>
+          ) : (
+            line
+          )}
+          {i < lines.length - 1 ? "\n" : null}
+        </Fragment>
+      ))}
+    </pre>
   );
 }
 

@@ -926,6 +926,10 @@ table.data-table {
  * with seg-tabs. The ONLY place this size is defined. */
 .btn-sm { font-size: 12px; padding: 4px 10px; }
 
+/* A verb that owns its whole column — the tray's one primary action (§3.4:
+ * "the one blue verb Update Auracle full-width"). */
+.btn-block { display: block; width: 100%; }
+
 .fs-2xs { font-size: 10px; }          /* chip/log tier for fine print */
 .err-text { color: var(--err); }
 .ok-text  { color: var(--ok); }
@@ -1551,6 +1555,11 @@ table.data-table {
 .orrery__mass { fill: var(--orbit-body); }
 .orrery__body[data-tone="warn"] .orrery__mass { fill: var(--warn); }
 .orrery__body[data-tone="err"] .orrery__mass { fill: var(--err); }
+/* The tray's still echo (§3.4) has no orbit group to hang the tone on — a
+   seated body IS the mass — so the same two rules answer to the tone on the
+   mass itself. One ink law, both instruments. */
+.orrery__mass[data-tone="warn"] { fill: var(--warn); }
+.orrery__mass[data-tone="err"] { fill: var(--err); }
 .orrery__hit { fill: transparent; }
 .orrery__flag {
   fill: var(--fg-dim);
@@ -1732,68 +1741,25 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   pointer-events: none;
 }
 
-/* ── Hub card grid (Updates / Changelog / FAQ / Support) ──────────────
- * The launcher's hub destinations, below the primary verb. 2x2 grid of
- * quiet cards that each open a right-docked inspector. */
-.hub-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s-2);
-  width: 100%;
-  max-width: 420px;
-  margin-top: var(--s-5);
-}
-.hub-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 16px;
-  text-align: left;
-  /* Translucent tile over the animated WebGL dot field — the sign-in screen's
-     own surface treatment. NO backdrop-filter on purpose: WKWebView can't blur
-     a WebGL canvas (a frosted panel over one paints solid black), so we read
-     the dots through a translucent tint instead. The bottom readability fade
-     dims the dots behind this row, so the low-alpha white still reads as a
-     distinct luminous tile rather than vanishing. */
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--r-md);
-  box-shadow: var(--hairline-top);
-  cursor: pointer;
-  transition: background 0.14s, border-color 0.14s, transform 0.06s;
-}
-.hub-card--wide {
-  grid-column: 1 / -1;
-}
-.hub-card:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-.hub-card:active { transform: scale(0.99); }
-.hub-card:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
-.hub-card__icon { color: var(--fg-dim); margin-bottom: 2px; }
-.hub-card__title { font-size: 14px; font-weight: 500; color: var(--fg); }
-.hub-card__desc { font-size: 12px; color: var(--fg-muted); line-height: 1.4; }
-/* Live status row — the same pip vocabulary as the vitals; pinned to the card
-   bottom (margin-top:auto) so the row of cards shares one baseline. Every value
-   here is real engine/update truth; the row is omitted when a probe is silent. */
-.hub-card__status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: auto;
-  padding-top: 10px;
-  font-variant-numeric: tabular-nums;
-}
-.hub-card__status .vital__dot { width: 6px; height: 6px; }
-.hub-card__status-text { font-size: 11.5px; color: var(--fg-dim); }
+/* The 2×2 grid of translucent tiles that used to sit under the verb (Updates /
+ * Changelog / FAQ / Support) is gone: slice 5 folded those destinations into
+ * the ledger row, and slice 6 takes its styles with it — including the one
+ * rule that still reached for `.vital__dot`, a class the ledger merge had
+ * already retired. The tiles were also the launcher's last translucent
+ * surface; §1's depth law is opaque planes and hairlines, which is what the
+ * tray below is built from. */
 
-/* ── Hub inspector content (Changelog / FAQ / Support) ────────────────
- * Lives inside the right-docked InspectorHost cards; matches the dark
- * theme via tokens (no hardcoded colors). */
+/* ── Tray content — the inspector bodies ──────────────────────────────
+ * Everything below lives INSIDE the tray (`.insp`), whose own chassis is
+ * further down. Same tokens as the rest of the product; no surface here gets
+ * its own theme. */
 
-/* Changelog + diagnostics: bundled plain text, monospace, scrollable. */
+/* Changelog + diagnostics: bundled plain text, monospace, scrollable. A
+ * recessed well — one step DOWN the canvas ladder from the tray's --surface,
+ * so a block of machine text reads as something the panel contains rather than
+ * something printed on it. (It used to name two tokens that do not exist,
+ * `--surface-0`/`--surface-1`, so the declaration was invalid and the well
+ * rendered flat.) */
 .changelog-text,
 .diag-text {
   font-family: var(--font-mono);
@@ -1806,11 +1772,14 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   overflow-y: auto;
   margin: 0;
   padding: 10px 12px;
-  background: var(--surface-0, var(--surface-1));
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
 }
 .diag-text { max-height: 220px; }
+/* Release headings lifted out of the ramp so the file can be scanned. The text
+ * is untouched — this only inks the line (§3.4). */
+.changelog-text__release { color: var(--fg); }
 
 /* FAQ accordion. */
 .faq-list { display: flex; flex-direction: column; }
@@ -1822,40 +1791,51 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   gap: 8px;
   width: 100%;
   text-align: left;
-  padding: 12px 0;
+  padding: var(--s-3) 0;
   background: none;
   border: none;
   cursor: pointer;
+  font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
   color: var(--fg);
 }
 .faq-q:hover { color: var(--accent-text); }
+.faq-q:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
 .faq-chev {
   flex: none;
   font-size: 15px;
   line-height: 1.3;
   color: var(--fg-muted);
+  /* 160ms (§3.4) — a micro-state, so CSS keeps it (§2.4 allows ≤150ms hover
+     transitions; a disclosure chevron is the one control that earns the extra
+     ten, because it is reporting a change of state rather than a hover). */
   transition: transform 0.16s ease-out;
 }
 .faq-chev.open { transform: rotate(90deg); color: var(--accent-text); }
 .faq-a {
-  margin: 0 0 12px 20px;
+  margin: 0 0 var(--s-3) 20px;
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--fg-muted);
 }
 
-/* The quiet vitals row that used to live here is gone: slice 5 folded it into
- * the ledger (`.ledger__dot` / `__key` / `__value` carry its dot, its mono
- * label and its reading), which is what freed the vertical the instrument's
- * ~55% band needed. Status-is-the-door survived the merge — the engine cell is
- * still the button that opens Supervision. */
-
-@keyframes standby-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+/* An inline text control inside prose — "Retry", "releases page", a device-flow
+ * URL. It is a real <button> for the semantics and the keyboard; this is what
+ * makes it read as the link it behaves like. (It had NO rule at all, so three
+ * inspectors were rendering a native grey button box mid-sentence.) */
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-text);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
+.linklike:hover { color: var(--fg); }
+.linklike:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
 
 /* ── Single-surface shell (replaces the rail) ──────────────────────
  * A thin top bar + the Standby stage. No left rail: Connections /
@@ -1922,99 +1902,115 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 .standby-stage .standby { height: 100%; }
 
 /* ── Floating surfaces — edges only ────────────────────────────────
- * Every surface the launcher floats over its home board — the inspector
- * card, the ⌘K palette, the tutorial overlay, and the coachmark — carries
- * slightly firmer hairlines than the canvas, because a floater has to
- * announce its own edge against a live board behind it.
+ * The ⌘K palette, the tutorial overlay and the coachmark carry slightly
+ * firmer hairlines than the canvas, because a floater has to announce its own
+ * edge against a live board behind it.
+ *
+ * The TRAY left this list in slice 6. It is an opaque charcoal plane the full
+ * height of the stage (§1's depth law), so it separates from the board by TONE
+ * — it does not need a louder edge, and boosting --line inside it made every
+ * divider in every inspector shout a step above the same divider everywhere
+ * else in the product. The tray runs on the canonical §2.1 hairlines.
  *
  * These roots used to re-point --accent/--accent-soft/--accent-text at the
  * website's old emerald here. Emerald is RETIRED as a brand colour, and the
  * accent is now the same Nous-blue on every surface — a floating panel does
  * not get its own brand. Green survives only as --ok (health), which these
  * overrides never touched. */
-.insp-scrim, .insp-stage, .insp,
 .cmdk-scrim, .cmdk,
 .tut-overlay, .coach-scrim {
   --line:        rgba(255, 255, 255, 0.1);
   --line-strong: rgba(255, 255, 255, 0.2);
 }
 
-/* Right-docked inspector — slides OVER a dimmed-but-still-live home. */
+/* ── THE TRAY (redesign §3.4) ──────────────────────────────────────
+ * "The back of the instrument": a full-height right tray over a dimmed —
+ * never blurred — home that keeps polling behind it.
+ *
+ * It is a machined part, so it is built like one: an opaque --surface plane,
+ * one hairline edge, one restrained floater shadow, and nothing else. No
+ * glass, no gradient, no glow. The entrance and the exit are GSAP's
+ * (InspectorHost.tsx) — the pop keyframe this replaces could not be reversed,
+ * which is why closing used to be a disappearance rather than a move. */
 .insp-scrim {
   position: absolute;
   inset: 0;
-  /* Dim the home so it RECEDES behind the inspector. NO backdrop-filter: the
-     home is now a WebGL canvas, which WKWebView can't blur (a frosted scrim
-     over one paints solid black). With the blur gone, darkening alone does the
-     recede — a heavy translucent veil sinks the twinkling field and the
-     translucent hub tiles into one calm wash behind the floating panel. */
-  background: rgba(0, 0, 0, 0.62);
+  /* §2.3: a scrim is a plain alpha fill at α.55. NO backdrop-filter — not
+     here, not anywhere in this app: WKWebView paints it as flat black over a
+     canvas layer, and the home behind this IS a canvas. Nothing needs blurring
+     to be unreadable through an opaque panel; the dim is for the parts of the
+     board the tray doesn't cover. */
+  background: rgba(0, 0, 0, 0.55);
   z-index: 40;
-  animation: insp-fade 0.18s ease-out;
 }
-/* Full-screen flex stage that centers the floating card. The stage is
- * click-through (pointer-events: none) so a click outside the card still
- * reaches the scrim below and closes; only the card re-enables pointer events. */
+/* The stage docks the tray to the right edge. It is click-through
+ * (pointer-events: none) so a click beside the tray still reaches the scrim
+ * below and closes; only the tray itself re-enables pointer events. */
 .insp-stage {
   position: absolute;
   inset: 0;
   z-index: 41;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+  justify-content: flex-end;
   pointer-events: none;
 }
-/* Floating rectangular card (website theme): a bounded, fully-opaque
- * near-black panel over the dimmed home. Centered by the flex stage — NOT
- * via transform, which keeps the pop animation opacity-only. */
 .insp {
   position: relative;
   pointer-events: auto;
-  width: min(460px, 92vw);
-  max-height: min(78vh, 720px);
-  /* Fully opaque near-black — no gradient, no glass, no backdrop-filter (the
-     home is a WebGL canvas WKWebView can't blur). The dimmed home never
-     bleeds through the card's content. */
-  background: var(--bg-elev);
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-  overflow: hidden;
+  width: 420px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  animation: insp-pop 0.2s ease-out;
+  background: var(--surface);
+  border-left: 1px solid var(--line-strong);
+  /* Square on the window edge, --r-lg on the inner corner only (§2.3): the
+     tray is flush with the chassis on three sides and finished on the one
+     side that faces into the room. */
+  border-radius: var(--r-lg) 0 0 var(--r-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
-@keyframes insp-pop {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* §3.9: below 720px the tray becomes a 92% sheet rather than squeezing the
+   home into a sliver beside it. */
+@media (max-width: 720px) {
+  .insp { width: 92%; }
 }
-/* On the opaque panel, inner groups sit directly on the card — no nested
- * card-on-card fill. Stacked groups get a hairline divider instead. */
+
+/* Inside the tray, groups sit directly on the plane — the tray IS the
+ * container, so a card would be a box inside a box. Each group is a hairline
+ * section instead (§3.4, system). */
 .insp .card {
   background: transparent;
-  border: none;
+  border: 0;
   box-shadow: none;
   padding: 0;
+  margin-bottom: 0;
 }
-.insp .card + .card {
+/* …including on hover: the base card lifts its shadow there, and a de-boxed
+   block has no box to lift. */
+.insp .card:hover {
+  border: 0;
+  box-shadow: none;
+}
+.insp .card + .card,
+.insp .sgcell + .sgcell {
   border-top: 1px solid var(--line);
-  padding-top: 14px;
+  padding-top: var(--s-3);
 }
+/* The drawer brings its own rule and top space; the body's rhythm is enough. */
+.insp .adv-drawer { margin-top: 0; }
+
 .insp__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
   border-bottom: 1px solid var(--line);
   flex: none;
 }
-/* Mono-uppercase label treatment (matches .card-title) — the inspector
- * header reads in the website's quiet label language. */
+/* The mono-label register (§2.2) — the tray names itself the way the ledger
+ * names its keys. */
 .insp__title {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2024,35 +2020,60 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   color: var(--fg-muted);
   margin: 0;
 }
-.insp__close {
-  background: transparent;
-  border: 0;
+/* The key that closes it, drawn as the key it is (§3.4). Esc and this button
+ * are one control; the ✕ glyph it replaces named neither, and taught nothing. */
+.insp__esc {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--fg-muted);
-  font-size: 15px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 4px 7px;
   line-height: 1;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
+  transition: color 0.15s ease-out, background-color 0.15s ease-out,
+    border-color 0.15s ease-out;
 }
-.insp__close:hover { color: var(--fg); background: var(--surface); }
+.insp__esc:hover {
+  color: var(--fg);
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+.insp__esc:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .insp__body {
-  padding: 16px;
+  padding: var(--s-4);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  /* Fill the panel height so a single fill-card (Connections) can size to
-   * the viewport and scroll internally — dynamic from minimized to
-   * fullscreen. Multi-card inspectors just gain trailing space + scroll. */
+  /* Terminal-tight (§2.3): --s-3 above each section's hairline and --s-3
+     below it, so the rule sits centred in its own gap. */
+  gap: var(--s-3);
+  /* Fill the tray height so a single fill-card can size to the window and
+   * scroll internally. Multi-section inspectors just gain trailing space. */
   flex: 1 1 auto;
   min-height: 0;
 }
 
-@keyframes insp-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes insp-slide {
-  from { transform: translateX(24px); opacity: 0.5; }
-  to { transform: translateX(0); opacity: 1; }
+/* The instrument's echo — the legend at the top of Supervision (§3.4). Its
+ * size and its cropped window are decided in fx/orrery.ts (ECHO) and ride on
+ * the SVG's own width/height, so the drawing and the box it is drawn in are
+ * settled in one place; this only has to stop the base .orrery__svg rule
+ * (which stretches the home's instrument to its band) from overriding them. */
+.orrery-echo {
+  display: flex;
+  justify-content: center;
+  flex: none;
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
 }
+.orrery-echo .orrery__svg { width: auto; height: auto; }
+
+@keyframes surface-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .kbd-hint {
   font-family: var(--font-mono);
@@ -2072,7 +2093,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   font-size: 11px;
   color: var(--fg-faint);
   pointer-events: none;
-  animation: insp-fade 0.15s ease-out;
+  animation: surface-fade 0.15s ease-out;
 }
 .echo-line .mono { color: var(--accent-text); }
 
@@ -2086,7 +2107,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   justify-content: center;
   align-items: flex-start;
   padding-top: 14vh;
-  animation: insp-fade 0.15s ease-out;
+  animation: surface-fade 0.15s ease-out;
 }
 .cmdk {
   width: min(560px, 92vw);
@@ -2237,37 +2258,83 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 }
 .unblockers__row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-dim); }
 
-/* Strategy lifecycle belt — read-only six-stage spine of work. */
+/* ── Strategy lifecycle — six stations on one spine (§3.4) ─────────
+ * Read-only: a count in mono above each tick, the stage under it, and one
+ * hairline running the length of the belt. The vertical dividers this
+ * replaces cut the belt into six boxes; a lifecycle is a line, and the line
+ * is what the spine draws.
+ *
+ * The Live station carries an --ok dot only when the engine has actually
+ * reported something running there. It used to be permanently highlighted,
+ * which said "live" whether or not anything was. */
 .belt {
   display: flex;
-  margin-top: 4px;
-  font: 500 10px/1 var(--font-mono);
+  align-items: stretch;
+  margin-top: var(--s-1);
+  font-family: var(--font-mono);
 }
-.belt__seg {
+.belt__station {
   flex: 1;
-  text-align: center;
-  padding: 9px 2px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
   border: 0;
-  border-right: 1px solid var(--line);
   background: transparent;
+  font-family: inherit;
   color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   cursor: pointer;
-  transition: background-color 0.15s ease-out;
 }
-.belt__seg:last-child { border-right: 0; }
-.belt__seg:hover { background: var(--surface-2); }
-.belt__seg b {
-  display: block;
+.belt__count {
   font-size: 15px;
   font-weight: 500;
+  line-height: 1;
   color: var(--fg-dim);
-  margin-bottom: 5px;
   font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+  transition: color 0.15s ease-out;
 }
-.belt__seg.live { color: var(--accent-text); background: var(--accent-soft); border-radius: 6px; }
-.belt__seg.live b { color: var(--accent-text); }
+/* Each station carries its own segment of the one hairline, so the spine is
+   continuous across the belt and every tick sits ON it. */
+.belt__rail {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-top: 1px solid var(--line);
+}
+.belt__rail::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 5px;
+  background: var(--line-strong);
+  transform: translateX(-50%);
+}
+/* Lit: the tick becomes a health dot, straddling the spine. */
+.belt__rail.is-lit::after {
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.belt__label {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 0.15s ease-out;
+}
+.belt__station:hover .belt__label,
+.belt__station:hover .belt__count { color: var(--fg); }
+.belt__station:focus-visible {
+  outline: 2px solid var(--accent-dim);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 
 /* First-home coachmark — learn the anatomy once. */
 .coach-scrim {
@@ -2278,7 +2345,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: insp-fade 0.18s ease-out;
+  animation: surface-fade 0.18s ease-out;
 }
 .coach {
   width: min(420px, 92vw);
