@@ -6,10 +6,17 @@
 // HONESTY: there is no generic per-container log binding, so no panel
 // claims logs it can't source. (Broker gateways — IBKR and friends — are
 // supervised inside the IDE now, alongside the connections themselves.)
+//
+// Slice 6 gave it the composition §3.4 specifies, and nothing else: the
+// instrument's still echo at the top (the legend), then the stack verbs, the
+// engine chip, and the per-container ledger the echo is a picture of. Every
+// state, action and fault below is exactly the one that was here before.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import IncidentCard from "@/components/IncidentCard";
+import OrreryEcho from "@/components/OrreryEcho";
+import { containerTone, type OrreryFrame } from "@/fx/orrery";
 import {
   cmd,
   openInBrowser,
@@ -18,7 +25,14 @@ import {
   type HealthSnapshot,
 } from "@/lib/tauri";
 
-export default function SupervisionInspector() {
+export default function SupervisionInspector({
+  /** The home's instrument, for the echo. Absent means the caller has no
+   *  frame to hand over — then there is no echo, because a miniature drawn
+   *  from nothing would be a picture of a machine we haven't looked at. */
+  instrument,
+}: {
+  instrument?: OrreryFrame;
+} = {}) {
   const [containers, setContainers] = useState<ContainerStatus[] | null>(null);
   const [docker, setDocker] = useState<DockerStatus | null | "error">(null);
   const [dockerErr, setDockerErr] = useState<string | null>(null);
@@ -72,6 +86,10 @@ export default function SupervisionInspector() {
 
   return (
     <>
+      {/* The instrument, still — the same ring, core and bodies the home is
+          drawing, so the ledger below reads as its caption (§3.4). */}
+      {instrument && <OrreryEcho frame={instrument} />}
+
       {/* Engine + Docker glance */}
       <div className="card">
         <div className="card-head">
@@ -166,12 +184,24 @@ export default function SupervisionInspector() {
   );
 }
 
+/** The row's dot, in the ledger's ok/warn/err vocabulary — read off the same
+ *  classifier the instrument's bodies use (`fx/orrery.ts`, tested).
+ *
+ *  It used to be a second, local implementation matching SUBSTRINGS, which is
+ *  how "unhealthy" tested true for "healthy" and painted a sick container
+ *  green. That was survivable while nothing else on the panel disagreed; now
+ *  the echo sits directly above this list showing the same containers, so one
+ *  container may not read amber up there and healthy down here. One classifier,
+ *  two vocabularies: the instrument has no green (§2.1), the ledger does. */
 function containerDot(c: ContainerStatus): string {
-  const s = (c.health || c.state || "").toLowerCase();
-  if (s.includes("healthy") || s.includes("running") || s.includes("up")) return "ok";
-  if (s.includes("restart") || s.includes("starting")) return "warn";
-  if (s.includes("exit") || s.includes("dead") || s.includes("unhealthy")) return "err";
-  return "";
+  switch (containerTone(c)) {
+    case "warn":
+      return "warn";
+    case "err":
+      return "err";
+    default:
+      return "ok";
+  }
 }
 
 function DockerFault({

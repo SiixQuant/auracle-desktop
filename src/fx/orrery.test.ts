@@ -24,6 +24,8 @@ import { deriveBoard, type EngineState } from "../lib/aggregator.ts";
 import type { ContainerStatus } from "../lib/tauri.ts";
 import {
   CHROME_DOTS,
+  ECHO,
+  ECHO_CHROME_DOTS,
   FALLBACK_PHASE,
   GEOM,
   MARK,
@@ -42,6 +44,7 @@ import {
   orreryPhase,
   ringExtent,
   ringPoint,
+  seatPoint,
   type OrreryPhase,
 } from "./orrery.ts";
 
@@ -345,6 +348,130 @@ test("the resting state reproduces the brand mark", () => {
   // (4) the size difference is the mark's, and it is perspective, not data.
   near(CHROME_DOTS[0].r / CHROME_DOTS[1].r, 0.624, 0.005, "chrome dot size ratio");
   assert.equal(CHROME_DOTS[1].r, GEOM.body, "the near dot is a body-sized body");
+});
+
+// ── §3.4: the echo is the same instrument, sat still ──────────────
+
+test("a seat is a point ON the ring, wherever the seed falls", () => {
+  for (const p of [0, 0.1, 0.25, 0.333, 0.5, 0.586, 0.75, 0.99]) {
+    const seat = seatPoint(p);
+    const dir = Math.atan2(seat.y - GEOM.cy, seat.x - GEOM.cx) / RAD;
+    // A body rides the ring itself, so its distance from the core must be the
+    // ring's own reach in that direction — the echo may not float one inside.
+    near(
+      Math.hypot(seat.x - GEOM.cx, seat.y - GEOM.cy),
+      ringExtent(dir),
+      0.05,
+      `seat at p=${p} sits on the ring`,
+    );
+  }
+});
+
+test("the seat walk starts where the ring path starts, and wraps", () => {
+  const start = ringPoint(180);
+  const zero = seatPoint(0);
+  near(zero.x, start.x, 1e-6, "seat(0) x");
+  near(zero.y, start.y, 1e-6, "seat(0) y");
+  // Progress wraps, so a seed at 1 (or beyond) is the same seat as 0 — the
+  // orbit has no end to fall off.
+  for (const p of [1, 2, -1]) {
+    const wrapped = seatPoint(p);
+    near(wrapped.x, zero.x, 1e-6, `seat(${p}) x wraps`);
+    near(wrapped.y, zero.y, 1e-6, `seat(${p}) y wraps`);
+  }
+});
+
+test("seats are walked by ARC LENGTH, not by the ellipse parameter", () => {
+  // This is the whole reason seatPoint exists. GSAP's MotionPath carries the
+  // live bodies along the path by length, so equal steps of progress are equal
+  // DISTANCES round the orbit. Evaluating the ellipse parameter instead would
+  // sprint through the foreshortened ends and crawl along the sides, seating
+  // the echo's bodies visibly away from where the home is carrying them.
+  // Measured with short steps on purpose: the yardstick is a straight chord,
+  // and a chord only equals the arc it spans in the limit. At 360 steps the
+  // gap is under a thousandth even at the orbit's tightest end, so what is
+  // left to see is the parameterisation itself.
+  const steps = 360;
+  const lengths: number[] = [];
+  for (let i = 0; i < steps; i++) {
+    const a = seatPoint(i / steps);
+    const b = seatPoint((i + 1) / steps);
+    lengths.push(Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  const min = Math.min(...lengths);
+  const max = Math.max(...lengths);
+  assert.ok(max / min < 1.005, `equal progress must be equal distance (${min}–${max})`);
+  // …and the naive parameterisation really would be wrong. The two agree only
+  // at the quarter points, where the ellipse's own symmetry forces it; away
+  // from those they part by several body-widths, which is what makes this a
+  // test rather than a preference. MARK.seed is one such place, and it is the
+  // seat a lone container actually gets.
+  for (const p of [0.1, MARK.seed]) {
+    const naive = ringPoint(180 + p * 360);
+    const seat = seatPoint(p);
+    assert.ok(
+      Math.hypot(naive.x - seat.x, naive.y - seat.y) > GEOM.body * 4,
+      `the ellipse parameter is not the path parameter (p=${p})`,
+    );
+  }
+});
+
+test("the echo quotes the instrument's proportions, not its pixels", () => {
+  // Scaling the drawing down would put a body under 2px — the echo re-picks
+  // the radii for its own size instead. What may NOT drift is the ordering
+  // (halo outside core, core bigger than a body) or the mark's dot ratio.
+  assert.ok(ECHO.halo > ECHO.core, "the soft ring contains the core");
+  assert.ok(ECHO.core > ECHO.body, "the core leads the bodies");
+  assert.ok(ECHO.size < GEOM.size, "the echo is a miniature");
+  // The cropped window keeps the drawing's own scale in both axes, so the
+  // orbit is still circular-in-projection rather than squashed to fit.
+  const [, vy, vw, vh] = ECHO.viewBox.split(" ").map(Number);
+  near(ECHO.height / ECHO.size, vh / vw, 1e-4, "the box matches its window");
+  assert.ok(vy > 0 && vy + vh < GEOM.size, "the window crops, and stays inside");
+  // …and it still contains the whole instrument: the ring's extremes, the
+  // halo, and a body's radius at each.
+  for (const theta of [0, 45, 90, 135, 180, 225, 270, 315]) {
+    const p = ringPoint(theta);
+    assert.ok(
+      p.y - ECHO.body >= vy && p.y + ECHO.body <= vy + vh,
+      `the window holds the ring at θ=${theta}`,
+    );
+  }
+  assert.ok(GEOM.cy - ECHO.halo > vy, "…and the core's soft ring");
+  // The mark's own two dots keep their ratio at echo scale (§2.5).
+  near(
+    ECHO_CHROME_DOTS[0].r / ECHO_CHROME_DOTS[1].r,
+    CHROME_DOTS[0].r / CHROME_DOTS[1].r,
+    0.005,
+    "chrome dot ratio survives the scale",
+  );
+  assert.equal(ECHO_CHROME_DOTS[1].r, ECHO.body, "the near dot is a body");
+  ECHO_CHROME_DOTS.forEach((dot, i) => {
+    assert.equal(dot.x, CHROME_DOTS[i].x, "the bearings do not move");
+    assert.equal(dot.y, CHROME_DOTS[i].y);
+  });
+});
+
+test("the echo draws the frame it is given, never one of its own", () => {
+  // The echo takes the home's frame whole, so every state it can be handed is
+  // one of the six — and each is already asserted distinct above. What this
+  // pins is that a frame carries everything the still drawing needs: a ring
+  // style, a core tone, and either bodies with seats or the mark's dots.
+  for (const phase of PHASES) {
+    const f = orreryFrame(phase, STACK);
+    assert.ok(f.ring && f.core, `${phase} has a ring and a core to draw`);
+    if (f.chrome) {
+      assert.equal(f.bodies.length, 0, `${phase}: chrome stands in for bodies`);
+    } else {
+      for (const body of f.bodies) {
+        const seat = seatPoint(body.seed);
+        assert.ok(
+          Number.isFinite(seat.x) && Number.isFinite(seat.y),
+          `${phase}: ${body.name} has a seat`,
+        );
+      }
+    }
+  }
 });
 
 // ── The guard ─────────────────────────────────────────────────────

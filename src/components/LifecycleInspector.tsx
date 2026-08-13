@@ -5,6 +5,13 @@
 // lit, otherwise it degrades to labels-only — it NEVER fabricates a count
 // the engine didn't give it. Mutation belongs to the IDE/engine, so every
 // segment deep-links into the workspace that owns the files and runs.
+//
+// Slice 6 redrew the belt as §3.4 specifies: six stations on one horizontal
+// hairline spine, each a tick with its count in mono above it. The one reading
+// that changed is the Live station's — it used to sit permanently highlighted,
+// which said "live" whether or not anything was. Now it carries the --ok dot
+// only when the engine has actually reported a strategy running there. Same
+// data, one fewer standing claim.
 
 import { useEffect, useState } from "react";
 
@@ -51,18 +58,24 @@ export default function LifecycleInspector() {
       </div>
 
       <div className="belt">
-        {STRATEGY_STATES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            className={`belt__seg${s === "live" ? " live" : ""}`}
-            onClick={() => void openIdePanel(s === "live" ? "runs" : "strategies")}
-            title={`Open ${LABELS[s]} in the workspace`}
-          >
-            <b>{counts ? counts[s] : "–"}</b>
-            {LABELS[s]}
-          </button>
-        ))}
+        {STRATEGY_STATES.map((s) => {
+          // Lit = the engine says something is actually running there. A
+          // count we were never given cannot light anything.
+          const lit = s === "live" && !!counts && counts.live > 0;
+          return (
+            <button
+              key={s}
+              type="button"
+              className="belt__station"
+              onClick={() => void openIdePanel(s === "live" ? "runs" : "strategies")}
+              title={`Open ${LABELS[s]} in the workspace`}
+            >
+              <b className="belt__count">{counts ? counts[s] : "–"}</b>
+              <span className={`belt__rail${lit ? " is-lit" : ""}`} aria-hidden="true" />
+              <span className="belt__label">{LABELS[s]}</span>
+            </button>
+          );
+        })}
       </div>
 
       <p className="muted fs-xs mt-3 lh-relaxed">
