@@ -229,7 +229,7 @@ function GithubConnect() {
 
     case "already":
       return (
-        <div className="ob-status mt-2">
+        <div className="comm-row mt-2">
           <span className="chip ok">connected</span>
           {phase.login ? (
             <span className="muted mono">@{phase.login}</span>
@@ -241,7 +241,7 @@ function GithubConnect() {
 
     case "connected":
       return (
-        <div className="ob-status mt-2">
+        <div className="comm-row mt-2">
           <span className="chip ok">connected</span>
           <span className="muted mono">
             {phase.login ? `Connected as @${phase.login}` : "Connected"}
@@ -264,7 +264,7 @@ function GithubConnect() {
     case "awaiting":
       return (
         <div className="mt-2">
-          <span className="ob-label">Enter this code on GitHub</span>
+          <span className="comm-label">Enter this code on GitHub</span>
           <div className="hstack" style={{ gap: 12, alignItems: "center" }}>
             <code className="mono" style={{ fontSize: 20, letterSpacing: 2 }}>
               {phase.start.user_code}

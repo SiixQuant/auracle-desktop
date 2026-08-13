@@ -1,23 +1,63 @@
-// Onboarding — first-run wizard. Three named steps:
+// Onboarding — the commissioning sequence. Three named stations:
 //   1. Environment — Docker runtime check (auto-detects once a
 //      download link is clicked; no relaunch needed)
-//   2. License — key entry (skip lands on Community)
+//   2. Sign in — account or license key (skip lands on Community)
 //   3. Install — pre-flight, then an EXPLICIT install start with
 //      live progress. The installer never starts itself: pulling
 //      gigabytes is a consented action, and an explicit gate is
 //      also what keeps a failed install from auto-retrying forever.
 //
-// Auto-shown by App.tsx when cmd.isInstalled() returns false.
-// Subscribes to the 'installer-progress' Tauri event for live
-// stepper updates while install.sh runs.
+// Auto-shown by App.tsx when cmd.isInstalled() returns false, and re-openable
+// from the home's "Re-run setup" ghost line. Subscribes to the
+// 'installer-progress' Tauri event for live progress while install.sh runs.
+//
+// ─── What slice 8 changed, and what it did not ────────────────────
+//
+// Design authority: launcher-redesign-direction.md §3.2. The horizontal
+// stepper becomes a commissioning rail down the left with three stations, and
+// the wizard's card becomes the same charcoal chamber the sign-in and the home
+// stand in — with the instrument itself at the top, being BUILT. The ring is
+// dim until a real Docker runtime answers; the arc is the installer's own
+// percent; the core stays unlit through the entire build and ignites only when
+// the engine answers a real health probe, at which point the containers the
+// install actually produced take their seats and the mechanism turns for the
+// first time. That frame is the home's frame, which is why the handover a
+// second later is a continuation and not a cut.
+//
+// NOTHING ABOUT THE FLOW MOVED. Every command, poll, event subscription,
+// gate, retry, consent point and endpoint below is the one that was here
+// before: the 5s Docker poll and both of its triggers, the license save
+// heuristic and the skip-clears-it path, the pre-flight's stack-up argument,
+// the explicit install gate, `waitForEngineHealthy` and its retry, the 1.8s
+// bounce to /ui/setup and `onDone()`. What changed is what they look like.
+//
+// The one new read is `stackStatus()` — the same call the home makes to draw
+// the same bodies. It runs after the installer has already finished, purely so
+// the instrument can seat the containers the install produced rather than
+// inventing two. If it fails or comes back empty, the instrument falls back to
+// the mark's own two chrome dots, which carry nothing.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { AuracleGlyph } from "@/components/AuracleGlyph";
+import CommissioningInstrument from "@/components/CommissioningInstrument";
+import IncidentCard from "@/components/IncidentCard";
+import DotField from "@/fx/DotField";
+import {
+  commissioningView,
+  type CommissioningReading,
+  type CommissioningView,
+  type PreflightVerdict,
+  type Station as RailStation,
+} from "@/fx/commissioning";
+import { DUR, gsap, mech, revealWords, useGSAP } from "@/fx/motion";
+import { orreryFrame, type OrreryFrame } from "@/fx/orrery";
 import { engineIsUp, waitForEngineHealthy } from "@/lib/onboarding";
 import {
   cmd,
   onEvent,
   openInBrowser,
+  type ContainerStatus,
   type DockerStatus,
   // Aliased locally so existing references in this file don't churn —
   // the canonical name lives in @/lib/tauri.ts.
@@ -31,7 +71,34 @@ interface OnboardingProps {
   googleWaiting?: boolean;
 }
 
-const STEPS = ["Environment", "Sign in", "Install"] as const;
+/** Where the instrument's core sits down the window, as a fraction of the
+ *  height — the focus point of the ambient field's brightness ramp, measured
+ *  the same way the Shell measures its own: the field is there to seat the
+ *  instrument, so it points at it. The commissioning stage runs a little
+ *  higher than the home's because the sequence takes the room underneath. */
+const INSTRUMENT_FOCUS_Y = 0.3;
+
+/** Everything the sequence's own state machine reports up to the instrument.
+ *  `step` and the browser sign-in live on the parent already; `phase` rides
+ *  along because the word under the arc is the installer's, even though the
+ *  staging never reads it. */
+type StationReading = Omit<CommissioningReading, "step" | "signInWaiting"> & {
+  phase?: string;
+};
+
+/** Station 3 as it is before it has asked anything. Re-applied whenever the
+ *  install station is (re-)entered, so a reading from a previous visit can
+ *  never stage the instrument ahead of a pre-flight that has not run yet. */
+const UNASKED: StationReading = {
+  dockerRunning: false,
+  preflight: "pending",
+  alreadyRunning: false,
+  installing: false,
+  finished: false,
+  engineHealthy: null,
+  installFailed: false,
+  percent: undefined,
+};
 
 export default function Onboarding({
   onDone,
@@ -40,6 +107,8 @@ export default function Onboarding({
 }: OnboardingProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [licenseKey, setLicenseKey] = useState("");
+  const [reading, setReading] = useState<StationReading>(UNASKED);
+  const [containers, setContainers] = useState<ContainerStatus[]>([]);
 
   // Pre-fill license input if a key was previously stored (re-run case).
   useEffect(() => {
@@ -50,71 +119,223 @@ export default function Onboarding({
       .catch(() => {});
   }, []);
 
-  return (
-    <div
-      className="ob-shell"
-      style={{ maxWidth: 640, margin: "48px auto", padding: 32 }}
-    >
-      <div className="hstack" style={{ marginBottom: 24 }}>
-        <span className="logo-dot healthy" style={{ width: 12, height: 12 }} />
-        <h1 className="ob-title m-0">Welcome to Auracle Desktop</h1>
-      </div>
+  /** The stations publish facts; the instrument reads them. One direction, and
+   *  the sequence's own components keep owning their state. */
+  const report = useCallback((patch: Partial<StationReading>) => {
+    setReading((prev) => ({ ...prev, ...patch }));
+  }, []);
 
-      <Stepper current={step} />
-
-      <div>
-        {step === 1 && (
-          <Step1
-            onNext={() => setStep(2)}
-          />
-        )}
-        {step === 2 && (
-          <Step2
-            licenseKey={licenseKey}
-            setLicenseKey={setLicenseKey}
-            onBack={() => setStep(1)}
-            onSkip={() => {
-              cmd.licenseClear().catch(() => {});
-              setStep(3);
-            }}
-            onNext={() => setStep(3)}
-            onGoogleSignIn={onGoogleSignIn}
-            googleWaiting={googleWaiting}
-          />
-        )}
-        {step === 3 && (
-          <Step3
-            licenseKey={licenseKey}
-            onBack={() => setStep(2)}
-            onDone={onDone}
-          />
-        )}
-      </div>
-    </div>
+  const goto = useCallback(
+    (next: 1 | 2 | 3) => {
+      // Entering the install station clears every station-3 fact: the pre-
+      // flight is about to be run again, and until it answers the honest
+      // reading is "we have not been told".
+      if (next === 3) {
+        setReading((prev) => ({ ...UNASKED, dockerRunning: prev.dockerRunning }));
+      }
+      setStep(next);
+    },
+    [],
   );
-}
 
-// ── Stepper bar ─────────────────────────────────────────────────
+  const view = commissioningView({
+    ...reading,
+    step,
+    signInWaiting: !!googleWaiting,
+  });
 
-function Stepper({ current }: { current: 1 | 2 | 3 }) {
+  // The bodies of the ceremony: the containers the install actually produced.
+  // Read once the installer has finished and again when the engine answers —
+  // in parallel with the health poll, never in front of it, so nothing the
+  // user needs to READ waits on a call made for the instrument's benefit.
+  useEffect(() => {
+    if (!reading.finished) return;
+    cmd.stackStatus()
+      .then((s) => setContainers(s.containers))
+      .catch(() => {});
+  }, [reading.finished, reading.engineHealthy]);
+
+  const frame = view.assembled ? orreryFrame("ready", containers) : null;
+
   return (
-    <div className="stepper">
-      {STEPS.map((name, i) => {
-        const n = i + 1;
-        const state = n < current ? "done" : n === current ? "current" : "";
-        return (
-          <div key={name} className={`step ${state}`}>
-            {name}
+    <div className="commissioning">
+      {/* The same ambient stage the threshold and the home stand on, at the
+          same ink and under the same power law (the component owns it): the
+          first run is the third room in one chamber, not a different app. */}
+      <DotField focusY={INSTRUMENT_FOCUS_Y} />
+
+      <header className="topbar">
+        <div className="topbar__brand">
+          <AuracleGlyph className="topbar__mark" />
+          <span className="commissioning__title">Commissioning your desk</span>
+        </div>
+      </header>
+
+      <main
+        className="commissioning__stage"
+        data-phase={view.assembled ? "handover" : view.stage}
+      >
+        <Stage view={view} frame={frame} phase={phaseWord(reading)} />
+
+        {view.assembled ? (
+          <Handover />
+        ) : (
+          <div className="commissioning__sequence">
+            <Rail stations={view.stations} />
+            <div className="comm-station">
+              {step === 1 && (
+                <Station1 onNext={() => goto(2)} publish={report} />
+              )}
+              {step === 2 && (
+                <Station2
+                  licenseKey={licenseKey}
+                  setLicenseKey={setLicenseKey}
+                  onBack={() => goto(1)}
+                  onSkip={() => {
+                    cmd.licenseClear().catch(() => {});
+                    goto(3);
+                  }}
+                  onNext={() => goto(3)}
+                  onGoogleSignIn={onGoogleSignIn}
+                  googleWaiting={googleWaiting}
+                />
+              )}
+              {step === 3 && (
+                <Station3
+                  licenseKey={licenseKey}
+                  onBack={() => goto(2)}
+                  onDone={onDone}
+                  publish={report}
+                />
+              )}
+            </div>
           </div>
-        );
-      })}
+        )}
+      </main>
     </div>
   );
 }
 
-// ── Step 1: Environment (Docker check) ─────────────────────────
+/** The installer's own phase word, under the arc (§3.2). Its words, with the
+ *  underscores it sends turned into spaces and nothing else changed — which is
+ *  why a failed install keeps the phase it died in rather than being handed a
+ *  word of ours. */
+function phaseWord(reading: StationReading): string | null {
+  // At the handover the installer has nothing left to say that the verdict
+  // underneath does not say better, and the frame is meant to BE the home's —
+  // which has no phase line. Everywhere else its last word stands.
+  if (reading.finished) return reading.engineHealthy === true ? null : "done";
+  if (!reading.installing && !reading.installFailed) return null;
+  return reading.phase ? reading.phase.replace(/_/g, " ") : "starting…";
+}
 
-function Step1({ onNext }: { onNext: () => void }) {
+// ── Band 1 — the instrument, being built ────────────────────────
+
+function Stage({
+  view,
+  frame,
+  phase,
+}: {
+  view: CommissioningView;
+  frame: OrreryFrame | null;
+  phase: string | null;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  /** The instrument's height as of the previous render, so the growth into the
+   *  room the sequence vacates can be a MOVE rather than a jump. */
+  const wasTall = useRef(0);
+
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el) return;
+      const now = el.getBoundingClientRect().height;
+      const before = wasTall.current;
+      wasTall.current = now;
+      // The band opens up twice — when an install actually starts, and at the
+      // handover — and never the other way. Anything else is a resize, which
+      // is not a move and is not animated.
+      if (before <= 0 || now <= before) return;
+      // Transform-only, so the mechanism grows on the compositor and the §4
+      // budget is untouched. Under reduced motion the time is zero and the
+      // instrument is simply already this size.
+      gsap.set(el, { scale: before / now, transformOrigin: "center" });
+      mech(el, { scale: 1, duration: DUR.long });
+    },
+    { dependencies: [view.stage] },
+  );
+
+  return (
+    <div className="commissioning__band">
+      <div className="commissioning__instrument" ref={ref}>
+        <CommissioningInstrument view={view} frame={frame} />
+      </div>
+      {phase && <div className="commission-phase">{phase}</div>}
+    </div>
+  );
+}
+
+// ── The commissioning rail (§3.2) ───────────────────────────────
+
+function Rail({ stations }: { stations: RailStation[] }) {
+  return (
+    <ol className="comm-rail" aria-label="Commissioning stations">
+      {stations.map((s) => (
+        <li
+          key={s.key}
+          className="comm-rail__station"
+          data-state={s.state}
+          aria-current={s.state === "current" ? "step" : undefined}
+        >
+          <span className="comm-rail__tick" aria-hidden="true" />
+          <span className="comm-rail__label">{s.label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+// ── The handover (§3.2 — the ceremony's last frame) ─────────────
+
+/** What the chamber says at the moment it becomes the home: one display-serif
+ *  line and the sentence that has always followed it. The wizard's own 1.8s
+ *  timer bounces the browser and calls `onDone()` from where it always did —
+ *  this surface is what is on screen while that happens, and it is not a gate
+ *  on anything. */
+function Handover() {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el) return;
+      return revealWords(el);
+    },
+    { scope: ref },
+  );
+
+  return (
+    <div className="commissioning__handover">
+      <h1 className="commissioning__verdict" ref={ref}>
+        The stack is up.
+      </h1>
+      <p className="comm-lede">
+        Finishing first-run setup in your browser at <code>localhost:1969</code>{" "}
+        — the launcher stays here for engine status and updates; brokers
+        connect in the workspace.
+      </p>
+    </div>
+  );
+}
+
+// ── Station 1: Environment (Docker check) ───────────────────────
+
+function Station1({
+  onNext,
+  publish,
+}: {
+  onNext: () => void;
+  publish: (patch: Partial<StationReading>) => void;
+}) {
   const [docker, setDocker] = useState<DockerStatus | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -148,8 +369,12 @@ function Step1({ onNext }: { onNext: () => void }) {
 
   const ready = !!docker?.installed && !!docker?.running;
 
+  // The instrument's ring lifts from dim to chrome on exactly this fact.
+  useEffect(() => publish({ dockerRunning: ready }), [ready, publish]);
+
   return (
-    <Actions
+    <Station
+      title="First, a Docker runtime."
       canNext={ready}
       onNext={onNext}
       nextDisabledReason={
@@ -162,35 +387,25 @@ function Step1({ onNext }: { onNext: () => void }) {
               : undefined
       }
     >
-      <div className="step-head">Set up Auracle</div>
-      <p className="muted">
-        Auracle Desktop manages a self-hosted algorithmic-trading platform
-        that runs locally on your machine. The first thing it needs is a
-        working Docker runtime.
+      <p className="comm-lede">
+        Auracle Desktop runs a self-hosted algorithmic-trading platform on this
+        machine. Everything it installs needs a working Docker runtime.
       </p>
 
-      <span className="ob-label">Docker runtime</span>
+      <span className="comm-label">Docker runtime</span>
       <DockerCheck docker={docker} onTriggerPoll={startPoll} />
 
-      <span className="ob-label">What you&apos;ll get after install</span>
-      <ul className="ob-values">
-        <li>
-          The <strong>Auracle platform</strong> at <code>localhost:1969</code>{" "}
-          — Home, Build, Research, and Trade in one place: backtests,
-          schedules, brokers, live runs
-        </li>
-        <li>
-          The <strong>Auracle IDE</strong> — an AI engineer inside Build that
-          drafts, edits, and backtests strategies with you
-        </li>
-        <li>
-          <strong>MCP server</strong> so Claude / Cursor can drive Auracle
-        </li>
-        <li>
-          <strong>TimescaleDB</strong> for tick-level price storage
-        </li>
-      </ul>
-    </Actions>
+      <span className="comm-label">What you&apos;ll get after install</span>
+      <div className="comm-rows">
+        <Row k="platform">
+          Backtests, schedules, brokers and live runs at{" "}
+          <code>localhost:1969</code>
+        </Row>
+        <Row k="ide">An AI engineer that drafts and backtests with you</Row>
+        <Row k="mcp">Claude and Cursor can drive Auracle directly</Row>
+        <Row k="timescaledb">Tick-level price storage</Row>
+      </div>
+    </Station>
   );
 }
 
@@ -203,7 +418,8 @@ function DockerCheck({
 }) {
   if (!docker) {
     return (
-      <div className="ob-status">
+      <div className="comm-row">
+        <span className="comm-row__key">docker</span>
         <span className="chip neutral">checking</span>
       </div>
     );
@@ -212,13 +428,14 @@ function DockerCheck({
   if (!docker.installed) {
     return (
       <>
-        <div className="ob-status">
+        <div className="comm-row">
+          <span className="comm-row__key">docker</span>
           <span className="chip err">not installed</span>
-          <span className="muted fs-sm">
-            Install Docker Desktop, leave this window open — the status
-            flips on its own once it&apos;s running.
-          </span>
         </div>
+        <p className="comm-note">
+          Install Docker Desktop, leave this window open — the status flips on
+          its own once it&apos;s running.
+        </p>
         <div className="wrap-row mt-2">
           <button
             type="button"
@@ -257,22 +474,27 @@ function DockerCheck({
 
   if (!docker.running) {
     return (
-      <div className="ob-status">
-        <span className="chip warn">installed · not running</span>
-        <span className="muted fs-sm">
-          Start <strong>{runtimeName(docker.runtime)}</strong> — this updates
-          on its own once the daemon is up.
-        </span>
-      </div>
+      <>
+        <div className="comm-row">
+          <span className="comm-row__key">docker</span>
+          <span className="comm-row__value">{runtimeName(docker.runtime)}</span>
+          <span className="chip warn">installed · not running</span>
+        </div>
+        <p className="comm-note">
+          Start <strong>{runtimeName(docker.runtime)}</strong> — this updates on
+          its own once the daemon is up.
+        </p>
+      </>
     );
   }
 
   return (
-    <div className="ob-status">
-      <span className="chip ok">running</span>
-      <span className="muted mono">
+    <div className="comm-row">
+      <span className="comm-row__key">docker</span>
+      <span className="comm-row__value">
         {docker.version || "docker"} · {runtimeName(docker.runtime)}
       </span>
+      <span className="chip ok">running</span>
     </div>
   );
 }
@@ -289,9 +511,9 @@ function runtimeName(r?: string) {
   );
 }
 
-// ── Step 2: License key ─────────────────────────────────────────
+// ── Station 2: Sign in / license key ────────────────────────────
 
-function Step2({
+function Station2({
   licenseKey,
   setLicenseKey,
   onBack,
@@ -309,7 +531,8 @@ function Step2({
   googleWaiting?: boolean;
 }) {
   return (
-    <Actions
+    <Station
+      title="Sign in, or bring a key."
       canNext
       onBack={onBack}
       onSkip={onSkip}
@@ -317,33 +540,21 @@ function Step2({
       nextLabel="Next →"
       skipLabel="Skip for Community tier"
     >
-      <div className="step-head">Sign in</div>
-      <p className="muted">
+      <p className="comm-lede">
         Sign in with your Auracle account and your subscription is your license
         — there&apos;s no key to paste. Have an enterprise or offline key
         instead? Add it below.
       </p>
       {onGoogleSignIn && (
         <>
+          {/* The threshold's own control, unchanged: the one deliberately
+              non-charcoal surface in the app, because the Google affordance is
+              a trust signal (§3.1). */}
           <button
             type="button"
+            className="comm-google"
             onClick={() => onGoogleSignIn()}
             disabled={googleWaiting}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              background: "#fff",
-              color: "#111",
-              fontWeight: 500,
-              border: "none",
-              borderRadius: 8,
-              padding: "11px 16px",
-              cursor: googleWaiting ? "default" : "pointer",
-              opacity: googleWaiting ? 0.6 : 1,
-            }}
           >
             {!googleWaiting && (
               <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
@@ -356,21 +567,12 @@ function Step2({
             {googleWaiting ? "Waiting for browser sign-in…" : "Continue with Google"}
           </button>
           {googleWaiting && (
-            <p className="muted fs-xs mt-2">
+            <p className="comm-note mt-2">
               Finish signing in in your browser, then return here.
             </p>
           )}
-          <div
-            className="hstack"
-            style={{ gap: 12, margin: "18px 0", alignItems: "center" }}
-          >
-            <span
-              style={{ height: 1, flex: 1, background: "var(--line, rgba(255,255,255,0.12))" }}
-            />
-            <span className="muted fs-xs">or with a license key</span>
-            <span
-              style={{ height: 1, flex: 1, background: "var(--line, rgba(255,255,255,0.12))" }}
-            />
+          <div className="comm-divider">
+            <span>or with a license key</span>
           </div>
         </>
       )}
@@ -382,31 +584,33 @@ function Step2({
         onChange={(e) => setLicenseKey(e.target.value)}
       />
       {licenseKey ? (
-        <div className="muted mono fs-xs mt-2">
+        <div className="comm-note mono mt-2">
           {licenseKey.length >= 16
             ? "Will be saved when you click Next."
             : "Looks short — check the key for typos."}
         </div>
       ) : null}
-      <p className="muted fs-xs mt-4">
+      <p className="comm-note mt-4">
         Don&apos;t have a key yet? Click <strong>Skip for Community tier</strong>
-        {" "}below — you can add one anytime from Settings → License Key.
-        Community gives you 1 strategy + 3 schedules + IBKR data.
+        {" "}below — you can add one anytime from System → License. Community
+        gives you 1 strategy + 3 schedules + IBKR data.
       </p>
-    </Actions>
+    </Station>
   );
 }
 
-// ── Step 3: Pre-flight + install ─────────────────────────────────
+// ── Station 3: Pre-flight + install ─────────────────────────────
 
-function Step3({
+function Station3({
   licenseKey,
   onBack,
   onDone,
+  publish,
 }: {
   licenseKey: string;
   onBack: () => void;
   onDone: () => void;
+  publish: (patch: Partial<StationReading>) => void;
 }) {
   const [preflight, setPreflight] = useState<PreflightReport | null>(null);
   const [preflightError, setPreflightError] = useState<string | null>(null);
@@ -432,6 +636,39 @@ function Step3({
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [logLines]);
 
+  // Everything the instrument is allowed to know about this station, and
+  // nothing it isn't: the pre-flight's verdict, the two install flags, the
+  // health answer, and the installer's own percent and phase.
+  const verdict: PreflightVerdict = preflightError
+    ? "failed"
+    : !preflight
+      ? "pending"
+      : preflight.can_install
+        ? "clear"
+        : "blocked";
+  useEffect(() => {
+    publish({
+      preflight: verdict,
+      alreadyRunning,
+      installing,
+      finished,
+      engineHealthy,
+      installFailed: !!installError,
+      percent: progress.percent,
+      phase: progress.phase,
+    });
+  }, [
+    publish,
+    verdict,
+    alreadyRunning,
+    installing,
+    finished,
+    engineHealthy,
+    installError,
+    progress.percent,
+    progress.phase,
+  ]);
+
   const runPreflight = async () => {
     setPreflightError(null);
     setPreflight(null);
@@ -453,8 +690,8 @@ function Step3({
       // collide with the running stack (it owns the required ports). Surface
       // an "open it" path instead of an "Install" button that's doomed.
       setAlreadyRunning(engineUp);
-      const report = await cmd.preflightCheck(stackUp);
-      setPreflight(report);
+      const checks = await cmd.preflightCheck(stackUp);
+      setPreflight(checks);
     } catch (err) {
       setPreflightError(String(err));
     }
@@ -526,34 +763,73 @@ function Step3({
     }
   };
 
+  // `Retry install` IS this action once an install has failed (§3.2), so the
+  // consent block stands down rather than offering the same verb twice.
   const canInstall =
-    !!preflight?.can_install && !installing && !finished && !alreadyRunning;
+    !!preflight?.can_install &&
+    !installing &&
+    !finished &&
+    !alreadyRunning &&
+    !installError;
 
   return (
-    <Actions canNext={false} hideSkip>
-      <div className="step-head">Pre-flight check</div>
-      <p className="muted">
-        Verifying your machine is ready. Nothing is downloaded until you
-        start the install.
-      </p>
+    <Station
+      title={installTitle(
+        installing,
+        finished,
+        engineHealthy,
+        installError,
+        alreadyRunning,
+      )}
+    >
+      {!installing && !finished && !installError && !alreadyRunning && (
+        <p className="comm-lede">
+          Verifying your machine is ready. Nothing is downloaded until you
+          start the install.
+        </p>
+      )}
 
-      <div style={{ margin: "16px 0" }}>
-        {preflightError ? (
-          <div className="banner err mono">
-            <strong>Pre-flight check failed.</strong> {preflightError}
-          </div>
-        ) : preflight ? (
-          <PreflightResults report={preflight} />
-        ) : (
-          <div className="ob-status">
-            <span className="chip neutral">running checks</span>
-          </div>
-        )}
-      </div>
+      {/* The headline answer comes first. When a live stack already owns the
+          ports there is nothing to install, and a column of green ticks about a
+          machine that is already running is not the news. */}
+      {alreadyRunning && !installing && !finished && (
+        <div className="mt-2">
+          <IncidentCard
+            severity="info"
+            cause="Auracle is already running."
+            detail="The platform is up and answering at localhost:1969 — there's nothing to install. Re-installing over a live stack would only collide with it."
+            action={{ label: "Open Auracle", onClick: onDone, primary: true }}
+          />
+          <button type="button" className="ghost" onClick={onBack}>
+            ← Back
+          </button>
+        </div>
+      )}
+
+      {/* The checks belong to the moment BEFORE a download: while one is
+          running they are noise, and after one has failed they are a list of
+          green ticks next to a red card. The verdict they produced still gates
+          the install below. */}
+      {!installing && !finished && !installError && (
+        <div className="comm-checks">
+          {preflightError ? (
+            <IncidentCard severity="err" cause="Pre-flight check failed.">
+              <div className="mono err-text mt-2">{preflightError}</div>
+            </IncidentCard>
+          ) : preflight ? (
+            <PreflightResults report={preflight} />
+          ) : (
+            <div className="comm-row">
+              <span className="comm-row__key">pre-flight</span>
+              <span className="chip neutral">running checks</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {preflight && !preflight.can_install && (
         <div className="mt-2">
-          <p className="muted fs-xs" style={{ margin: "12px 0" }}>
+          <p className="comm-note" style={{ margin: "12px 0" }}>
             Fix the items above and re-check. The install can&apos;t run while
             critical checks are failing.
           </p>
@@ -566,25 +842,9 @@ function Step3({
         </div>
       )}
 
-      {alreadyRunning && !installing && !finished && (
-        <div className="mt-2">
-          <div className="banner info">
-            <strong>Auracle is already running.</strong> The platform is up and
-            answering at <code>localhost:1969</code> — there&apos;s nothing to
-            install. Re-installing over a live stack would only collide with it.
-          </div>
-          <button type="button" className="primary" onClick={onDone}>
-            Open Auracle
-          </button>
-          <button type="button" className="ghost ml-2" onClick={onBack}>
-            ← Back
-          </button>
-        </div>
-      )}
-
       {canInstall && (
         <div className="mt-2">
-          <p className="muted fs-xs" style={{ margin: "12px 0" }}>
+          <p className="comm-note" style={{ margin: "12px 0" }}>
             Ready. The install pulls the platform&apos;s Docker images and
             starts the stack — typically 3–8 minutes on a fresh machine.
           </p>
@@ -603,98 +863,86 @@ function Step3({
           handler unmounted — an invisible error.) */}
       {installError && !installing && (
         <div className="mt-4">
-          <div className="banner err mono">
-            <strong>Install failed.</strong> {installError}
-          </div>
-          <button type="button" className="primary" onClick={beginInstall}>
-            Retry install
-          </button>
-          <button type="button" className="ghost ml-2" onClick={onBack}>
+          <IncidentCard
+            severity="err"
+            cause="Install failed."
+            action={{ label: "Retry install", onClick: beginInstall, primary: true }}
+          >
+            <div className="mono err-text mt-2">{installError}</div>
+          </IncidentCard>
+          <button type="button" className="ghost" onClick={onBack}>
             ← Back
           </button>
         </div>
       )}
 
-      {(installing || finished) && (
-        <>
-          <span className="ob-label">
-            {finished ? "Install complete" : "Setting up Auracle"}
-          </span>
-          {!finished && (
-            <p className="muted">
-              Pulling Docker images and starting services. Safe to leave this
-              window in the background — progress continues either way.
-            </p>
-          )}
-          <div style={{ margin: "24px 0" }}>
-            <div className="muted mono fs-xs mb-2">
-              {finished
-                ? "done"
-                : progress.phase
-                  ? progress.phase.replace(/_/g, " ")
-                  : "starting…"}
-            </div>
-            <div className="progress">
-              <div style={{ transform: `scaleX(${(progress.percent ?? 0) / 100})` }} />
-            </div>
-          </div>
-          {finished && engineHealthy === true ? (
-            <div className="banner info">
-              <strong>The stack is up.</strong> Finishing first-run setup in
-              your browser at <code>localhost:1969</code> — the launcher stays
-              here for engine status and updates; brokers connect in the
-              workspace.
-            </div>
-          ) : finished && engineHealthy === false ? (
-            <div className="banner warn">
-              <strong>Containers installed, but the engine hasn't answered
-              yet.</strong> It can take a minute on first boot. Give it a
-              moment, then open <code>localhost:1969</code> — or check the
-              installer log below if it doesn't come up.
-              <div className="mt-2">
-                <button
-                  className="btn btn-sm"
-                  onClick={async () => {
-                    const healthy = await waitForEngineHealthy(
-                      () => cmd.healthcheckNow(),
-                      { attempts: 10 },
-                    );
-                    setEngineHealthy(healthy);
-                    if (healthy) {
-                      try {
-                        await openInBrowser("http://localhost:1969/ui/setup");
-                      } catch {
-                        // ignore
-                      }
-                      onDone();
-                    }
-                  }}
-                >
-                  Retry health check
-                </button>
-              </div>
-            </div>
-          ) : finished ? (
-            <div className="muted fs-sm" style={{ minHeight: 20 }}>
-              Waiting for the engine to answer…
-            </div>
-          ) : (
-            <div className="muted fs-sm" style={{ minHeight: 20 }}>
-              {progress.message || ""}
-            </div>
-          )}
-          <details className="mt-4">
-            <summary className="muted fs-xs" style={{ cursor: "pointer" }}>
-              Show installer log
-            </summary>
-            <pre ref={logRef} className="logs logs-compact mt-2 fs-2xs">
-              {logLines.join("\n")}
-            </pre>
-          </details>
-        </>
+      {installing && !finished && (
+        <p className="comm-lede">
+          Pulling Docker images and starting services. Safe to leave this
+          window in the background — progress continues either way.
+        </p>
       )}
-    </Actions>
+
+      {finished && engineHealthy === false && (
+        <IncidentCard
+          severity="warn"
+          cause="Containers installed, but the engine hasn't answered yet."
+          detail="It can take a minute on first boot. Give it a moment, then open localhost:1969 — or check the installer log below if it doesn't come up."
+          action={{
+            label: "Retry health check",
+            onClick: async () => {
+              const healthy = await waitForEngineHealthy(
+                () => cmd.healthcheckNow(),
+                { attempts: 10 },
+              );
+              setEngineHealthy(healthy);
+              if (healthy) {
+                try {
+                  await openInBrowser("http://localhost:1969/ui/setup");
+                } catch {
+                  // ignore
+                }
+                onDone();
+              }
+            },
+          }}
+        />
+      )}
+
+      {(installing || finished) && progress.message && (
+        <div className="comm-note">{progress.message}</div>
+      )}
+
+      {/* The installer's own words. Shown whenever it has said anything —
+          which now includes a failed install, where they are the only
+          account of what went wrong. */}
+      {logLines.length > 0 && (
+        <details className="mt-4">
+          <summary className="comm-note" style={{ cursor: "pointer" }}>
+            Show installer log
+          </summary>
+          <pre ref={logRef} className="logs logs-compact mt-2 fs-2xs">
+            {logLines.join("\n")}
+          </pre>
+        </details>
+      )}
+    </Station>
   );
+}
+
+/** The install station's display line, one per real situation. */
+function installTitle(
+  installing: boolean,
+  finished: boolean,
+  engineHealthy: boolean | null,
+  installError: string | null,
+  alreadyRunning: boolean,
+): string {
+  if (installError && !installing) return "The install stopped.";
+  if (finished && engineHealthy === false) return "Built, but not answering yet.";
+  if (installing || finished) return "Building your desk.";
+  if (alreadyRunning) return "Nothing to install.";
+  return "Nothing is downloaded yet.";
 }
 
 function PreflightResults({ report }: { report: PreflightReport }) {
@@ -704,14 +952,14 @@ function PreflightResults({ report }: { report: PreflightReport }) {
         const variant = c.passed ? "ok" : c.level === "warning" ? "warn" : "err";
         const label = c.passed ? "pass" : c.level === "warning" ? "warn" : "fail";
         return (
-          <div key={i} className="ob-check">
-            <div className="ob-check__head">
+          <div key={i} className="comm-check">
+            <div className="comm-row">
               <span className={`chip ${variant}`}>{label}</span>
-              <span className="ob-check__name">{c.name}</span>
+              <span className="comm-check__name">{c.name}</span>
             </div>
-            <div className="muted fs-xs mt-1">{c.message}</div>
+            <div className="comm-note mt-1">{c.message}</div>
             {c.remediation && (
-              <div className="muted fs-xs mt-1">{c.remediation}</div>
+              <div className="comm-note mt-1">{c.remediation}</div>
             )}
           </div>
         );
@@ -720,9 +968,19 @@ function PreflightResults({ report }: { report: PreflightReport }) {
   );
 }
 
-// ── Action button row ───────────────────────────────────────────
+// ── Station shell — title, body, and the back/next rail ─────────
 
-function Actions({
+function Row({ k, children }: { k: string; children: React.ReactNode }) {
+  return (
+    <div className="comm-row">
+      <span className="comm-row__key">{k}</span>
+      <span className="comm-row__value">{children}</span>
+    </div>
+  );
+}
+
+function Station({
+  title,
   children,
   canNext,
   onNext,
@@ -730,53 +988,72 @@ function Actions({
   onSkip,
   nextLabel,
   skipLabel,
-  hideSkip,
   nextDisabledReason,
 }: {
+  title: string;
   children: React.ReactNode;
-  canNext: boolean;
+  canNext?: boolean;
   onNext?: () => void;
   onBack?: () => void;
   onSkip?: () => void;
   nextLabel?: string;
   skipLabel?: string;
-  hideSkip?: boolean;
   nextDisabledReason?: string;
 }) {
+  const ref = useRef<HTMLHeadingElement>(null);
+
+  // The station title arrives word by word, like the home's verdict — the same
+  // helper, so it reveals words that are already in the DOM and can do nothing
+  // else. The `key` retires the element when the line changes, which is what
+  // keeps the split markup from outliving the sentence it was made from.
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el) return;
+      return revealWords(el);
+    },
+    { dependencies: [title], scope: ref },
+  );
+
   return (
     <>
-      <div>{children}</div>
-      <div className="step-footer">
-        {onBack ? (
-          <button type="button" className="ghost" onClick={onBack}>
-            ← Back
-          </button>
-        ) : (
-          <div />
-        )}
-        <div className="hstack" style={{ gap: 8 }}>
-          {!hideSkip && onSkip && (
-            <button type="button" className="ghost" onClick={onSkip}>
-              {skipLabel || "Skip"}
+      <h2 key={title} ref={ref} className="comm-station__title">
+        {title}
+      </h2>
+      <div className="comm-station__body">{children}</div>
+      {(onBack || onNext) && (
+        <div className="comm-foot">
+          {onBack ? (
+            <button type="button" className="ghost" onClick={onBack}>
+              ← Back
             </button>
+          ) : (
+            <div />
           )}
-          {onNext &&
-            (canNext ? (
-              <button type="button" className="primary" onClick={onNext}>
-                {nextLabel || "Next →"}
+          <div className="hstack" style={{ gap: 8 }}>
+            {onSkip && (
+              <button type="button" className="ghost" onClick={onSkip}>
+                {skipLabel || "Skip"}
               </button>
-            ) : (
-              <div className="hstack" style={{ gap: 8 }}>
-                {nextDisabledReason && (
-                  <span className="muted fs-xs">{nextDisabledReason}</span>
-                )}
-                <button type="button" className="primary" disabled>
+            )}
+            {onNext &&
+              (canNext ? (
+                <button type="button" className="primary" onClick={onNext}>
                   {nextLabel || "Next →"}
                 </button>
-              </div>
-            ))}
+              ) : (
+                <div className="hstack" style={{ gap: 8 }}>
+                  {nextDisabledReason && (
+                    <span className="comm-note">{nextDisabledReason}</span>
+                  )}
+                  <button type="button" className="primary" disabled>
+                    {nextLabel || "Next →"}
+                  </button>
+                </div>
+              ))}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

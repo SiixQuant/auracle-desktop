@@ -15,6 +15,17 @@
 
 import { useState } from "react";
 
+/** The chip that leads the card. `info` is not a fault and has no status hue
+ *  of its own — the accent tint belongs to the banner (`.banner.info`), and a
+ *  second accent inside it would spend the screen's blue on a notice. So its
+ *  chip stays neutral, which is also the honest reading: "info" is not a state
+ *  the machine is in. */
+const CHIP: Record<"info" | "warn" | "err", string> = {
+  info: "neutral",
+  warn: "warn",
+  err: "err",
+};
+
 export default function IncidentCard({
   severity,
   cause,
@@ -22,7 +33,10 @@ export default function IncidentCard({
   action,
   children,
 }: {
-  severity: "warn" | "err";
+  /** `info` carries good news that still needs a shape — the first run's
+   *  "Auracle is already running" (§3.2). It is not a severity in the status
+   *  family and never renders a status hue. */
+  severity: "info" | "warn" | "err";
   /** Plain-sentence statement of what is wrong. This IS the title. */
   cause: string;
   /** One short muted line under the cause (guidance, identifiers). */
@@ -53,7 +67,7 @@ export default function IncidentCard({
   return (
     <div className={`banner ${severity}`}>
       <div className="hstack">
-        <span className={`chip ${severity}`}>{severity}</span>
+        <span className={`chip ${CHIP[severity]}`}>{severity}</span>
         <span style={{ flex: 1 }}>{cause}</span>
         {action && (
           <button
