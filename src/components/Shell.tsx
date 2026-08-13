@@ -13,12 +13,20 @@ import { AuracleGlyph } from "@/components/AuracleGlyph";
 import Coachmark, { coachSeen } from "@/components/Coachmark";
 import CommandPalette from "@/components/CommandPalette";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
-import ShellBackground from "@/components/ShellBackground";
 import StandbyHome from "@/components/StandbyHome";
+import DotField from "@/fx/DotField";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
 import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/tauri";
 import { useEngineState } from "@/lib/useEngineState";
+
+/** Where the status lamp sits down the window, as a fraction of its height —
+ *  the focus point of the ambient field's brightness ramp. The standby column
+ *  is vertically centred under a 44px topbar and the lamp heads that column,
+ *  which lands it above the window's middle: measured at 0.31 in the default
+ *  900×700 window and 0.34 at the 600×500 minimum. One constant covers both,
+ *  because the ramp is 240px wide and 20px of error is invisible inside it. */
+const INSTRUMENT_FOCUS_Y = 0.32;
 
 export default function Shell({
   onOpenTutorial,
@@ -170,7 +178,11 @@ export default function Shell({
 
   return (
     <div className="shell-standby">
-      <ShellBackground />
+      {/* The ambient stage. Its brightened core sits on the status lamp rather
+          than on the geometric centre of the window — the field is there to
+          seat the instrument, so it points at it. (When the lamp becomes the
+          orrery, re-measure this.) */}
+      <DotField focusY={INSTRUMENT_FOCUS_Y} />
       <header className="topbar">
         <div className="topbar__brand">
           <AuracleGlyph className="topbar__mark" />

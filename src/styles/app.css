@@ -89,6 +89,16 @@
   --grid-h:      rgba(255, 255, 255, 0.04);
   --grid-v:      rgba(255, 255, 255, 0.025);
 
+  /* Ambient stage — the dot-field behind the home and the sign-in screen.
+     Derived ink, no new hue: --fg at a whisper. The field brightens toward
+     --stage-dot-near within 240px of the instrument, precomputed per dot in
+     src/fx/ambient.ts (NOT a CSS gradient — the canvas owns the falloff).
+     These two tokens are the only declaration of the ambient's colour; the
+     canvas resolves them at mount. Raise them at your peril: the stage is
+     texture, and anything brighter starts competing with the type. */
+  --stage-dot:      rgba(230, 237, 243, 0.05);
+  --stage-dot-near: rgba(230, 237, 243, 0.09);
+
   /* Foreground — Percept ramp (primary → muted), high-contrast not glowing */
   --fg:          #e6edf3;
   --fg-dim:      #9da7b3;
@@ -2214,108 +2224,43 @@ table.data-table {
   cursor: pointer;
 }
 
+/* ── The ambient stage ─────────────────────────────────────────────
+   The dot-field canvas (src/fx/DotField.tsx) behind the home and the
+   sign-in screen. Full-bleed, never interactive, always the bottom layer.
+   Its ink comes from --stage-dot / --stage-dot-near; its cadence is
+   governed in src/fx/ambient.ts (suspended when the window is hidden,
+   halved when it is blurred, one static frame under reduced motion), so
+   there is deliberately no CSS animation here to fight with. */
+.dot-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dot-field__canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
 /* ──────────────────────────────────────────────────────────────────
-   Home (Standby) — match the sign-in screen: pure black with the same
-   animated dot-matrix shader behind translucent-glass surfaces. Scoped
-   to .shell-standby so the rest of the app keeps the charcoal system.
+   Home (Standby) — the same chamber as the sign-in screen: a dark floor
+   with the ambient dot-field behind the chrome. Scoped to .shell-standby
+   so the rest of the app keeps the charcoal system.
    ────────────────────────────────────────────────────────────────── */
 .shell-standby {
   position: relative;
   background: #000;
   isolation: isolate;
 }
-/* Shader canvas + gradient overlays at z-0; all chrome sits above. */
-.shell-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-/* Live WebGL shader wrapper — fills the surface; the <Canvas> inside is
-   absolutely positioned. This is the home's default, animated backdrop and is
-   byte-for-byte the same shader the sign-in screen runs. */
-.shell-bg__canvas {
-  position: absolute;
-  inset: 0;
-}
-/* Static CSS dot-matrix — the prefers-reduced-motion fallback only (hidden
-   while the canvas is live). Kept as a calm, motionless texture for users who
-   opt out of animation. */
-.shell-bg__dots {
-  display: none;
-  position: absolute;
-  inset: 0;
-  background-color: #04050a;
-  background-image: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.26) 1.1px,
-    transparent 1.7px
-  );
-  background-size: 23px 23px;
-  animation:
-    shell-dots-drift 26s linear infinite,
-    shell-dots-breathe 9s ease-in-out infinite;
-}
-/* A travelling glow that brightens the dots it passes — the localized shimmer
-   the static grid was missing. */
-.shell-bg__dots::after {
-  content: "";
-  position: absolute;
-  inset: -25%;
-  background:
-    radial-gradient(38% 38% at 30% 28%, rgba(120, 150, 255, 0.1), transparent 72%),
-    radial-gradient(34% 34% at 72% 66%, rgba(255, 255, 255, 0.06), transparent 72%);
-  animation: shell-dots-shimmer 19s ease-in-out infinite alternate;
-}
-@keyframes shell-dots-drift {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 69px 46px;
-  }
-}
-@keyframes shell-dots-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 0.85;
-  }
-}
-@keyframes shell-dots-shimmer {
-  from {
-    transform: translate3d(-7%, -5%, 0) scale(1.05);
-  }
-  to {
-    transform: translate3d(7%, 5%, 0) scale(1.05);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  /* Drop the animated WebGL canvas; show the motionless dot field instead. */
-  .shell-bg__canvas {
-    display: none;
-  }
-  .shell-bg__dots {
-    display: block;
-    animation: none;
-    opacity: 0.7;
-  }
-  .shell-bg__dots::after {
-    animation: none;
-  }
-}
 .shell-standby > .topbar,
 .shell-standby > .standby-stage {
   position: relative;
   z-index: 1;
   /* Promote each to its own compositing layer so WebKit (the macOS WKWebView)
-     paints it ABOVE the WebGL canvas. Without this, the canvas composites over
-     the hero text/lamp/button/cards and washes them out. The hub tiles sit
-     INSIDE this promoted stage, so they ride above the canvas with it — they no
-     longer need their own backdrop-filter layer. Invisible in Chromium;
-     required in WKWebView. */
+     paints it ABOVE the ambient canvas. Without this, the canvas composites
+     over the hero text/lamp/button/cards and washes them out. The hub tiles
+     sit INSIDE this promoted stage, so they ride above the canvas with it.
+     Invisible in Chromium; required in WKWebView. */
   transform: translateZ(0);
 }
 /* Transparent chrome so the shader reads through the whole surface. */

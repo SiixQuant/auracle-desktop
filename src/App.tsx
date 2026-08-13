@@ -18,8 +18,8 @@ import { cmd, openClerkSignIn } from "@/lib/tauri";
 import Onboarding from "@/views/Onboarding";
 
 // Lazy so the sign-in screen's own weight stays out of the signed-in app
-// bundle. (The WebGL deps — three, @react-three/fiber — are shared with the
-// home backdrop and load either way until the ambient stage swap.)
+// bundle. Its ambient backdrop is now shared code (src/fx/DotField.tsx) that
+// the home loads anyway, so what defers here is just this screen.
 const SignInScreen = lazy(() =>
   import("@/components/ui/sign-in-flow-1").then((m) => ({
     default: m.SignInPage,
