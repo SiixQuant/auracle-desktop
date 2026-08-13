@@ -1348,31 +1348,103 @@ table.data-table {
 .flame-aura.b { animation-delay: 2s; }
 @keyframes flamePulse { 0%, 100% { transform: scale(1); opacity: 0.16; } 50% { transform: scale(1.1); opacity: 0.05; } }
 
-/* ── Tutorial overlay ─────────────────────────────────────────────── */
+/* ── Tutorial — the orientation card (redesign §3.6) ────────────────
+ * "An orientation card bottom-center above the ledger: mono step label, [display
+ * serif] title, dots become station ticks on a hairline." Machined like every
+ * other depth surface (§1): an opaque plane on the elevation ladder, ONE
+ * canonical hairline, one floater shadow, no glass and no glow.
+ *
+ * It sits at the foot of the chamber rather than dead centre so the thing each
+ * step is describing — the instrument, the verb, the ledger — stays visible
+ * above it while it is read. */
 .tut-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 7, 10, 0.66);
+  /* §2.3: the one scrim value in the app. This surface used to mix its own
+     (rgba(5,7,10,.66)), which read as a different room. */
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
+  /* Clears the ledger row and the re-run ghost line under it. */
+  padding: var(--s-5) var(--s-5) 88px;
   z-index: 50;
 }
 .tut-card {
   width: 420px;
-  max-width: 90%;
+  max-width: 100%;
+  /* The GitHub step grows (code + helper line); at the 600×500 minimum the card
+     scrolls inside itself rather than pushing its own foot off-screen. */
+  max-height: 100%;
+  overflow-y: auto;
   background: var(--bg-elev);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
-  padding: 22px 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  text-align: left;
 }
-.tut-step-label { font-family: var(--font-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
-.tut-title { font-size: var(--t-lg); font-weight: 500; letter-spacing: -0.02em; margin: 6px 0 8px; }
-.tut-body { color: var(--fg-dim); font-size: 13px; line-height: 1.6; margin: 0; }
-.tut-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
-.tut-dots { display: flex; gap: 6px; }
-.tut-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); }
-.tut-dot.on { background: var(--accent); }
+/* The mono-label register (§2.2) — "STEP 2 OF 5" is a key, not a sentence. */
+.tut-step-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.tut-title {
+  font-family: var(--font-display);
+  font-variation-settings: var(--fvs-display);
+  font-size: var(--t-station);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--fg);
+  margin: var(--s-2) 0 var(--s-2);
+}
+.tut-body {
+  color: var(--fg-dim);
+  font-size: var(--t-sm);
+  line-height: 1.6;
+  margin: 0;
+}
+.tut-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+}
+/* Station ticks on a hairline spine (§3.6) — the same commissioning language
+ * §3.2 gives the onboarding rail: pending is faint, the current station is
+ * bright and taller. No accent here; the card already spends its one blue on
+ * the primary verb. */
+.tut-ticks {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 3px;
+}
+.tut-ticks::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--line);
+}
+.tut-tick {
+  position: relative;
+  width: 1px;
+  height: 5px;
+  background: var(--fg-faint);
+}
+.tut-tick.on {
+  height: 9px;
+  background: var(--fg);
+}
 
 /* ── Responsive — stack the home hub when the window narrows ───────
  * Below ~720px the fixed 212px aside + main column collide. Drop to a
@@ -1901,27 +1973,23 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
    exactly — the bands divide what there is rather than growing a column. */
 .standby-stage .standby { height: 100%; }
 
-/* ── Floating surfaces — edges only ────────────────────────────────
- * The ⌘K palette, the tutorial overlay and the coachmark carry slightly
- * firmer hairlines than the canvas, because a floater has to announce its own
- * edge against a live board behind it.
+/* ── Floating surfaces — one hairline, everywhere ──────────────────
+ * There is no longer a per-floater --line override here, and there must not be
+ * one again. The palette, the tutorial card and the coachmark used to carry
+ * firmer hairlines than the canvas "because a floater has to announce its own
+ * edge"; the tray left that list in slice 6 and slice 7 empties it.
  *
- * The TRAY left this list in slice 6. It is an opaque charcoal plane the full
- * height of the stage (§1's depth law), so it separates from the board by TONE
- * — it does not need a louder edge, and boosting --line inside it made every
- * divider in every inspector shout a step above the same divider everywhere
- * else in the product. The tray runs on the canonical §2.1 hairlines.
+ * The reason is §1's depth law: a depth surface is a MACHINED PART of the same
+ * instrument — an opaque charcoal plane with a hairline edge — so it separates
+ * from the board by TONE, not by a louder line. Boosting --line inside a panel
+ * also boosts every divider the panel contains, which made the same rule read
+ * one step brighter here than it does three pixels away in the tray. §2.1
+ * declares exactly two line values for the whole product; every surface now
+ * uses them.
  *
- * These roots used to re-point --accent/--accent-soft/--accent-text at the
- * website's old emerald here. Emerald is RETIRED as a brand colour, and the
- * accent is now the same Nous-blue on every surface — a floating panel does
- * not get its own brand. Green survives only as --ok (health), which these
- * overrides never touched. */
-.cmdk-scrim, .cmdk,
-.tut-overlay, .coach-scrim {
-  --line:        rgba(255, 255, 255, 0.1);
-  --line-strong: rgba(255, 255, 255, 0.2);
-}
+ * (These roots also used to re-point --accent/--accent-soft/--accent-text at
+ * the website's old emerald. Emerald is RETIRED; a floating panel does not get
+ * its own brand. Green survives only as --ok, on health.) */
 
 /* ── THE TRAY (redesign §3.4) ──────────────────────────────────────
  * "The back of the instrument": a full-height right tray over a dimmed —
@@ -2073,8 +2141,6 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 }
 .orrery-echo .orrery__svg { width: auto; height: auto; }
 
-@keyframes surface-fade { from { opacity: 0; } to { opacity: 1; } }
-
 .kbd-hint {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2082,7 +2148,12 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 }
 
 /* Transient command echo (echo-to-teach) — names the verb you just ran.
- * Floats just above the ledger, which owns the floor of the chamber now. */
+ * Floats just above the ledger, which owns the floor of the chamber now.
+ *
+ * Its arrival is a GSAP entrance (Shell.tsx), not a keyframe: §2.4 lists the
+ * echo line among the things that animate, and this app has ONE engine. The
+ * `animation:` that used to live here also outranked the reduced-motion media
+ * block's neutralising rule for anything that re-mounted mid-preference. */
 .echo-line {
   position: absolute;
   left: 0;
@@ -2093,102 +2164,144 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   font-size: 11px;
   color: var(--fg-faint);
   pointer-events: none;
-  animation: surface-fade 0.15s ease-out;
 }
 .echo-line .mono { color: var(--accent-text); }
 
-/* ── ⌘K command palette ────────────────────────────────────────────── */
+/* ── ⌘K command palette (redesign §3.5) ────────────────────────────
+ * "The instrument's voice tube": centred in the top third, one opaque plane on
+ * the §2.1 elevation ladder, one hairline edge, one restrained floater shadow.
+ * No glass, no glow, no keyframes — the open and the close are GSAP moves in
+ * CommandPalette.tsx (scale .98→1 + y −6→0, 180ms), which is what let closing
+ * become a move instead of a disappearance.
+ *
+ * The register is §2.2's: the input is mono (you are typing a command, not
+ * prose), and the tag / group / footer all sit in the mono-label register. */
 .cmdk-scrim {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 0, 0, 0.5);
+  /* §2.3: a scrim is a plain alpha fill at α.55. No backdrop-filter, here or
+     anywhere — WKWebView paints it black over the home's canvas. */
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding-top: 14vh;
-  animation: surface-fade 0.15s ease-out;
 }
 .cmdk {
   width: min(560px, 92vw);
   background: var(--bg-elev);
   border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  /* §2.3's radius ladder tops out at --r-lg; 12px was off it. */
+  border-radius: var(--r-lg);
+  /* The one floater shadow (§2.3) — the same one the tray wears. */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   overflow: hidden;
-  animation: cmdk-pop 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .cmdk__input {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 13px 15px;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
   border-bottom: 1px solid var(--line);
   color: var(--fg-muted);
 }
 .cmdk__input input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: 0;
   outline: 0;
   color: var(--fg);
-  font-size: 14px;
+  font-size: var(--t-base);
   font-family: var(--font-mono);
 }
+.cmdk__input input::placeholder { color: var(--fg-faint); }
+/* The mono-label register (§2.2), as a keycap-shaped tag: this row is sourced
+   from the live stack, and the tag is the honesty note that says so. */
 .cmdk__tag {
-  font: 500 10px/1 var(--font-mono);
+  flex: none;
+  font: 500 10.5px/1 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--fg-muted);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   padding: 4px 6px;
 }
-.cmdk__list { max-height: 46vh; overflow-y: auto; padding: 6px; }
+.cmdk__list {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: var(--s-1);
+}
 .cmdk__item {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--s-3);
   background: transparent;
   border: 0;
-  border-radius: 7px;
-  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  padding: 9px var(--s-3);
   cursor: pointer;
   text-align: left;
 }
-.cmdk__item.sel { background: var(--accent-soft); }
-.cmdk__title { font-size: 13px; color: var(--fg); display: flex; align-items: center; gap: 8px; }
-.cmdk__item.sel .cmdk__title { color: var(--accent-text); }
+/* §3.5: the selected row is --surface-2 with an inset 1px --accent hairline —
+   the focus law, drawn on the row itself. The title stays --fg: the hairline is
+   already one of the screen's three permitted blues (§2.1), and tinting the
+   words as well would spend a second one saying the same thing. */
+.cmdk__item.sel {
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.cmdk__title {
+  font-size: var(--t-sm);
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+/* The armed half of the double-Enter confirm. Amber, because it is a warning
+   about the next keystroke — not an error, and not the row's title. */
+.cmdk__arm {
+  color: var(--warn);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+}
 .cmdk__danger {
   font: 500 9px/1 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   /* The launcher's own danger red — this used to hardcode the website's
      #ef4444 "for parity", which is the same drift that gave these floating
      surfaces an emerald accent. One --err across every surface. */
   color: var(--err);
+  background: var(--err-soft);
   border: 1px solid var(--err-dim);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   padding: 3px 5px;
 }
 .cmdk__group {
-  font: 500 10px/1 var(--font-mono);
+  flex: none;
+  font: 500 10.5px/1 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fg-faint);
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
 }
-.cmdk__empty { padding: 18px; text-align: center; color: var(--fg-muted); font-size: 13px; }
+.cmdk__empty {
+  padding: var(--s-5);
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: var(--t-sm);
+}
 .cmdk__foot {
-  padding: 9px 15px;
+  padding: 9px var(--s-4);
   border-top: 1px solid var(--line);
-  font: 400 10px/1 var(--font-mono);
+  font: 400 10.5px/1.4 var(--font-mono);
+  letter-spacing: 0.02em;
   color: var(--fg-faint);
-}
-@keyframes cmdk-pop {
-  from { transform: scale(0.97); opacity: 0.4; }
-  to { transform: scale(1); opacity: 1; }
 }
 
 /* Streamed container/gateway logs. */
@@ -2336,42 +2449,168 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   border-radius: var(--r-sm);
 }
 
-/* First-home coachmark — learn the anatomy once. */
+/* ── First-home coachmark (redesign §3.6) ──────────────────────────
+ * "Three sequential hairline callouts that point at the real bands —
+ * instrument → verb → ledger — each a small mono card with a connecting
+ * hairline; 'Got it' completes."
+ *
+ * THE ANCHORING, which §3.6 says the fixed band layout makes deterministic:
+ * this overlay is mounted INSIDE the standby stage and repeats `.standby`'s own
+ * row template, so each callout lands in the band it annotates without a single
+ * measurement. Rows 1 and 2 are template-sized (a percentage and a fraction),
+ * so a callout that is taller than its band overflows instead of resizing it —
+ * only row 3 would have grown, which is why it is pinned to 0 and its callout
+ * is anchored to the floor above the ledger with a hairline pointing down at
+ * it. Each callout also takes the band content's OWN alignment: the instrument
+ * is centred in its band, the verdict + verb are top-aligned in theirs. */
 .coach-scrim {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 70;
+  /* §2.3's one scrim. It dims the bands without hiding them — this overlay
+     exists to point at them, so they have to stay readable underneath. */
   background: rgba(0, 0, 0, 0.55);
+}
+/* One overlay at a time. Both of these auto-show once on a first run, and the
+ * tour is a window-level modal that lands straight on top of the callouts —
+ * two aria-modal dialogs, one of them annotating bands the other is covering.
+ * The callouts stand down while the tour is up and come back the moment it
+ * closes: this is purely what PAINTS, so the coachmark's own show / dismiss /
+ * persist contract (COACH_KEY, and the palette's "Show home tips" replay) is
+ * exactly what it was — it still appears once, immediately after the tour. */
+body:has(.tut-overlay) .coach-scrim { display: none; }
+.coach {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 55%) 1fr 0;
+  row-gap: var(--s-6);
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  /* Only the cards take the pointer: a click on the dimmed board around them
+     still reaches the scrim and completes, exactly as it did before. */
+  pointer-events: none;
+}
+.coach__callout {
   display: flex;
   align-items: center;
-  justify-content: center;
-  animation: surface-fade 0.18s ease-out;
+  justify-self: start;
+  min-width: 0;
 }
-.coach {
-  width: min(420px, 92vw);
-  background: var(--bg-elev);
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  padding: 20px 22px;
+.coach__callout--instrument { align-self: center; }
+/* The verb's callout takes the right margin: its band and the ledger's are the
+   bottom half of a 700px window between them, and two cards in one column there
+   would sit on top of each other. Reversed, so the hairline still reaches
+   INWARD from the card to the centred verb it is pointing at. */
+.coach__callout--verb {
+  align-self: start;
+  justify-self: end;
+  flex-direction: row-reverse;
+}
+.coach__callout--ledger {
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: end;
+  /* Clears the ledger row and the re-run ghost line beneath it. */
+  margin-bottom: 52px;
+}
+/* A machined part like every other depth surface (§1): opaque plane, one
+   canonical hairline, the card elevation — no glass, no glow. */
+.coach__card {
+  pointer-events: auto;
+  /* Narrow enough that the two side columns still leave the centred band they
+     annotate visible at the 600px minimum window (§3.9). */
+  width: min(252px, 34vw);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--elev-card), var(--hairline-top);
+  padding: var(--s-3);
   text-align: left;
 }
-.coach h3 { font-size: 16px; font-weight: 500; margin: 0 0 12px; color: var(--fg); }
-.coach__beat { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.coach__beat:last-of-type { border-bottom: 0; }
-.coach__n {
-  flex: none;
-  width: 20px; height: 20px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font: 500 11px/1 var(--font-mono);
-  background: var(--accent-soft); color: var(--accent-text);
+/* The mono-label register (§2.2) — each callout names its band the way the
+   tray names itself and the ledger names its keys. */
+.coach__label {
+  display: block;
+  font: 500 10.5px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
 }
-.coach__beat div { font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
+.coach__text {
+  margin: var(--s-2) 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--fg-dim);
+}
+/* The connecting hairline — the whole reason these read as callouts and not as
+   three stacked cards. It runs from the card to the band it is pointing at. */
+.coach__link {
+  flex: none;
+  background: var(--line-strong);
+}
+.coach__link--across {
+  width: 36px;
+  height: 1px;
+}
+.coach__link--down {
+  width: 1px;
+  height: 28px;
+  margin-left: var(--s-5);
+}
 .coach__done {
-  margin-top: 16px;
-  background: var(--accent); color: var(--accent-ink);
-  border: 0; border-radius: 8px; padding: 9px 16px;
-  font-size: 13px; font-weight: 500; cursor: pointer;
+  pointer-events: auto;
+  margin-top: var(--s-3);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: var(--r-md);
+  padding: 8px 14px;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out;
+}
+.coach__done:hover { background: var(--accent-2); }
+.coach__done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Small windows — annotation collapses to a list (§3.9's "density holds at min
+ * size with no column collisions"). Near the 600×500 minimum the three bands
+ * are ~150px apart and the cards are taller than that, so pointing at them
+ * would mean cards overlapping each other AND the verb they describe. The
+ * honest degrade is to stop pointing: the beats stack in the middle, in the
+ * same order, and the connecting hairlines — which would now point at nothing
+ * in particular — are dropped rather than left lying. */
+@media (max-width: 760px), (max-height: 640px) {
+  .coach {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    padding: var(--s-4);
+  }
+  .coach__callout,
+  .coach__callout--instrument,
+  .coach__callout--verb,
+  .coach__callout--ledger {
+    display: block;
+    /* The bands' own alignments (centre / start / end) are what staggered the
+       cards across their rows; in one column they have to line up. */
+    align-self: center;
+    width: min(420px, 100%);
+    margin: 0;
+  }
+  .coach__card {
+    width: 100%;
+    padding: var(--s-2) var(--s-3);
+  }
+  .coach__text {
+    margin-top: var(--s-1);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .coach__link { display: none; }
+  .coach__done { margin-top: var(--s-2); }
 }
 
 /* ──────────────────────────────────────────────────────────────────

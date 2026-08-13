@@ -15,6 +15,7 @@ import CommandPalette from "@/components/CommandPalette";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
 import StandbyHome from "@/components/StandbyHome";
 import DotField from "@/fx/DotField";
+import { DUR, enter, useGSAP } from "@/fx/motion";
 import { frameFor } from "@/fx/orrery";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
@@ -235,22 +236,45 @@ export default function Shell({
           instrument={frameFor(board, containers)}
           onClose={() => setInspector(null)}
         />
-        {echo && (
-          <div className="echo-line" role="status" aria-live="polite">
-            ran <span className="mono">{echo}</span>
-          </div>
-        )}
+        {echo && <EchoLine key={echo} verb={echo} />}
+        {/* The coachmark annotates the three bands, so it lives in the stage
+            that holds them (§3.6's deterministic anchoring) rather than over
+            the whole window — the same reason the tray is mounted here. */}
+        {showCoach && <Coachmark onClose={() => setShowCoach(false)} />}
       </main>
 
-      {paletteOpen && (
-        <CommandPalette
-          commands={commands}
-          onClose={() => setPaletteOpen(false)}
-          onRun={runCommand}
-        />
-      )}
+      {/* Always mounted: the palette owns its own exit (§3.5), so it has to
+          outlive the close it was asked for. `open` stays the authority. */}
+      <CommandPalette
+        open={paletteOpen}
+        commands={commands}
+        onClose={() => setPaletteOpen(false)}
+        onRun={runCommand}
+      />
+    </div>
+  );
+}
 
-      {showCoach && <Coachmark onClose={() => setShowCoach(false)} />}
+/** The transient command echo (echo-to-teach) — names the verb you just ran.
+ *
+ *  §2.4 lists the echo line among the things that animate, so its arrival is a
+ *  house entrance rather than a CSS keyframe: one engine, one curve, and it
+ *  collapses to an instant appearance under reduced motion like everything
+ *  else. The `key` on the caller's element retires the old verb, so a second
+ *  command re-runs the entrance instead of silently swapping the word. */
+function EchoLine({ verb }: { verb: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      if (ref.current) enter(ref.current, { duration: DUR.micro });
+    },
+    { dependencies: [verb], scope: ref },
+  );
+
+  return (
+    <div ref={ref} className="echo-line" role="status" aria-live="polite">
+      ran <span className="mono">{verb}</span>
     </div>
   );
 }
