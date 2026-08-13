@@ -21,16 +21,17 @@ import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/
 import { useEngineState } from "@/lib/useEngineState";
 
 /** Where the instrument's core sits down the window, as a fraction of its
- *  height — the focus point of the ambient field's brightness ramp. The
- *  standby column is vertically centred under the topbar and the instrument
- *  heads that column, which lands its centre above the window's middle.
+ *  height — the focus point of the ambient field's brightness ramp. The field
+ *  is there to seat the orrery, so it points at it rather than at the
+ *  geometric centre of the window.
  *
- *  Re-measured against the orrery (it is more than twice the lamp's height, so
- *  the old 0.32 pointed the ramp above the new core): 0.346 at the 600×500
- *  minimum, 0.347 in the default 900×700, 0.356 at 1200×900. One constant
- *  covers the range — the ramp is 240px wide and 10px of error is invisible
+ *  Re-measured against slice 5's three bands, where the instrument is centred
+ *  in the top 55% of the stage under the 46px topbar rather than heading a
+ *  centred column: (46 + 0.55·stage/2) / height — 0.342 at the 600×500
+ *  minimum, 0.323 in the default 900×700, 0.312 at 1200×900. One constant
+ *  covers the range: the ramp is 240px wide and 15px of error is invisible
  *  inside it. */
-const INSTRUMENT_FOCUS_Y = 0.35;
+const INSTRUMENT_FOCUS_Y = 0.33;
 
 export default function Shell({
   onOpenTutorial,

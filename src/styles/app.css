@@ -1395,19 +1395,84 @@ table.data-table {
   }
 }
 
-/* ── The Standby home ──────────────────────────────────────────────
- * The calm panel of an already-running machine: one instrument, one
- * System Line, one adaptive verb, and a quiet vitals row. Emptiness is
- * the success state — generous negative space, charcoal floor, the core
- * the only color when all-green. Everything derives from deriveBoard(). */
+/* ── The Standby home — three bands (redesign §1, §3.3) ────────────
+ * The calm panel of an already-running machine, as a chamber rather than a
+ * stack: THE INSTRUMENT (~55%), THE VERDICT + one verb, THE LEDGER. Emptiness
+ * is the success state — generous negative space, charcoal floor, the core the
+ * only colour when all-green. Everything derives from deriveBoard().
+ *
+ * The row template is the whole composition, so it is worth reading:
+ *
+ *   minmax(0, 55%)  the instrument takes §3.3's band WHEN THERE IS ROOM. Its
+ *                   base size is 0 and its cap is the band, so it grows into
+ *                   the space the other two bands don't need — and yields when
+ *                   they need more (the down state's incident card at the
+ *                   600×500 minimum). The instrument is a second reading of a
+ *                   verdict already stated in words below it; under pressure
+ *                   the words win. That is the honest give.
+ *   1fr             the verdict band: at least its content, then all the slack,
+ *                   so the verdict + verb sit optically centred in the middle
+ *                   of the chamber instead of riding up under the instrument.
+ *   auto            the ledger: exactly its own height, pinned to the floor. */
 .standby {
-  min-height: 80vh;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 55%) 1fr auto;
+  row-gap: var(--s-6);
+  justify-items: center;
+  text-align: center;
+  padding: var(--s-5) var(--s-5) var(--s-4);
+}
+
+/* Band 1 — the instrument stage. A COLUMN flex box, so the orrery's size is
+   settled by flex arithmetic (basis 300, shrink 1, min 0) rather than by a
+   percentage against a grid row the layout is still resolving — which browsers
+   are entitled to treat as indefinite, and which left the instrument at its
+   300px ceiling inside a shorter band. */
+.standby__instrument {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  padding: 48px 24px;
+  width: 100%;
+  min-height: 0;
+}
+
+/* Band 2 — the verdict and the one verb. Top-aligned, not centred: the sketch
+ * reads instrument → verdict → verb → (space) → ledger, so the verdict follows
+ * the instrument at one --s-6 and the slack collects above the floor. */
+.standby__verdict-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--s-5);
+  width: 100%;
+  /* No `min-height: 0` here, deliberately: this band's automatic minimum is
+     what tells the grid how much room the verdict, the verb, an error line and
+     an incident card actually need, and therefore how much the instrument
+     above must give back. Suppress it and the down state's card slides under
+     the ledger. The instrument band carries the `min-height: 0` instead — it
+     is the one that yields. */
+}
+
+/* Band 3 — the ledger, on the floor of the chamber. */
+.standby__ledger-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* Short windows — the 600×500 minimum and anything near it. The chamber keeps
+   all three bands and every reading in them; what tightens is the RHYTHM, so
+   the room it buys goes to the instrument (§3.9: density holds at min size). */
+@media (max-height: 620px) {
+  .standby {
+    row-gap: var(--s-5);
+    padding-top: var(--s-4);
+  }
+  .standby__verdict-band { gap: var(--s-4); }
 }
 
 /* ── The Orrery — the instrument (redesign §3.3) ───────────────────
@@ -1423,25 +1488,29 @@ table.data-table {
  *     used to wear a drop-shadow; it is an animated layer, and §4 budgets it
  *     at zero. The 20px soft ring at α.13 does that job with a fill. */
 .orrery {
-  /* The instrument takes exactly the height this composition leaves it.
-     Measured: the rest of the column (verdict, verb, footer, re-run, vitals,
-     padding) is a fixed ~450px under the 46px topbar, so `100vh - 450px` is
-     the honest budget — 306px (a 300px orbit, §3.3's ceiling, where one SVG
-     unit is one CSS pixel and the 8px core / 5px bodies are literal) from a
-     756px-tall window up, ~250px in the default 900×700, and a 110px floor at
-     the 600×500 minimum, which is the footprint of the lamp it replaces so no
-     window size loses a row it used to show. §3.9's 180px floor and the ~55%
-     instrument band arrive with the ledger (slice 5), which reclaims the
-     three stacked rows below the verb. */
-  width: clamp(110px, calc(100vh - 450px), 306px);
-  height: clamp(110px, calc(100vh - 450px), 306px);
-  flex: none;
+  /* The instrument fills its band. Slice 4 had to budget it against a fixed
+     column of stacked rows (`100vh - 450px`); the ledger merge retired those
+     rows, so it now simply takes what §3.3's band gives it. Measured: 300px —
+     the ceiling, where one SVG unit is one CSS pixel and the 8px core / 5px
+     bodies are literal — in the default 900×700 and above, 232px at the
+     600×500 minimum, both clear of §3.9's 180px floor. The one place that
+     floor gives is the down state at the minimum window, where the incident
+     card takes the room (see the row template above for why).
+
+     Height: the 300px ceiling as a flex basis, free to shrink to the band.
+     Width: the band, capped at the same 300. The two need not agree — the
+     drawing is a 300-unit square viewBox that letterboxes itself
+     (preserveAspectRatio), so the orbit stays circular at every band height. */
+  flex: 0 1 300px;
+  min-height: 0;
+  max-height: 300px;
+  width: 100%;
+  max-width: 300px;
   display: block;
   padding: 0;
   background: transparent;
   border: none;
   cursor: pointer;
-  margin-bottom: 20px;
 }
 .orrery:focus-visible {
   outline: 2px solid var(--accent);
@@ -1494,7 +1563,10 @@ table.data-table {
 }
 .orrery__body:hover .orrery__flag { opacity: 1; }
 
-.standby__line {
+/* THE VERDICT (§3.3 Band 2) — the display serif, and the only sentence on the
+ * screen. The per-word entrance lives in fx/motion.ts (`revealWords`); nothing
+ * here may hide it, so no CSS animation and no opacity of its own. */
+.standby__verdict {
   font-family: var(--font-display);
   font-variation-settings: var(--fvs-display);
   font-size: var(--t-verdict);
@@ -1505,16 +1577,14 @@ table.data-table {
   line-height: 1.2;
   text-wrap: balance;
 }
-.standby__stamp {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg-muted);
-  margin-top: 12px;
-  font-variant-numeric: tabular-nums;
+/* SplitText wraps each word; inline-block is what lets one word take a
+   transform. `white-space: pre` on the wrapper is deliberately NOT set —
+   the element keeps its own wrapping and balance. */
+.standby__verdict div {
+  display: inline-block;
 }
 
 .standby__actuator-wrap {
-  margin-top: 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1524,12 +1594,12 @@ table.data-table {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
+  min-height: 44px;
   padding: 0 22px;
   background: var(--accent);
   color: var(--accent-ink);
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--r-md);
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
@@ -1561,44 +1631,106 @@ table.data-table {
   100% { left: 100%; }
 }
 .standby__act-reason { font-size: 12px; color: var(--fg-muted); max-width: 38ch; }
-/* Quiet "re-run the first-run stack setup" escape under the hub grid. */
+/* Quiet "re-run the first-run stack setup" escape — a ghost line UNDER the
+ * ledger (§3.3), which is the quietest thing on the screen that is still a
+ * control. */
 .standby__rerun {
-  margin-top: 12px;
   background: none;
   border: none;
-  color: var(--fg-muted);
-  font-size: 12.5px;
+  color: var(--fg-faint);
+  font-size: 12px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: var(--r-sm);
   transition: color 0.14s;
 }
-.standby__rerun:hover { color: var(--fg); text-decoration: underline; }
-.standby__err { margin-top: 14px; color: var(--err); font-size: 12.5px; max-width: 46ch; }
+.standby__rerun:hover { color: var(--fg-muted); text-decoration: underline; }
+.standby__rerun:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.standby__err { color: var(--err); font-size: 12.5px; max-width: 46ch; }
 
-/* Quiet footer — one row of small links; goes bright only when an update
- * is waiting. Replaces the old 2x2 hub-card grid. */
-.standby__footer {
-  margin-top: 30px;
+/* ── THE LEDGER (§3.3 Band 3) ──────────────────────────────────────
+ * One mono row that used to be three: the vitals row, the footer links, and
+ * the update status. `engine Healthy · v0.8.37 · What's new · Help` — every
+ * cell a discrete control, every reading still carrying its dot, its
+ * freshness and its provenance.
+ *
+ * Register (§2.2): JetBrains Mono; KEYS are the 10.5px/0.08em uppercase
+ * mono-label the type system defines and consumers were left to apply;
+ * VALUES stay sentence-case at reading size, because "Healthy" and "What's
+ * new" are words the user reads, not labels they scan. */
+.ledger {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-family: var(--font-mono);
 }
-.standby__link {
-  background: transparent;
-  border: none;
-  cursor: pointer;
+.ledger__sep {
   color: var(--fg-faint);
-  font-size: 12.5px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: color 0.15s ease;
+  opacity: 0.5;
+  font-size: 11.5px;
+  padding: 0 2px;
+  user-select: none;
 }
-.standby__link:hover { color: var(--fg-muted); }
-.standby__link.is-accent { color: var(--fg); font-weight: 500; }
-.standby__link:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
-.standby__dot { color: var(--fg-faint); opacity: 0.5; }
+.ledger__cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, border-color 0.15s ease-out,
+    color 0.15s ease-out;
+}
+.ledger__cell.is-static { cursor: default; }
+button.ledger__cell:hover { background: var(--surface); border-color: var(--line); }
+.ledger__cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ledger__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+  flex: none;
+}
+.ledger__dot.ok { background: var(--ok); }
+.ledger__dot.warn { background: var(--warn); }
+.ledger__dot.err { background: var(--err); }
+.ledger__dot.accent { background: var(--accent); }
+/* The mono-label register — the one place the launcher spells a KEY. */
+.ledger__key {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.ledger__value {
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+button.ledger__cell:hover .ledger__value { color: var(--fg); }
+/* A reading too old to stand behind says so, in the colour of a warning. */
+.ledger__cell.is-stale .ledger__value { color: var(--warn); }
+/* An update is waiting: the cell goes bright and takes the one-time
+   underline sweep. The rule is scaled from the left by GSAP (once, never a
+   loop — §2.4); it is 1px of accent under one cell, well inside the
+   three-blues-per-screen budget since the core is calm in this state. */
+.ledger__cell.is-waiting .ledger__value { color: var(--fg); }
+.ledger__sweep {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  height: 1px;
+  background: var(--accent-text);
+  transform-origin: left center;
+  pointer-events: none;
+}
 
 /* ── Hub card grid (Updates / Changelog / FAQ / Support) ──────────────
  * The launcher's hub destinations, below the primary verb. 2x2 grid of
@@ -1714,47 +1846,11 @@ table.data-table {
   color: var(--fg-muted);
 }
 
-/* Quiet vitals row — each item is a door (status-is-the-door). */
-.standby__vitals {
-  display: flex;
-  gap: 8px;
-  margin-top: 42px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.vital {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  padding: 7px 11px;
-  cursor: pointer;
-  transition: background-color 0.15s ease-out, border-color 0.15s ease-out;
-}
-.vital:hover { background: var(--surface); border-color: var(--line); }
-.vital:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.vital__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); flex: none; }
-.vital__dot.ok { background: var(--ok); }
-.vital__dot.warn { background: var(--warn); }
-.vital__dot.err { background: var(--err); }
-.vital__dot.accent { background: var(--accent); }
-.vital__label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
-.vital__value {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-}
-.vital__value.is-live { color: var(--accent-text); font-weight: 600; }
-.vital.is-stale .vital__value { color: var(--warn); }
+/* The quiet vitals row that used to live here is gone: slice 5 folded it into
+ * the ledger (`.ledger__dot` / `__key` / `__value` carry its dot, its mono
+ * label and its reading), which is what freed the vertical the instrument's
+ * ~55% band needed. Status-is-the-door survived the merge — the engine cell is
+ * still the button that opens Supervision. */
 
 @keyframes standby-pulse {
   0%, 100% { opacity: 1; }
@@ -1818,9 +1914,12 @@ table.data-table {
 .standby-stage {
   position: relative;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
-.standby-stage .standby { min-height: 100%; }
+/* The home is a fixed three-band chamber, so it takes the stage's height
+   exactly — the bands divide what there is rather than growing a column. */
+.standby-stage .standby { height: 100%; }
 
 /* ── Floating surfaces — edges only ────────────────────────────────
  * Every surface the launcher floats over its home board — the inspector
@@ -1961,12 +2060,13 @@ table.data-table {
   color: var(--fg-muted);
 }
 
-/* Transient command echo (echo-to-teach) — names the verb you just ran. */
+/* Transient command echo (echo-to-teach) — names the verb you just ran.
+ * Floats just above the ledger, which owns the floor of the chamber now. */
 .echo-line {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 18px;
+  bottom: 78px;
   text-align: center;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2084,9 +2184,11 @@ table.data-table {
   overflow: auto;
 }
 
-/* Interrogable provenance — hover/focus a vital to audit the green dot. */
-.vital { position: relative; }
-.vital__prov {
+/* Interrogable provenance — hover/focus the engine cell to audit the green
+ * dot. The native `title` says the same thing, but only to a pointer; this is
+ * what keeps the audit reachable from the keyboard. Opens UPWARD, because the
+ * ledger sits on the floor of the chamber. */
+.ledger__prov {
   position: absolute;
   bottom: calc(100% + 7px);
   left: 50%;
@@ -2100,41 +2202,22 @@ table.data-table {
   font: 400 11px/1.45 var(--font-mono);
   color: var(--fg-dim);
   text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease-out, transform 0.12s ease-out;
   z-index: 30;
 }
-.vital:hover .vital__prov,
-.vital:focus-visible .vital__prov {
+.ledger__cell:hover .ledger__prov,
+.ledger__cell:focus-visible .ledger__prov {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
-/* Agent on-ramp chip — the brain the workspace uses, beside the actuator. */
-.standby__agent {
-  margin-top: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
-}
-.standby__agent:hover { border-color: var(--line-strong); background: var(--surface-2); }
-.standby__agent-label {
-  font: 500 10px/1 var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
-.standby__agent-name { font-size: 13px; color: var(--fg); }
-
-/* Inline incident on the home (progressive escalation). */
-.standby__incident { margin-top: 18px; width: min(440px, 92vw); text-align: left; }
+/* Inline incident on the home (progressive escalation). Spacing comes from the
+ * verdict band's gap now, not from a margin — the band owns its rhythm. */
+.standby__incident { width: min(440px, 92vw); text-align: left; }
 
 /* Connections "what this unblocks" legend. */
 .unblockers {
@@ -2281,13 +2364,19 @@ table.data-table {
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   Home (Standby) — the same chamber as the sign-in screen: a dark floor
-   with the ambient dot-field behind the chrome. Scoped to .shell-standby
-   so the rest of the app keeps the charcoal system.
+   Home (Standby) — the same chamber as the sign-in screen: the charcoal
+   floor with the ambient dot-field behind the chrome. Scoped to
+   .shell-standby so the rest of the app keeps the charcoal system.
+
+   The floor was #000 — the last hex left over from the WebGL era, when the
+   shader needed pure black behind it to composite against. §2.1's canvas
+   ladder starts at --bg, and the dot-field is ink on charcoal like every
+   other surface, so the home now stands on the same floor as the rest of
+   the product (slice 3 flagged this as slice 5's to move).
    ────────────────────────────────────────────────────────────────── */
 .shell-standby {
   position: relative;
-  background: #000;
+  background: var(--bg);
   isolation: isolate;
 }
 .shell-standby > .topbar,
@@ -2311,28 +2400,25 @@ table.data-table {
 }
 .shell-standby .standby-stage {
   background: transparent;
+  /* The stage is a <main>, and the app's generic main rule (a centred 900px
+     column with 24/24/32 padding) is the wrong shape for a chamber: the home's
+     three bands are full-bleed and own their own margins. Its `margin: 0 auto`
+     also made the stage shrink-to-fit inside the shell's column flex, which is
+     why the chamber used to be as wide as its widest row instead of as wide as
+     the window. Neutralised here rather than on `main` itself, which every
+     other view still wants. */
+  padding: 0;
+  max-width: none;
+  margin: 0;
 }
 /* The verb takes the accent from the base .standby__actuator rule
    (background: var(--accent); color: var(--accent-ink)) — Nous-blue with a
    white label, the same primary as every other surface. This screen used to
    force a white pill by hand, which made the launcher's own front door the
-   one place in the product that wasn't on brand. Only the disabled treatment
-   is still specific to this control. */
-.shell-standby .standby__actuator:disabled {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--fg-muted);
-}
-/* Agent pill + lamp ring → glass; the lamp CORE keeps its semantic
-   colour (green = ready / red = needs you) — that's a functional signal,
-   not decoration, so it stays. */
-.shell-standby .standby__agent {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-.shell-standby .standby__agent:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-}
+   one place in the product that wasn't on brand. Its disabled treatment used
+   to be re-specified here in raw white alpha for the black chamber; on the
+   charcoal floor the base rule's --surface-2 + hairline is exactly §3.3's
+   spec, so the override is gone with the black. */
 
 /* ── Pair a phone (M5) ────────────────────────────────────────────────
    QR scanners want dark modules on a light field, so the tile is the one

@@ -130,6 +130,29 @@ const walk = (dir: string): string[] =>
     return TEXT.test(e.name) ? [full] : [];
   });
 
+test("no plugin that INVENTS text may enter the tree", () => {
+  // §2.4 + §4: the verdict is allowed to animate, never to lie. Scramble /
+  // decrypt / typewriter / split-flap all render characters the machine never
+  // said — a half-scrambled "Everything's ready." is a sentence the engine
+  // never reported. SplitText is the one text plugin this app registers, and
+  // it only ever REVEALS words that are already in the DOM.
+  const banned = ["ScrambleText" + "Plugin", "gsap/" + "TextPlugin", "Decrypted" + "Text"];
+  const offenders: string[] = [];
+
+  for (const file of [...walk(SRC), path.join(ROOT, "package.json")]) {
+    const text = readFileSync(file, "utf8");
+    for (const needle of banned) {
+      if (text.includes(needle)) offenders.push(`${path.relative(ROOT, file)} → ${needle}`);
+    }
+  }
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `text is truth, not material (§2.4). Offenders:\n${offenders.join("\n")}`,
+  );
+});
+
 test("the retired animation library stays out of the frontend", () => {
   // Spelled from parts so the guard doesn't trip over its own source text.
   const banned = ["framer" + "-motion", "motion" + "/react"];
