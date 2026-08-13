@@ -35,6 +35,7 @@ import { useSyncExternalStore } from "react";
 
 import { useGSAP } from "@gsap/react";
 import { gsap } from "gsap";
+import { SplitText } from "gsap/SplitText";
 
 // Relative, with the extension: this module is imported by `node --test`,
 // which resolves neither Vite's `@/` alias nor extensionless specifiers.
@@ -44,7 +45,12 @@ import { readAmbientEnv, tickerPower, watchAmbientEnv } from "./ambient.ts";
 // it scopes them to a gsap.context and reverts on unmount, which is what
 // keeps React 18 StrictMode's double-mounted effects from double-registering
 // (redesign doc, Risk 5). Registering it also protects it from tree-shaking.
-gsap.registerPlugin(useGSAP);
+//
+// SplitText joins it for the verdict line (§2.4, §3.3 Band 2). It is registered
+// HERE rather than at the one call site for the same reason the eases are: a
+// plugin is a process-wide singleton, and the module that owns the vocabulary
+// owns the registration. What it is allowed to do is narrow — see revealWords.
+gsap.registerPlugin(useGSAP, SplitText);
 
 // ── The vocabulary ────────────────────────────────────────────────
 
@@ -272,10 +278,50 @@ export function snapStatus(
     .to(target, { opacity: 1, duration: half, ease: EASE.enter });
 }
 
+/** The verdict entrance (§2.4, §3.3 Band 2): a display line arrives word by
+ *  word — y 8→0, opacity 0→1, 30ms apart, 320ms on the house enter curve.
+ *
+ *  THE HONESTY LAW, AS A HELPER. A verdict may animate as ceremony, but its
+ *  CONTENT is truth: this reveals the words the element already holds, and can
+ *  do nothing else. No scramble, no decrypt, no typewriter, no split-flap —
+ *  every one of those spells words the machine never said, and the one sentence
+ *  on this screen may not be wrong even for 200ms (§4 excludes that whole
+ *  family from the quarry for exactly this reason; a grep guard in the tests
+ *  keeps their plugins out of the tree).
+ *
+ *  Splitting rewrites the element's markup, so the caller must hand the
+ *  returned function to `useGSAP`'s cleanup — it kills the tween and restores
+ *  the element to its own text. `aria: "auto"` (SplitText's default, stated
+ *  here because it is load-bearing) mirrors the line into an `aria-label` and
+ *  hides the word pieces, so assistive tech still reads one sentence.
+ *
+ *  Under reduced motion every time collapses to zero: the words are still
+ *  split and the tween still runs, it simply lands complete on its first tick. */
+export function revealWords(target: HTMLElement, vars: Vars = {}): () => void {
+  const split = SplitText.create(target, { type: "words", aria: "auto" });
+  const tween = gsap.from(
+    split.words,
+    houseVars(
+      {
+        y: 8,
+        opacity: 0,
+        duration: DUR.verdict,
+        ease: EASE.enter,
+        stagger: STAGGER.word,
+      },
+      vars,
+    ),
+  );
+  return () => {
+    tween.kill();
+    split.revert();
+  };
+}
+
 // NOTE — there is deliberately no `countTo` / `tweenNumber` / `progressTo`
 // helper here, and there must never be one. Numbers, counts, countdowns and
 // percentages SNAP (§2.4): a lifecycle count that rolls up to its value, or an
 // install bar that trickles ahead of real `installer-progress` events, is a
 // small lie about what the machine knows. Render the value; let it change.
 
-export { gsap, useGSAP };
+export { SplitText, gsap, useGSAP };
