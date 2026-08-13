@@ -1,10 +1,24 @@
 // Tutorial — a short, dismissible first-run walkthrough.
 //
+// Design authority: launcher-redesign-direction.md §3.6 ("Tutorial") — the five
+// steps keep their order and their one interactive embed, and the card becomes
+// an "orientation card" at the foot of the chamber: mono step label, display-
+// serif title, and the dots redrawn as station ticks on a hairline. Slice 7 of
+// the redesign.
+//
 // A handful of steps, no jargon. Shown once after install (gated on a
-// localStorage flag in App), and re-openable any time from Help.
-// Most steps are pure presentational copy; one ("Connect GitHub")
-// renders an interactive device-flow sign-in via the `render` hook on
-// the step shape. Skip and Done both call onClose.
+// localStorage flag in App), and re-openable from ⌘K ("Replay the tour") or
+// System → Advanced / Diagnostics. Most steps are pure presentational copy;
+// one ("Connect GitHub") renders an interactive device-flow sign-in via the
+// `render` hook on the step shape. Skip and Done both call onClose.
+//
+// THE COPY. Slices 4–6 replaced the parts three of these steps described — the
+// lamp became the instrument, the status line moved ABOVE the button, the card
+// grid became the ledger row, Settings became System, and the agent moved to
+// its own Intelligence panel. Slice 7 rewrites those claims against the screens
+// that are actually there (each one walked before it was written). The steps,
+// their order and the GitHub embed are unchanged: a tour may be re-worded, but
+// it may never describe a surface the product no longer has.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -25,11 +39,11 @@ const STEPS: Step[] = [
   },
   {
     title: "Start, then open the workspace",
-    body: "The home screen has one primary button. If your engine isn't running it reads Start engine; once it's up it becomes Open workspace and launches the IDE. The status line under it always tells you the engine's real state.",
+    body: "The home has one button, and it is always your next move. If your engine isn't running it reads Start engine; once it's up it becomes Open workspace and launches the IDE. The line above it always tells you the engine's real state.",
   },
   {
     title: "Your hub, at a glance",
-    body: "The launcher is your hub: the lamp and status line show the engine's real state, and the cards take you to Updates, Changelog, FAQ, and Support. Brokers and data sources connect inside the workspace itself.",
+    body: "The instrument at the top is the stack itself — one body on the ring for each container that really reported, and pressing it opens Supervision. The mono row on the floor is the ledger: the engine reading, your version, What's new and Help, each of them a door. Brokers and data sources connect inside the workspace itself.",
   },
   {
     title: "Connect GitHub",
@@ -37,8 +51,8 @@ const STEPS: Step[] = [
     render: () => <GithubConnect />,
   },
   {
-    title: "Settings & help",
-    body: "Manage your license, choose your agent, and control the engine in Settings. Need help? The FAQ and Support cards on the home screen answer common questions and let you copy diagnostics. Reopen this tour any time from Help.",
+    title: "System & help",
+    body: "Manage your license and the engine's preferences in System, from the top bar or ⌘K, and choose your agent in Intelligence. Help answers the common questions and copies your diagnostics for support. You can replay this tour any time from ⌘K, or from System → Advanced / Diagnostics.",
   },
 ];
 
@@ -57,9 +71,11 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
         <p className="tut-body">{step.body}</p>
         {step.render?.()}
         <div className="tut-foot">
-          <div className="tut-dots" aria-hidden="true">
+          {/* The dots become station ticks on a hairline spine (§3.6) — the
+              same commissioning-rail language the onboarding stations use. */}
+          <div className="tut-ticks" aria-hidden="true">
             {STEPS.map((_, n) => (
-              <span key={n} className={`tut-dot${n === i ? " on" : ""}`} />
+              <span key={n} className={`tut-tick${n === i ? " on" : ""}`} />
             ))}
           </div>
           <div className="hstack">
