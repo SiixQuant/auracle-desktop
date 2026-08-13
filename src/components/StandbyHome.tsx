@@ -1,27 +1,30 @@
 // StandbyHome — the launcher home, "The Standby".
 //
-// The calm panel of an already-running machine: one orbital status lamp, one
-// plain-English System Line, and one adaptive verb ("Open workspace" when the
-// engine is ready, "Start engine" when it's down). The screen stays quiet by
-// default — a footer of small links (update status / What's new / Help) — and
-// only raises a card when something needs attention (the engine down). The
-// lamp, line, and verb are pure derivations of one engine snapshot
+// The calm panel of an already-running machine: one instrument (the orrery),
+// one plain-English System Line, and one adaptive verb ("Open workspace" when
+// the engine is ready, "Start engine" when it's down). The screen stays quiet
+// by default — a footer of small links (update status / What's new / Help) —
+// and only raises a card when something needs attention (the engine down). The
+// instrument, line, and verb are pure derivations of one engine snapshot
 // (deriveBoard), so what the home says is, by construction, what the engine
 // reports.
 
 import IncidentCard from "@/components/IncidentCard";
+import Orrery from "@/components/Orrery";
+import { frameFor } from "@/fx/orrery";
 import {
   deriveBoard,
   type ActuatorState,
   type Door,
-  type LampTone,
   type Vital,
 } from "@/lib/aggregator";
+import type { ContainerStatus } from "@/lib/tauri";
 import type { EngineStateHook } from "@/lib/useEngineState";
 import type { InspectorKey } from "@/components/InspectorHost";
 
 export default function StandbyHome({
   eng,
+  containers,
   onActuator,
   onDoor,
   onCard,
@@ -30,6 +33,10 @@ export default function StandbyHome({
   /** Shared live engine read (owned by the Shell, so the home keeps
    *  polling behind an open inspector). */
   eng: EngineStateHook;
+  /** The stack as `stackStatus()` last reported it — the ONLY source of the
+   *  instrument's bodies. Undefined means "we haven't been told", which the
+   *  instrument renders as the mark at rest rather than as an empty machine. */
+  containers?: ContainerStatus[];
   /** Run the home's one verb — owned by the Shell so the palette and the
    *  button trigger the same action. */
   onActuator: () => void;
@@ -61,7 +68,10 @@ export default function StandbyHome({
 
   return (
     <div className="standby">
-      <Lamp tone={board.lamp} pulse={board.pulse} onClick={() => onDoor?.("supervision")} />
+      <Orrery
+        frame={frameFor(board, containers ?? [])}
+        onOpen={() => onDoor?.("supervision")}
+      />
 
       <h1 className="standby__line">{board.systemLine}</h1>
 
@@ -112,66 +122,6 @@ export default function StandbyHome({
         ))}
       </div>
     </div>
-  );
-}
-
-// ── Lamp — an orbital that echoes the Auracle mark ──────────────────
-//
-// A glowing core with a comet-trail satellite tracing a tilted orbit. Colour
-// follows the engine tone (green ready, amber degraded, red down, white
-// active) through `currentColor`, so it reads as "alive and in orbit" rather
-// than a plain dot. On `err` the orbit halts and the ring goes dashed.
-
-function Lamp({
-  tone,
-  pulse,
-  onClick,
-}: {
-  tone: LampTone;
-  pulse: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`standby__lamp tone-${tone}${pulse ? " is-pulsing" : ""}`}
-      onClick={onClick}
-      aria-label="Engine status — open Supervision"
-    >
-      <svg
-        className="standby__orbital"
-        viewBox="0 0 140 140"
-        width="108"
-        height="108"
-        aria-hidden="true"
-        xmlns="http://www.w3.org/2000/svg"
-        xmlnsXlink="http://www.w3.org/1999/xlink"
-      >
-        <circle className="orb-halo" cx="70" cy="70" r="41" />
-        <g transform="rotate(-24 70 70)">
-          <ellipse className="orb-ring" cx="70" cy="70" rx="49" ry="18" />
-          <path id="standbyOrb" d="M21,70 A49,18 0 1 1 119,70 A49,18 0 1 1 21,70" fill="none" />
-          <circle className="orb-glow" cx="70" cy="70" r="18" opacity="0.13" />
-          <circle className="orb-core" cx="70" cy="70" r="6.4" />
-          <circle className="orb-bright" cx="70" cy="70" r="3.4" />
-          <circle className="orb-sat orb-sat--t2" r="1.5">
-            <animateMotion dur="6.5s" begin="-0.36s" repeatCount="indefinite">
-              <mpath href="#standbyOrb" xlinkHref="#standbyOrb" />
-            </animateMotion>
-          </circle>
-          <circle className="orb-sat orb-sat--t1" r="2.2">
-            <animateMotion dur="6.5s" begin="-0.18s" repeatCount="indefinite">
-              <mpath href="#standbyOrb" xlinkHref="#standbyOrb" />
-            </animateMotion>
-          </circle>
-          <circle className="orb-sat orb-sat--head" r="3.3">
-            <animateMotion dur="6.5s" repeatCount="indefinite">
-              <mpath href="#standbyOrb" xlinkHref="#standbyOrb" />
-            </animateMotion>
-          </circle>
-        </g>
-      </svg>
-    </button>
   );
 }
 

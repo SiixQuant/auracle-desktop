@@ -99,6 +99,14 @@
   --stage-dot:      rgba(230, 237, 243, 0.05);
   --stage-dot-near: rgba(230, 237, 243, 0.09);
 
+  /* The Orrery — the home instrument. Derived, no new hue, and deliberately
+     achromatic: the ring is CHROME (it is the mechanism, not a reading) and a
+     body is neutral INK until its own container reports otherwise. Only the
+     core is ever chromatic, which is what keeps one status colour on screen
+     instead of a constellation of them. */
+  --orbit-ring: var(--line-strong);
+  --orbit-body: var(--fg-dim);
+
   /* Foreground — Percept ramp (primary → muted), high-contrast not glowing */
   --fg:          #e6edf3;
   --fg-dim:      #9da7b3;
@@ -1388,9 +1396,9 @@ table.data-table {
 }
 
 /* ── The Standby home ──────────────────────────────────────────────
- * The calm panel of an already-running machine: one status lamp, one
+ * The calm panel of an already-running machine: one instrument, one
  * System Line, one adaptive verb, and a quiet vitals row. Emptiness is
- * the success state — generous negative space, charcoal floor, the lamp
+ * the success state — generous negative space, charcoal floor, the core
  * the only color when all-green. Everything derives from deriveBoard(). */
 .standby {
   min-height: 80vh;
@@ -1402,59 +1410,89 @@ table.data-table {
   padding: 48px 24px;
 }
 
-/* Lamp — the aggregate status light (brand mark). Ring + core, both
- * tinted by tone; pulses only while in-flight (checking / starting). */
-.standby__lamp {
-  color: var(--lamp-color, var(--fg-faint));
-  width: 108px;
-  height: 108px;
-  display: grid;
-  place-items: center;
+/* ── The Orrery — the instrument (redesign §3.3) ───────────────────
+ * The engine core at the centre, every real container a body on a hairline
+ * ring. Geometry, state map and the mark quotation live in src/fx/orrery.ts;
+ * the tweens live in src/components/Orrery.tsx. This is the ink only.
+ *
+ * Two laws are enforced here rather than in JS:
+ *   · the ring is CHROME and a body is INK — neither is ever accent-blue, so
+ *     the screen's three permitted blues stay the core, the verb and the
+ *     focus ring (§2.1);
+ *   · nothing on this surface carries a filter or a blurred shadow. The core
+ *     used to wear a drop-shadow; it is an animated layer, and §4 budgets it
+ *     at zero. The 20px soft ring at α.13 does that job with a fill. */
+.orrery {
+  /* The instrument takes exactly the height this composition leaves it.
+     Measured: the rest of the column (verdict, verb, footer, re-run, vitals,
+     padding) is a fixed ~450px under the 46px topbar, so `100vh - 450px` is
+     the honest budget — 306px (a 300px orbit, §3.3's ceiling, where one SVG
+     unit is one CSS pixel and the 8px core / 5px bodies are literal) from a
+     756px-tall window up, ~250px in the default 900×700, and a 110px floor at
+     the 600×500 minimum, which is the footprint of the lamp it replaces so no
+     window size loses a row it used to show. §3.9's 180px floor and the ~55%
+     instrument band arrive with the ledger (slice 5), which reclaims the
+     three stacked rows below the verb. */
+  width: clamp(110px, calc(100vh - 450px), 306px);
+  height: clamp(110px, calc(100vh - 450px), 306px);
+  flex: none;
+  display: block;
+  padding: 0;
   background: transparent;
   border: none;
   cursor: pointer;
-  margin-bottom: 24px;
-  transition: color 0.2s ease-out;
+  margin-bottom: 20px;
 }
-.standby__orbital { display: block; overflow: visible; }
-.standby__orbital .orb-halo {
+.orrery:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-lg);
+}
+.orrery__svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+/* The ring. One hairline that stays one pixel at every window size. */
+.orrery__ring,
+.orrery__seam {
   fill: none;
-  stroke: var(--lamp-ring, var(--line-strong));
+  stroke: var(--orbit-ring);
   stroke-width: 1;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: orb-halo 5s ease-in-out infinite;
 }
-@keyframes orb-halo { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.09); opacity: 0.8; } }
-.standby__orbital .orb-ring { fill: none; stroke: var(--lamp-ring, var(--line-strong)); stroke-width: 1.1; }
-.standby__orbital .orb-glow { fill: currentColor; }
-.standby__orbital .orb-core { fill: currentColor; filter: drop-shadow(0 0 8px currentColor); }
-.standby__orbital .orb-bright {
-  fill: var(--fg, #fff);
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: orb-core 5s ease-in-out infinite;
+/* No probe has answered yet — the mechanism is there, but dimmer than chrome. */
+.orrery__ring[data-ring="dim"] { stroke: var(--line); }
+/* Engine down: a stopped watch. */
+.orrery__ring[data-ring="dashed"] { stroke-dasharray: 3 6; opacity: 0.6; }
+/* First-run unfinished: the ring has a seam in it. */
+.orrery__seam { stroke-dasharray: 2 5; }
+
+/* The mark's own two dots — drawn only when there is no machine to show. */
+.orrery__chrome { fill: var(--fg-faint); }
+
+/* The core: the one chromatic thing on the home screen. */
+.orrery__core { color: var(--fg-faint); }
+.orrery__core[data-tone="accent"] { color: var(--accent); }
+.orrery__core[data-tone="ready"]  { color: var(--accent-text); }
+.orrery__core[data-tone="warn"]   { color: var(--warn); }
+.orrery__core[data-tone="err"]    { color: var(--err); }
+.orrery__dot  { fill: currentColor; }
+.orrery__halo { fill: currentColor; opacity: 0.13; }
+
+/* Bodies. Neutral ink; a container's own report is the only thing that can
+ * tint one. Each carries an invisible hover target, because a 5px dot is not
+ * a pointer target and its mono flag is the only thing a pointer can ask for. */
+.orrery__mass { fill: var(--orbit-body); }
+.orrery__body[data-tone="warn"] .orrery__mass { fill: var(--warn); }
+.orrery__body[data-tone="err"] .orrery__mass { fill: var(--err); }
+.orrery__hit { fill: transparent; }
+.orrery__flag {
+  fill: var(--fg-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-anchor: middle;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
 }
-@keyframes orb-core { 0%, 100% { opacity: 0.68; transform: scale(0.86); } 50% { opacity: 1; transform: scale(1); } }
-.standby__orbital .orb-sat { fill: currentColor; filter: drop-shadow(0 0 4px currentColor); }
-.standby__orbital .orb-sat--t1 { opacity: 0.5; }
-.standby__orbital .orb-sat--t2 { opacity: 0.25; }
-.standby__lamp.tone-ok       { --lamp-ring: var(--ok-dim);      --lamp-color: var(--ok); }
-.standby__lamp.tone-warn     { --lamp-ring: var(--warn-dim);    --lamp-color: var(--warn); }
-.standby__lamp.tone-err      { --lamp-ring: var(--err-dim);     --lamp-color: var(--err); }
-.standby__lamp.tone-accent   { --lamp-ring: var(--accent-dim);  --lamp-color: var(--accent); }
-.standby__lamp.tone-checking { --lamp-ring: var(--line-strong); --lamp-color: var(--fg-faint); }
-/* engine down: the orbit halts, the ring dashes */
-.standby__lamp.tone-err .orb-sat { display: none; }
-.standby__lamp.tone-err .orb-ring { stroke-dasharray: 3 6; opacity: 0.6; }
-/* in-flight (checking / starting): quicken the core's breath */
-.standby__lamp.is-pulsing .orb-bright { animation-duration: 1.4s; }
-.standby__lamp:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 50%; }
-@media (prefers-reduced-motion: reduce) {
-  .standby__orbital .orb-sat { display: none; }
-  .standby__orbital .orb-halo,
-  .standby__orbital .orb-bright { animation: none; }
-}
+.orrery__body:hover .orrery__flag { opacity: 1; }
 
 .standby__line {
   font-family: var(--font-display);
