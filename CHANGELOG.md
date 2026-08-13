@@ -4,6 +4,9 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Fixed
+- Sign-in no longer waits for something that can't happen. With the engine stopped, the sign-in screen says so and names your next move instead of opening a browser page that can't load and waiting on it; the moment the engine answers, the normal sign-in comes back.
+
 ## [0.9.0]
 
 The launcher becomes the mark.

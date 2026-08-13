@@ -12,8 +12,16 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import Shell from "@/components/Shell";
 import Tutorial from "@/components/Tutorial";
-import { needsOnboarding as shouldOnboard } from "@/lib/onboarding";
+import { engineIsUp, needsOnboarding as shouldOnboard } from "@/lib/onboarding";
 import { SettingsProvider } from "@/lib/settings";
+import {
+  phaseOnProbe,
+  phaseOnStart,
+  shouldProbe,
+  SIGN_IN_MAX_TICKS,
+  SIGN_IN_POLL_MS,
+  type SignInPhase,
+} from "@/lib/signin";
 import { cmd, openClerkSignIn } from "@/lib/tauri";
 import Onboarding from "@/views/Onboarding";
 
@@ -27,6 +35,13 @@ const SignInScreen = lazy(() =>
 );
 
 const TUTORIAL_SEEN_KEY = "auracle_tutorial_seen";
+
+/** Is the local engine answering right now? Any health answer other than
+ *  "down" counts — the hosted sign-in only needs the engine to respond, and
+ *  a failed probe is not an engine. Same ladder the install gate uses. */
+async function engineReachable(): Promise<boolean> {
+  return engineIsUp(await cmd.healthcheckNow().catch(() => null));
+}
 
 export default function App() {
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -102,46 +117,70 @@ export default function App() {
   // Continue with Google: the engine opens its hosted sign-in in the browser
   // and persists the shared session; we poll it until it appears, then reveal
   // the app. The engine (or the IDE) may complete it — either way we see it.
-  const [googleWaiting, setGoogleWaiting] = useState(false);
-  const googlePoll = useRef<number | null>(null);
+  //
+  // That page is served by the LOCAL engine, so the whole flow is gated on
+  // the engine answering (see @/lib/signin). Opening the browser at a
+  // stopped engine can only land on a connection error, so we don't open it
+  // and the card says why instead of waiting for something that cannot
+  // happen.
+  const [phase, setPhase] = useState<SignInPhase>("idle");
+  const starting = useRef(false);
 
   const startGoogleSignIn = async () => {
-    setGoogleWaiting(true);
+    // The probe is a round trip; ignore a second click while it's out.
+    if (starting.current) return;
+    starting.current = true;
     try {
-      await openClerkSignIn();
-    } catch {
-      setGoogleWaiting(false);
-      return;
+      const next = phaseOnStart(await engineReachable());
+      setPhase(next);
+      if (next !== "waiting") return; // engine down — nothing was opened
+      try {
+        await openClerkSignIn();
+      } catch {
+        setPhase("idle");
+      }
+    } finally {
+      starting.current = false;
     }
-    if (googlePoll.current) window.clearInterval(googlePoll.current);
+  };
+
+  // One timer, driven by the phase — never two, which would race each other
+  // onto the same state. While waiting it watches both the shared session
+  // appearing and the engine still being there to complete it; while the
+  // engine is down it watches only for the engine to come back, and then
+  // hands the screen back to the user. Returning never re-opens the browser:
+  // the next move stays a click.
+  useEffect(() => {
+    if (!shouldProbe(phase)) return;
+    let cancelled = false;
     let ticks = 0;
-    googlePoll.current = window.setInterval(() => {
+    const id = window.setInterval(() => {
       void (async () => {
+        const reachable = await engineReachable();
+        if (cancelled) return;
+        const next = phaseOnProbe(phase, reachable);
+        if (next !== phase) {
+          setPhase(next);
+          return;
+        }
+        if (phase !== "waiting") return;
         ticks += 1;
-        const done = () => {
-          if (googlePoll.current) window.clearInterval(googlePoll.current);
-          googlePoll.current = null;
-          setGoogleWaiting(false);
-        };
-        if (ticks > 100) {
-          done();
+        if (ticks > SIGN_IN_MAX_TICKS) {
+          setPhase("idle");
           return;
         }
         const s = await cmd.clerkSession().catch(() => null);
-        if (s?.signed_in) {
-          done();
+        if (!cancelled && s?.signed_in) {
+          setPhase("idle");
           completeSignIn();
         }
       })();
-    }, 3000);
-  };
-
-  useEffect(
-    () => () => {
-      if (googlePoll.current) window.clearInterval(googlePoll.current);
-    },
-    [],
-  );
+    }, SIGN_IN_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [phase]);
 
   if (!bootstrapped) return null;
 
@@ -157,7 +196,8 @@ export default function App() {
       >
         <SignInScreen
           onGoogleSignIn={startGoogleSignIn}
-          googleWaiting={googleWaiting}
+          googleWaiting={phase === "waiting"}
+          engineDown={phase === "engine-down"}
         />
       </Suspense>
     );
@@ -168,7 +208,8 @@ export default function App() {
       <Onboarding
         onDone={() => setNeedsOnboarding(false)}
         onGoogleSignIn={startGoogleSignIn}
-        googleWaiting={googleWaiting}
+        googleWaiting={phase === "waiting"}
+        engineDown={phase === "engine-down"}
       />
     );
   }

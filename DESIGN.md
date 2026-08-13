@@ -328,6 +328,7 @@ under plain `node --test` with no renderer.
 | `src/components/OrreryEcho.tsx` | The still miniature at the top of Supervision. Plain SVG, zero tweens. |
 | `src/lib/aggregator.ts` | `deriveBoard()` — the single source of what the home says. Pure, and the highest-value test seam in the app. |
 | `src/lib/ledger.ts` | Band 3's cells and the update-truth ladder. |
+| `src/lib/signin.ts` | The pre-auth gate: whether the browser sign-in can start at all, and what the card says when it can't. **Pure.** |
 | `src/components/Shell.tsx` | The live surface: bands, hotkeys, echo line, polling. |
 | `src/components/StandbyHome.tsx` | The three bands' markup: instrument, verdict + verb, ledger. |
 | `src/components/InspectorHost.tsx` | The tray: one at a time, Esc/scrim close, the mechanical slide. |

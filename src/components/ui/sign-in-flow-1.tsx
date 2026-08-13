@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { AuracleGlyph } from "@/components/AuracleGlyph";
 import DotField from "@/fx/DotField";
 import { DUR, enter, useGSAP } from "@/fx/motion";
+import { ENGINE_DOWN_DETAIL, ENGINE_DOWN_LINE } from "@/lib/signin";
 
 interface SignInPageProps {
   className?: string;
@@ -13,6 +14,10 @@ interface SignInPageProps {
   onGoogleSignIn?: () => void;
   /** True while waiting for the browser sign-in to complete. */
   googleWaiting?: boolean;
+  /** True when the local engine isn't answering — the hosted sign-in it
+   *  serves cannot start, and nothing was opened. Mutually exclusive with
+   *  `googleWaiting`: see @/lib/signin. */
+  engineDown?: boolean;
 }
 
 /** Minimal Auracle wordmark — the orbital mark from the design, no nav chrome. */
@@ -31,6 +36,7 @@ export const SignInPage = ({
   className,
   onGoogleSignIn,
   googleWaiting,
+  engineDown,
 }: SignInPageProps) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -101,11 +107,28 @@ export const SignInPage = ({
                       ? "Waiting for browser sign-in…"
                       : "Continue with Google"}
                   </button>
-                  <p className="text-xs text-white/45">
-                    {googleWaiting
-                      ? "Finish signing in in your browser, then return here."
-                      : "Opens a secure Auracle sign-in in your browser."}
-                  </p>
+                  {/* Truth over ceremony: with the engine down nothing was
+                      opened, so the card says what happened and what the next
+                      move is instead of narrating a wait that can't end. The
+                      button above stays live — pressing it re-checks the
+                      engine, and the check runs on its own too, so this line
+                      clears itself the moment the engine answers. */}
+                  {engineDown ? (
+                    <div className="space-y-1" role="status">
+                      <p className="text-sm text-white/70">
+                        {ENGINE_DOWN_LINE}
+                      </p>
+                      <p className="text-xs text-white/45">
+                        {ENGINE_DOWN_DETAIL}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-white/45">
+                      {googleWaiting
+                        ? "Finish signing in in your browser, then return here."
+                        : "Opens a secure Auracle sign-in in your browser."}
+                    </p>
+                  )}
                 </div>
 
                 <p className="text-xs text-white/40 pt-10">
