@@ -81,13 +81,9 @@
   --bg:          #0b0c0e;   /* canvas — charcoal floor to lift surfaces from */
   --bg-rail:     #08090b;   /* chrome/sidebar — recedes below the canvas */
   --bg-elev:     #181b20;   /* elevated wells / popovers */
-  --hero-bg:     #101216;
   --surface:     #131519;   /* cards + containers — reads clearly above canvas */
   --surface-2:   #1b1e23;   /* interactive controls / hover */
   --surface-3:   #23272d;   /* pressed / neutral fill */
-  /* Barely-there grid texture (deliberate, ~4%) — apply on canvas surfaces */
-  --grid-h:      rgba(255, 255, 255, 0.04);
-  --grid-v:      rgba(255, 255, 255, 0.025);
 
   /* Ambient stage — the dot-field behind the home and the sign-in screen.
      Derived ink, no new hue: --fg at a whisper. The field brightens toward
@@ -253,47 +249,7 @@ html, body {
   border-bottom: 1px solid var(--line);
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-}
 
-.brand strong {
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.version {
-  font-size: var(--t-xs);
-  color: var(--fg-muted);
-  margin-left: var(--s-2);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Tabs ───────────────────────────────────────────────────────── */
-
-.tabs {
-  display: flex;
-  gap: var(--s-1);
-}
-
-.tab {
-  background: transparent;
-  border: none;
-  color: var(--fg-dim);
-  font-family: inherit;
-  font-size: var(--t-sm);
-  font-weight: 500;
-  padding: var(--s-2) var(--s-3);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.tab:hover  { color: var(--fg); background: var(--surface); }
-.tab.active { color: var(--fg); background: var(--surface-2); }
 
 /* ── Main ───────────────────────────────────────────────────────── */
 
@@ -352,82 +308,7 @@ h2 {
 
 .row + .row { border-top: 1px solid var(--line); }
 
-/* Block-flow list row — .row's sibling-border idiom for column
- * content (a control row stacked over a sub-card). */
-.list-row { padding: var(--s-3) 0; }
-.list-row + .list-row { border-top: 1px solid var(--line); }
 
-/* ── Launch card (Home → Workspaces) ─────────────────────────────
- * The one platform door. The whole card is a button — the arrow +
- * hover accent signal it. */
-
-.launch-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-  text-align: left;
-  padding: var(--s-4);
-  min-height: 120px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  color: var(--fg);
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
-}
-.launch-card:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
-}
-.launch-card:focus-visible {
-  outline: none;
-  border-color: var(--accent-dim);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-/* Primary = the one door into the platform. Accent edge so the eye
- * lands here first without shouting. */
-.launch-card--primary {
-  border-color: var(--accent-dim);
-  background: var(--accent-soft);
-}
-.launch-card--primary:hover {
-  border-color: var(--accent);
-  background: rgba(0, 83, 253, 0.20);
-}
-
-.launch-card__title {
-  font-size: var(--t-lg);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  padding-right: var(--s-5);
-}
-.launch-card--primary .launch-card__title { color: var(--accent-text); }
-
-.launch-card__desc {
-  font-size: var(--t-sm);
-  line-height: 1.5;
-  color: var(--fg-dim);
-  margin: 0;
-}
-
-.launch-card__arrow {
-  position: absolute;
-  top: var(--s-4);
-  right: var(--s-4);
-  font-size: var(--t-lg);
-  line-height: 1;
-  color: var(--fg-muted);
-  transition: transform 0.15s, color 0.15s;
-}
-.launch-card:hover .launch-card__arrow {
-  transform: translateX(3px);
-  color: var(--fg);
-}
-.launch-card--primary .launch-card__arrow { color: var(--accent-dim); }
-.launch-card--primary:hover .launch-card__arrow { color: var(--accent-text); }
 
 /* ── Segmented toggle (Settings → Workspace) ─────────────────────
  * Compact binary control — same language as Forge's Agent|Code switch,
@@ -455,14 +336,6 @@ h2 {
 .seg-tab:hover { color: var(--fg); }
 .seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent-dim); }
 .seg-tab.active { background: var(--accent-soft); color: var(--accent-text); }
-/* Mode-aware selected tabs (ibeam paper/live) — same token vocabulary as
- * the Dashboard .mode-badge so a chosen mode reads its own salience, not a
- * generic accent "on". PAPER = the safe default: quiet neutral surface +
- * dim ink. LIVE = real money: high-contrast desaturated --err (alert, no
- * glow). These override the default .active accent only on the toggle that
- * opts in via the --paper / --live modifier. */
-.seg-tab--paper.active { background: var(--surface-2); color: var(--fg-dim); }
-.seg-tab--live.active  { background: var(--err-soft);  color: var(--err); }
 
 /* ── Setup hint — the actionable "no owner account yet" affordance ─── */
 .setup-hint {
@@ -490,8 +363,6 @@ h2 {
 }
 .setup-hint__btn:hover { background: var(--accent-2); }
 
-@keyframes riser-up { from { transform: translateY(101%); } to { transform: translateY(0); } }
-@keyframes riser-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .sr-only {
   position: absolute;
@@ -989,10 +860,6 @@ input[type="text"]:focus, input[type="password"]:focus {
 .chip.warn    { background: var(--warn-soft);    color: var(--warn); }
 .chip.err     { background: var(--err-soft);     color: var(--err); }
 .chip.neutral { background: var(--surface-3);    color: var(--fg-dim); }
-/* live = the ONE place a chip earns the surgical accent (blue): a genuinely
- * connected/authenticated session (ibeam auth_ok). Reserved for real
- * "connected" truth — transient/starting states stay desaturated. */
-.chip.live    { background: var(--accent-soft);  color: var(--accent-text); }
 
 /* ── Banners — inline notices inside cards/views ──────────────────
  * info = accent-tinted guidance; warn = needs attention; err = failed.
@@ -1032,97 +899,10 @@ pre.logs {
  * action on screen (ibeam sub-card, installer details). */
 pre.logs.logs-compact { max-height: 200px; }
 
-/* ── Pane head — quiet header for collapsible sub-panes ──────────
- * Uppercase label left, small actions right. Not a card title bar. */
-.pane-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--s-1);
-}
-.pane-head__label,
-.micro-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
-.micro-label { display: block; }
-.pane-head__actions { display: flex; gap: var(--s-2); }
 
-/* ── Section head — h2 + right-aligned actions on one line ───────
- * Buttons never live inside the h2 element; the wrapper carries the
- * section margins and the h2 inside drops to zero. */
-.section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  margin: var(--s-5) 0 var(--s-2);
-}
-/* Editorial band: the mono-label sits on a hairline rule so each section
- * reads as a ruled band, and generous top whitespace separates bands. The
- * Settings page (de-boxed cards) leans on this rule for structure since the
- * blocks below no longer carry their own borders. */
-.settings .section-head {
-  margin: var(--s-6) 0 var(--s-3);
-  padding-bottom: var(--s-2);
-  border-bottom: 1px solid var(--line);
-}
-/* Section head label = mono-label (Percept): SF Mono, tracked, uppercase,
- * tertiary ink — over a hairline divider. The data does the talking. */
-.section-head h2 {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.section-head__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  margin-left: auto;
-}
 
-/* ── KPI tiles — the broker glance numbers ───────────────────────── */
-.kpi-grid { display: grid; gap: var(--s-2); }
-.kpi {
-  padding: var(--s-2) var(--s-3);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
-.kpi__value {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--t-md);
-  font-weight: 500;
-}
 
-/* ── Data table — quiet mono table for glance data ──────────────── */
-table.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--t-xs);
-}
-.data-table thead tr { border-bottom: 1px solid var(--line); color: var(--fg-dim); }
-.data-table tbody tr { border-bottom: 1px solid var(--line); }
 
-/* ── Sub-panel — implied-chrome region inside a row (ibeam under IBKR) ──
- * NOT a nested card (the rubric + detector reject cards-in-cards). A
- * hairline top divider sets it off from the row above — no fill, no
- * enclosing box; implied chrome only. */
-.subcard {
-  margin-top: var(--s-3);
-  padding: var(--s-3) 0 var(--s-1);
-  border-top: 1px solid var(--line);
-}
 
 /* ── Density utilities ───────────────────────────────────────────
  * The only sanctioned way to do micro-typography and small gaps in
@@ -1134,10 +914,11 @@ table.data-table {
 .fs-sm { font-size: var(--t-sm); }
 
 .m-0  { margin: 0; }
-.mt-0 { margin-top: 0; }
 .mt-1 { margin-top: var(--s-1); }
 .mt-2 { margin-top: var(--s-2); }
+.mt-3 { margin-top: var(--s-3); }
 .mt-4 { margin-top: var(--s-4); }
+.mb-0 { margin-bottom: 0; }
 .mb-2 { margin-bottom: var(--s-2); }
 .ml-2 { margin-left: var(--s-2); }
 
@@ -1158,102 +939,12 @@ table.data-table {
 
 .fs-2xs { font-size: 10px; }          /* chip/log tier for fine print */
 .err-text { color: var(--err); }
-.ok-text  { color: var(--ok); }
-.mb-1 { margin-bottom: var(--s-1); }
 .mb-3 { margin-bottom: var(--s-3); }
 
-/* Table cells (status/positions tables) — quiet, right-aligned numerics. */
-.cell     { padding: var(--s-1) var(--s-2); text-align: left;  font-weight: 400; }
-.cell-num { padding: var(--s-1) var(--s-2); text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; }
 
 /* ═══ Hub shell (v7.1 — left rail + content) ═════════════════════════ */
 
-.shell { display: flex; height: 100vh; overflow: hidden; }
 
-.rail {
-  width: 200px;
-  flex: none;
-  background: var(--bg-rail);
-  border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  padding: 14px 12px;
-  gap: 2px;
-}
-.rail__brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 6px; }
-.rail__brand strong { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
-.tier-chip {
-  align-self: flex-start;
-  margin: 2px 0 12px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  border-radius: var(--r-sm);
-  padding: 2px 7px;
-  background: var(--surface-3);
-  color: var(--fg-dim);
-}
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 9px 10px;
-  border-radius: 9px;
-  color: var(--fg-dim);
-  font-size: 13px;
-  font-weight: 500;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  width: 100%;
-  text-align: left;
-  transition: background-color 0.12s, color 0.12s;
-}
-.nav-item:hover { background: var(--surface); color: var(--fg); }
-/* Selected — an elevated charcoal plane with an inset hairline ring and a
-   surgical accent (blue) icon. Reads as "lifted + chosen" rather than a
-   flat accent wash; no banned side-stripe. */
-.nav-item.active {
-  background: var(--surface-2);
-  color: var(--fg);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-.nav-item.active svg { color: var(--accent-text); }
-.nav-item svg { flex: none; }
-.rail__foot {
-  margin-top: auto;
-  padding: 10px 8px 2px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.rail__foot .version { margin-left: 0; }
-
-.content { flex: 1; overflow: auto; }
-.view-narrow { max-width: 760px; margin: 0 auto; padding: 22px 24px 40px; }
-
-/* Settings — a fluid grid that scales with the window: it fills the
- * width at fullscreen (up to a readable cap) with viewport-relative
- * padding, packs the small setting cards into a top row, and lets the
- * big Connections panel span full width below — so the page never sits
- * as a lone narrow column in a sea of empty space, and never gets
- * uncomfortably wide on an ultra-wide display either. */
-.settings {
-  width: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 24px clamp(20px, 3vw, 56px) 56px;
-}
-.settings > h1 {
-  font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
-  margin: 0 0 var(--s-5);
-  font-size: 26px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  color: var(--fg);
-}
 .settings-grid {
   display: grid;
   /* min(100%, 380px) keeps a single card from overflowing a narrow
@@ -1265,46 +956,8 @@ table.data-table {
   align-items: start;
 }
 .sgcell { min-width: 0; }
-.sgcell.full { grid-column: 1 / -1; }
 .sgcell > .card { margin-bottom: 0; }
 
-/* Editorial-hairline Settings ─────────────────────────────────────
- * On the Settings page the cards DROP their box: no fill, no border, no
- * radius, no shadow. Each becomes a hairline-ruled block sitting under the
- * section's mono-label, with whitespace (not a frame) doing the separating.
- * Specificity is handled by the `.settings` scope — no !important. */
-.settings .card {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: var(--s-3) 0 var(--s-4);
-  margin-bottom: 0;
-}
-.settings .card:hover {
-  border: 0;
-  box-shadow: none;
-}
-/* Two de-boxed blocks share a grid track and read as one band — a hairline
- * rule between stacked blocks keeps them legible without reintroducing the
- * box. (Grid siblings sit side-by-side, so this only rules vertical stacks
- * within a single column on a narrow window.) */
-
-/* EXCEPTION — the primary Connections directory keeps a subtle contained
- * well: rows lift out of a deeper plane (one step below the canvas) with a
- * crisper edge + the restrained card elevation. The `directory-well`
- * modifier opts this one card back in. */
-.settings .card.directory-well {
-  background: var(--hero-bg);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  box-shadow: var(--elev-card), var(--hairline-top);
-  padding: var(--s-4);
-}
-.settings .card.directory-well:hover {
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--elev-card), var(--hairline-top);
-}
 
 /* In-card header — title (and optional action) live inside the card,
  * so a setting is one self-contained box instead of a floating
@@ -1422,82 +1075,6 @@ table.data-table {
 }
 .adv-drawer__caret.open { transform: rotate(90deg); }
 
-/* ── Home hub ─────────────────────────────────────────────────────── */
-
-.hub { display: flex; min-height: 100%; max-width: 1280px; margin: 0 auto; }
-.hub__main {
-  flex: 1;
-  min-width: 0;
-  padding: 20px 22px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.hub__aside {
-  width: 212px;
-  flex: none;
-  border-left: 1px solid var(--line);
-  padding: 20px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.hub__head { display: flex; align-items: center; justify-content: space-between; }
-.hub__head h1 { margin: 0; font-size: var(--t-md); }
-
-/* Hero */
-.hero {
-  position: relative;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  background: var(--hero-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  min-height: 172px;
-}
-/* The flame is an immersive right-side backdrop (not a flex sibling),
- * so the hero reads the same at any width — no far-right floating gap
- * when the window is fullscreen. */
-.hero__bg {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 42%;
-  min-width: 190px;
-  opacity: 0.55;
-  pointer-events: none;
-}
-.hero__body { position: relative; z-index: 1; padding: 24px 26px; max-width: 440px; min-width: 0; }
-/* Medium weight, tracking-tight — this is product, not brand: no oversized
- * hero (rubric: headings 500, ~-0.02em, no showy display type). */
-.hero__title { font-family: var(--font-display); font-variation-settings: var(--fvs-display); font-size: 27px; font-weight: 400; letter-spacing: -0.01em; line-height: 1.1; margin: 0; }
-.hero__sub { color: var(--fg-dim); font-size: 13px; margin: 7px 0 0; line-height: 1.5; }
-
-.btn-launch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  border: none;
-  border-radius: var(--r-lg);
-  padding: 12px 24px;
-  font-size: 15px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  margin-top: 18px;
-  transition: background-color 0.15s, box-shadow 0.15s;
-}
-.btn-launch:hover { background: var(--accent-2); }
-/* Real focus ring (rubric: visible accent focus ring on interactives) —
- * not a decorative hover glow. */
-.btn-launch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-dim); }
-.btn-launch:disabled { opacity: 0.55; cursor: wait; }
-
-.statusline { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--fg-dim); margin-top: 15px; }
 .sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--fg-muted); }
 /* OK = a healthy/live capability — a semantic signal, so it carries the
  * success hue rather than the brand accent. (It briefly rode --accent back
@@ -1506,73 +1083,9 @@ table.data-table {
 .sdot.ok     { background: var(--ok); }
 .sdot.warn   { background: var(--warn); }
 .sdot.err    { background: var(--err); }
-.sdot.hollow { background: transparent; border: 1.5px solid var(--fg-muted); box-sizing: border-box; }
 
-.hero__links { display: flex; gap: 16px; margin-top: 14px; }
-.hlink { background: none; border: none; padding: 0; font-family: inherit; font-size: 12px; color: var(--fg-muted); cursor: pointer; }
-.hlink:hover { color: var(--fg-dim); text-decoration: underline; text-underline-offset: 2px; }
 
-/* Mode badge (paper / live) — restrained Percept status pills. */
-.mode-badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  border-radius: var(--r-pill);
-  padding: 2px 8px;
-  letter-spacing: 0.06em;
-}
-/* PAPER = the safe default, so it stays quiet: neutral surface + dim ink,
- * a hairline ring rather than a colored fill. It must not compete with
- * the live badge for attention. */
-.mode-badge.paper { background: var(--surface-2); color: var(--fg-dim); box-shadow: inset 0 0 0 1px var(--line); }
-/* LIVE = real money. High-contrast desaturated-red pill via the --err
- * token family — high salience, but NO glow (rubric: high-contrast, not
- * glowing). The inset 1px --err-dim ring sharpens the edge. */
-.mode-badge.live  { background: var(--err-soft); color: var(--err); box-shadow: inset 0 0 0 1px var(--err-dim); }
 
-/* Account tiles — hairline tone panels (white 0.02 + white 0.06 line),
- * NOT solid cards: implied chrome, the data does the talking. */
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 11px; }
-.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 13px 14px; }
-/* Label = mono-label spec (SF Mono, tracked, uppercase, tertiary ink). */
-.tile__label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.tile__value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18px; margin-top: 4px; letter-spacing: -0.01em; }
-.tile__foot { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 10px; color: var(--fg-muted); margin-top: 8px; }
-/* Whole glance dims when any of its three fetches is stale, so no tile
- * reads as live while the header shows the amber "stale" stamp. */
-.tiles.is-stale { opacity: 0.6; }
-/* The "as of HH:MM:SS · Ns ago" stamp is data — mono + tabular so the
- * digits don't shimmy as the clock ticks. */
-.asof { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--fg-muted); }
-.asof.stale { color: var(--warn); }
-
-/* Today aside */
-/* Panel head = mono-label (Percept): SF Mono, tracked, uppercase, tertiary. */
-.aside__title {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.aside__row { display: flex; align-items: center; gap: 9px; font-size: 12px; }
-.aside__row .lbl { flex: 1; color: var(--fg-dim); }
-/* The value is the datum (engine state, broker, feed, version) — mono +
- * tabular so the status column reads like a terminal readout. */
-.aside__row .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg-muted); }
-.aside__sep { height: 1px; background: var(--line); }
-
-/* Animated flame (hero) */
-.flame-aura { transform-box: fill-box; transform-origin: center; animation: flamePulse 5.5s ease-in-out infinite; }
-.flame-aura.b { animation-delay: 2s; }
-@keyframes flamePulse { 0%, 100% { transform: scale(1); opacity: 0.16; } 50% { transform: scale(1.1); opacity: 0.05; } }
 
 /* ── Tutorial — the orientation card (redesign §3.6) ────────────────
  * "An orientation card bottom-center above the ledger: mono step label, [display
@@ -1672,29 +1185,25 @@ table.data-table {
   background: var(--fg);
 }
 
-/* ── Responsive — stack the home hub when the window narrows ───────
- * Below ~720px the fixed 212px aside + main column collide. Drop to a
- * single column: aside falls under main with a top hairline instead of
- * a left one. Tiles already auto-fit/wrap (no fixed 3-up). */
-@media (max-width: 720px) {
-  .hub { flex-direction: column; }
-  .hub__aside {
-    width: auto;
-    border-left: none;
-    border-top: 1px solid var(--line);
-  }
-}
 
 /* ── Reduced motion — honor the OS preference ─────────────────────
  * Covert/minimal: motion only conveys state. When the user asks for less,
  * neutralize what CSS still owns — hover/focus micro-transitions — to
  * instant. Everything that moves on a STATE change goes through
- * src/fx/motion.ts, whose own kill switch collapses it to zero. */
+ * src/fx/motion.ts, whose own kill switch collapses it to zero.
+ *
+ * The DELAYS are zeroed too. A duration of ~0 after a 2s delay is still a 2s
+ * wait staring at the pre-animation state, which is exactly the stall the
+ * preference exists to prevent — so "instant" has to mean instant at both
+ * ends. Nothing in this file relies on a delay today; the rule is here so the
+ * next `transition-delay` someone adds cannot quietly open the hole. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }
@@ -2189,7 +1698,6 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   transition: background-color 0.15s ease-out, color 0.15s ease-out;
 }
 .topbar__btn:hover { background: var(--surface); color: var(--fg); }
-.topbar__btn.icon-only { padding: 7px; }
 
 .standby-stage {
   position: relative;
@@ -2532,19 +2040,6 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   color: var(--fg-faint);
 }
 
-/* Streamed container/gateway logs. */
-.term-block {
-  background: #08090b;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 10px 12px;
-  font: 400 11px/1.55 var(--font-mono);
-  color: var(--fg-dim);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 240px;
-  overflow: auto;
-}
 
 /* Interrogable provenance — hover/focus the engine cell to audit the green
  * dot. The native `title` says the same thing, but only to a pointer; this is
@@ -2581,23 +2076,6 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
  * verdict band's gap now, not from a margin — the band owns its rhythm. */
 .standby__incident { width: min(440px, 92vw); text-align: left; }
 
-/* Connections "what this unblocks" legend. */
-.unblockers {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 11px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.unblockers__title {
-  font: 500 10px/1 var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
-.unblockers__row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-dim); }
 
 /* ── Strategy lifecycle — six stations on one spine (§3.4) ─────────
  * Read-only: a count in mono above each tick, the stage under it, and one
@@ -2919,9 +2397,9 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   z-index: 1;
   /* Promote each to its own compositing layer so WebKit (the macOS WKWebView)
      paints it ABOVE the ambient canvas. Without this, the canvas composites
-     over the hero text/lamp/button/cards and washes them out. The hub tiles
-     sit INSIDE this promoted stage, so they ride above the canvas with it.
-     Invisible in Chromium; required in WKWebView. */
+     over the instrument, the verdict, the verb and the ledger and washes them
+     out. Every band sits INSIDE this promoted stage, so they all ride above
+     the canvas with it. Invisible in Chromium; required in WKWebView. */
   transform: translateZ(0);
 }
 /* Transparent chrome so the shader reads through the whole surface. */

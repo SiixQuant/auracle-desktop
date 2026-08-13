@@ -590,10 +590,19 @@ function Station2({
             : "Looks short — check the key for typos."}
         </div>
       ) : null}
+      {/* HONESTY: these numbers are the engine's, not marketing's — they trace
+          to auracle/license.py `_TIER_FEATURES["community"]` (schedule_cap 3,
+          user_cap 1, broker_pinned "ibkr", live_orders False) and
+          auracle/live/tiers.py (max_live_deployments 3, allowed_modes
+          ("paper",)). This line previously claimed "1 strategy + 3 schedules +
+          IBKR data": nothing in the engine caps the number of strategies, and
+          the IBKR pin is an EXECUTION pin, not a data grant. Do not restate a
+          cap here that you have not read out of those two files. */}
       <p className="comm-note mt-4">
         Don&apos;t have a key yet? Click <strong>Skip for Community tier</strong>
-        {" "}below — you can add one anytime from System → License. Community
-        gives you 1 strategy + 3 schedules + IBKR data.
+        {" "}below — you can add one anytime from System → License. Community is
+        paper trading on IBKR: up to 3 paper deployments, 3 schedules and one
+        user. Live orders need a paid plan.
       </p>
     </Station>
   );

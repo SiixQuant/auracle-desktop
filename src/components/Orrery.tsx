@@ -70,6 +70,30 @@ import {
 // MotionPath is what lets a body be paused, seeked and re-tempoed — none of
 // which SVG's `animateMotion` (what the lamp used) can do. Registered at module
 // load, once, exactly like the eases in fx/motion.ts.
+//
+// IT COSTS 9.64 kB gz AND IT STAYS. Slice 4 flagged that tweening a position
+// parametrically off `ringPoint()` would drop the plugin, so slice 10 measured
+// the trade instead of guessing (720 samples against GSAP's own walk of
+// RING_PATH):
+//
+//   · the flagged parametric swap is WRONG, not merely different. The ellipse
+//     parameter is not the path parameter: it sprints through a foreshortened
+//     orbit's ends and crawls along its sides. Peak error 22.5px — 4.5 body
+//     widths — and 20.8px at MARK.seed, which is exactly the seat a single
+//     container gets. `orrery.test.ts` already asserts this gap on purpose.
+//   · walking by arc length instead (`seatPoint`) does track GSAP to 0.24px,
+//     but it buys the saving by breaking the invariant this file is built on:
+//     RING_PATH is ONE string that is both drawn and ridden, so the ring you
+//     see and the orbit the bodies run on cannot drift apart. A parametric
+//     ride evaluates the ellipse in JS while the browser rasterises an SVG
+//     arc — two implementations that agree today. It would also invert the
+//     calibration (seatPoint exists BECAUSE MotionPath is the authority; make
+//     it the authority and its test measures itself), build the 2048-sample
+//     seat table eagerly on the home rather than lazily in Supervision, and
+//     move a once-per-tween lookup into a per-body per-frame binary search.
+//
+// The bundle is ~198 kB gz under the pre-redesign baseline. Nine kilobytes is
+// not worth paying for in geometry the instrument is the whole point of.
 gsap.registerPlugin(MotionPathPlugin);
 
 /** How far the core's soft ring swells on the in-breath. */

@@ -52,10 +52,15 @@ export default function LifecycleInspector() {
 
   return (
     <div className="card">
-      <div className="card-head">
-        <span className="card-title">Strategy lifecycle</span>
-        {cached && <span className="chip warn">cached</span>}
-      </div>
+      {/* No title here: the tray header already says "Strategy lifecycle", and
+          §3.4's law is that the tray IS the container — a body that renames
+          itself under its own header is the nested-card smell in typographic
+          form. The head exists only when there is a badge to hang on it. */}
+      {cached && (
+        <div className="card-head card-head--action-only">
+          <span className="chip warn">cached</span>
+        </div>
+      )}
 
       <div className="belt">
         {STRATEGY_STATES.map((s) => {
