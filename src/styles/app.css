@@ -6,6 +6,73 @@
  * auracle-marketing/css/site.css and auracle/houston/web/static/style.css.
  */
 
+/* ── Bundled type (OFL 1.1) ───────────────────────────────────────────
+ * Three faces ship inside the app as woff2 — no CDN, no runtime fetch, no
+ * system-font lottery. The files come from the @fontsource* packages in
+ * package.json (Vite fingerprints and emits them into dist/assets), and we
+ * declare the faces by hand rather than importing the packages' own CSS so
+ * that ONLY the latin subset and ONLY the axes/weights the design system
+ * uses get bundled — the package entrypoints also drag in latin-ext and
+ * vietnamese, roughly tripling the on-disk cost for glyphs this UI has no
+ * copy for. Licences + provenance: src/assets/fonts/OFL-NOTICES.txt.
+ *
+ * font-display: block — the files are local, so "loading" is a sub-frame
+ * event; blocking avoids a flash of the fallback serif on the verdict line.
+ * CSP: default-src 'self' covers font-src, and these resolve to app-local
+ * asset URLs, so nothing leaves the machine.
+ * ──────────────────────────────────────────────────────────────────── */
+
+/* Display — Fraunces (wght + opsz axes; SOFT/WONK fixed at their 0 default). */
+@font-face {
+  font-family: "Fraunces Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* UI sans — Inter (wght axis only; ss01/cv01 are set on html,body). */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Data mono — JetBrains Mono, Regular + Medium only (the two weights the
+ * ledger/chip/label register actually sets). */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   /* Surface — Percept terminal, charcoal elevation ladder. Depth comes
      from OPAQUE tone steps (not 2% white washes that vanish on pure black)
@@ -46,25 +113,37 @@
   --elev-card:    0 1px 2px rgba(0, 0, 0, 0.45);
   --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 
-  /* Accent — WHITE on the charcoal base. The Standby home already rendered
-     its primary as a white pill by hand (see .standby__actuator below); this
-     promotes that value into the token so every accent usage follows it and
-     the launcher, IDE, and website read as one black-and-white product.
-     Retired: Nous-blue #0053fd.
+  /* Accent — Nous-blue on the charcoal base. THE brand accent, shared by the
+     launcher, the IDE, the marketing site, and Houston ("Hermes-on-dark").
+     Two retired values you may still see referenced in older comments:
+     emerald (retired as a BRAND colour — green now means health and only
+     health) and white (a white "accent" is not an accent, it is ink).
 
      BRAND ONLY. Status stays chromatic — a lamp core "keeps its semantic
      colour (green = ready / red = needs you) ... a functional signal, not
-     decoration". Never point --ok/--warn/--danger at --accent; a white
-     health dot conveys nothing. */
-  --accent:      #ffffff;
-  --accent-2:    rgba(255, 255, 255, 0.88);    /* hover/pressed tier */
-  --accent-soft: rgba(255, 255, 255, 0.10);
-  --accent-dim:  rgba(255, 255, 255, 0.24);
-  --accent-ink:  #000000;                      /* text ON a filled accent — white is light, needs black not white */
-  /* Accent as TEXT/glyph on dark soft-fills. The retired blue needed a
-     separate brightened tier because #0053fd (~0.13 luma) failed AA as small
-     text on charcoal. White does not, so this is simply the accent. */
-  --accent-text: #ffffff;
+     decoration". Never point --ok/--warn/--err at --accent; a blue health
+     dot conveys nothing.
+
+     Contrast law, verified against --bg #0b0c0e:
+       #0053fd on --bg        ≈ 3.4:1 — fills / borders / graphics ONLY,
+                                        never small text;
+       --accent-ink on accent ≈ 5.7:1 — the label on a filled verb button;
+       --accent-text on --bg  ≈ 7:1   — EVERY blue text or glyph on dark.
+     Blue lands at most three times per screen (the one primary verb, one
+     live signal, the focus ring) and never fills a region. */
+  --accent:      #0053fd;
+  --accent-2:    #0042cc;                      /* hover/pressed tier */
+  --accent-soft: rgba(0, 83, 253, 0.16);       /* tinted fill, read with --accent-text on top */
+  /* Dim tier — keylines, control borders, focus rings. Derived from the
+     READABLE blue rather than the raw accent on purpose: #0053fd is dark
+     (~0.13 luma), so at a hairline alpha it composites straight into the
+     charcoal and the focus ring vanishes. At 0.55 this clears 3:1 on --bg
+     (the retiring white-α.24 tier only managed ~2.1:1). */
+  --accent-dim:  rgba(122, 162, 255, 0.55);
+  --accent-ink:  #ffffff;                      /* text ON a filled accent */
+  /* Accent as TEXT/glyph on dark or on --accent-soft. #0053fd fails AA as
+     small text on charcoal, so blue type always takes this brightened tier. */
+  --accent-text: #7aa2ff;
   --ok:          #34d399;                       /* desaturated success */
   --warn:        #fbbf24;                       /* desaturated amber */
   --err:         #f87171;                       /* desaturated red */
@@ -98,25 +177,37 @@
   --t-md: 16px;
   --t-lg: 18px;
   --t-xl: 24px;
+  /* Display steps — the two places the serif is allowed to be big. */
+  --t-verdict: clamp(22px, 3.4vw, 30px);  /* the home verdict line */
+  --t-station: 20px;                      /* onboarding station titles (consumer lands with the commissioning rail) */
 
-  /* Fonts — the IDE's UI stack, so the launcher and the IDE resolve to the
-     same face on the same machine; SF Mono leads for data/labels (Percept).
-     tabular-nums on data. Inter used to lead here, but it is not bundled and
-     not a system font, so on a machine without it this silently fell through
-     to -apple-system anyway — while the IDE started from -apple-system. The
-     two surfaces were only ever identical by accident. */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-               Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue",
-               Arial, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Monaco,
+  /* Fonts — bundled OFL faces lead every role (see the @font-face block at
+     the top of this file); the system stacks are fallbacks only. Inter used
+     to lead --font-sans unbundled, which meant it silently fell through to
+     -apple-system on most machines; SF Mono used to lead --font-mono, which
+     meant the msi/deb/rpm builds got a different data face than the mac
+     build, and the Bodoni/Didot display stack simply did not exist off-mac.
+     Bundling settles all three: the launcher renders identically on macOS,
+     Windows, and Linux, offline, on first paint. tabular-nums on data. */
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans",
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco,
                "Cascadia Mono", Consolas, "Courier New", monospace;
-  /* Display serif (Hermes DNA) — big dramatic headline faces for heroes +
-     page titles. A system high-contrast serif stack (Bodoni 72 / Didot on
-     macOS) stands in for Hermes' proprietary "Collapse" — same drama, zero
-     licensing risk, fully offline. Cross-platform builds can bundle a free
-     OFL serif (e.g. Fraunces) later. */
-  --font-display: "Bodoni 72", "Didot", "Didot LT STD", "Playfair Display",
-               "Times New Roman", Georgia, serif;
+  /* Display serif (Hermes DNA) — big dramatic headline faces for the verdict
+     line + page titles, nowhere else, never bold. Fraunces is the bundled
+     stand-in for Hermes' proprietary "Collapse": same high-contrast drama,
+     OFL-licensed, fully offline. The old system serifs stay as fallbacks. */
+  --font-display: "Fraunces Variable", "Bodoni 72", "Didot", "Didot LT STD",
+               "Playfair Display", "Times New Roman", Georgia, serif;
+  /* Fraunces' variable axes for the display role. opsz 72 is the direct
+     analogue of the face this replaces — "Bodoni 72" is named for its 72pt
+     optical size — so the drama (fine hairlines, high stroke contrast)
+     carries over instead of drifting toward a text cut. SOFT 0 keeps the
+     sharp terminal rather than the rounded one. Pair with weight 400: the
+     serif already reads heavier than the sans, and this face is never set
+     bold. Harmlessly ignored by the fallback serifs, which have no axes. */
+  --fvs-display: "opsz" 72, "SOFT" 0;
 }
 
 * { box-sizing: border-box; }
@@ -164,11 +255,10 @@ html, body {
   transition: background-color 0.3s, box-shadow 0.3s;
 }
 
-/* healthy/degraded/down is a STATUS family, so healthy takes the success hue,
-   not the brand accent. It rode --accent only because the accent used to be
-   blue and so happened to look distinct; against a white accent it would be
-   an unreadable white dot beside amber and red. `starting` stays on the
-   accent deliberately — it is a neutral "no verdict yet", not a health state. */
+/* healthy/degraded/down is a STATUS family, so healthy takes the success hue
+   and never the brand accent — a health dot painted in the brand colour
+   conveys nothing next to amber and red. `starting` stays on the accent
+   deliberately: blue here reads "alive, no verdict yet", not a health state. */
 .logo-dot.healthy  { background: var(--ok); }
 .logo-dot.degraded { background: var(--warn); }
 .logo-dot.down     { background: var(--err); }
@@ -222,8 +312,9 @@ h1 {
   /* Display serif (Hermes DNA) — page titles get the dramatic high-contrast
      serif; the weight drops because serifs read heavier than the sans. */
   font-family: var(--font-display);
+  font-variation-settings: var(--fvs-display);
   font-size: 28px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.01em;
   margin: 0 0 var(--s-4);
 }
@@ -301,7 +392,7 @@ h2 {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* Primary = the one door into the platform. Emerald edge so the eye
+/* Primary = the one door into the platform. Accent edge so the eye
  * lands here first without shouting. */
 .launch-card--primary {
   border-color: var(--accent-dim);
@@ -371,9 +462,9 @@ h2 {
 .seg-tab.active { background: var(--accent-soft); color: var(--accent-text); }
 /* Mode-aware selected tabs (ibeam paper/live) — same token vocabulary as
  * the Dashboard .mode-badge so a chosen mode reads its own salience, not a
- * generic emerald "on". PAPER = the safe default: quiet neutral surface +
+ * generic accent "on". PAPER = the safe default: quiet neutral surface +
  * dim ink. LIVE = real money: high-contrast desaturated --err (alert, no
- * glow). These override the default .active emerald only on the toggle that
+ * glow). These override the default .active accent only on the toggle that
  * opts in via the --paper / --live modifier. */
 .seg-tab--paper.active { background: var(--surface-2); color: var(--fg-dim); }
 .seg-tab--live.active  { background: var(--err-soft);  color: var(--err); }
@@ -431,7 +522,7 @@ button.primary {
 }
 button.primary:hover    { background: var(--accent-2); }
 button.primary:disabled { opacity: 0.4; cursor: wait; box-shadow: none; }
-/* Visible emerald focus ring (zero-blur, rubric-allowed) — a crisp
+/* Visible accent focus ring (zero-blur, rubric-allowed) — a crisp
  * keyline against the panel, not a glow. */
 button.primary:focus-visible {
   outline: none;
@@ -455,7 +546,7 @@ button.ghost {
 button.ghost:hover        { background: var(--surface-2); border-color: var(--line-strong); }
 button.ghost.danger       { color: var(--err); border-color: var(--err-dim); }
 button.ghost.danger:hover { background: var(--err-soft); }
-/* Same crisp emerald focus ring as the primary — every control is
+/* Same crisp accent focus ring as the primary — every control is
  * keyboard-visible. */
 button.ghost:focus-visible {
   outline: none;
@@ -503,11 +594,11 @@ input[type="text"]:focus, input[type="password"]:focus {
 .badge.err  { background: var(--err-soft);       color: var(--err); }
 
 /* ── Wizard stepper (onboarding) ─────────────────────────────────
- * Named steps as mono-labels (SF Mono, tracked, uppercase) over a
- * hairline keyline. Three states: done (walked → primary ink, dim
- * keyline), current (surgical emerald text + emerald keyline),
- * upcoming (muted ink, hairline keyline). The keyline + ink ARE the
- * state — implied chrome, no heavy filled pills, no extra icons. */
+ * Named steps as mono-labels (tracked, uppercase) over a hairline
+ * keyline. Three states: done (walked → primary ink, dim keyline),
+ * current (accent text + accent keyline), upcoming (muted ink,
+ * hairline keyline). The keyline + ink ARE the state — implied
+ * chrome, no heavy filled pills, no extra icons. */
 .stepper { display: flex; gap: var(--s-3); margin-bottom: var(--s-6); }
 .step {
   flex: 1;
@@ -523,11 +614,11 @@ input[type="text"]:focus, input[type="password"]:focus {
   text-transform: uppercase;
   color: var(--fg-muted);
 }
-/* Done = walked: primary-secondary ink, a dim emerald keyline marks
+/* Done = walked: primary-secondary ink, a dim accent keyline marks
  * the trail behind the current step. */
 .step.done    { border-top-color: var(--accent-dim); color: var(--fg-dim); }
-/* Current = emphasized: surgical emerald text + a solid emerald
- * keyline. The one place emerald lands in the chrome. */
+/* Current = emphasized: accent text + a solid accent keyline. One of
+ * the few places the accent lands in the chrome. */
 .step.current { border-top-color: var(--accent);     color: var(--accent-text); }
 
 /* Step lead title — tracking-tight medium heading so a step reads as a
@@ -649,7 +740,7 @@ input[type="text"]:focus, input[type="password"]:focus {
   text-transform: uppercase;
 }
 /* Each fill matches its own text token (one source) — ok rides the
- * desaturated --ok family, not the surgical-emerald --accent fill. */
+ * desaturated --ok family, never the brand --accent fill. */
 .chip.ok      { background: var(--ok-soft);      color: var(--ok); }
 .chip.warn    { background: var(--warn-soft);    color: var(--warn); }
 .chip.err     { background: var(--err-soft);     color: var(--err); }
@@ -908,9 +999,10 @@ table.data-table {
 }
 .settings > h1 {
   font-family: var(--font-display);
+  font-variation-settings: var(--fvs-display);
   margin: 0 0 var(--s-5);
   font-size: 26px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.01em;
   color: var(--fg);
 }
@@ -1132,7 +1224,7 @@ table.data-table {
 .hero__body { position: relative; z-index: 1; padding: 24px 26px; max-width: 440px; min-width: 0; }
 /* Medium weight, tracking-tight — this is product, not brand: no oversized
  * hero (rubric: headings 500, ~-0.02em, no showy display type). */
-.hero__title { font-family: var(--font-display); font-size: 27px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.1; margin: 0; }
+.hero__title { font-family: var(--font-display); font-variation-settings: var(--fvs-display); font-size: 27px; font-weight: 400; letter-spacing: -0.01em; line-height: 1.1; margin: 0; }
 .hero__sub { color: var(--fg-dim); font-size: 13px; margin: 7px 0 0; line-height: 1.5; }
 
 .btn-launch {
@@ -1152,7 +1244,7 @@ table.data-table {
   transition: background-color 0.15s, box-shadow 0.15s;
 }
 .btn-launch:hover { background: var(--accent-2); }
-/* Real focus ring (rubric: visible emerald focus ring on interactives) —
+/* Real focus ring (rubric: visible accent focus ring on interactives) —
  * not a decorative hover glow. */
 .btn-launch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-dim); }
 .btn-launch:disabled { opacity: 0.55; cursor: wait; }
@@ -1160,9 +1252,9 @@ table.data-table {
 .statusline { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--fg-dim); margin-top: 15px; }
 .sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--fg-muted); }
 /* OK = a healthy/live capability — a semantic signal, so it carries the
- * success hue rather than the brand accent (it was swept onto --accent when
- * emerald was retired; against a white accent that reads as no signal at all).
- * No glow (rubric): the dot is the signal, not a halo. */
+ * success hue rather than the brand accent. (It briefly rode --accent back
+ * when emerald was the brand colour; that conflated "on brand" with
+ * "healthy".) No glow (rubric): the dot is the signal, not a halo. */
 .sdot.ok     { background: var(--ok); }
 .sdot.warn   { background: var(--warn); }
 .sdot.err    { background: var(--err); }
@@ -1356,7 +1448,8 @@ table.data-table {
 
 .standby__line {
   font-family: var(--font-display);
-  font-size: 30px;
+  font-variation-settings: var(--fvs-display);
+  font-size: var(--t-verdict);
   font-weight: 400;
   color: var(--fg);
   margin: 0;
@@ -1365,7 +1458,7 @@ table.data-table {
   text-wrap: balance;
 }
 .standby__stamp {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-muted);
   margin-top: 12px;
@@ -1523,7 +1616,7 @@ table.data-table {
 /* Changelog + diagnostics: bundled plain text, monospace, scrollable. */
 .changelog-text,
 .diag-text {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   line-height: 1.55;
   color: var(--fg-dim);
@@ -1600,14 +1693,14 @@ table.data-table {
 .vital__dot.err { background: var(--err); }
 .vital__dot.accent { background: var(--accent); }
 .vital__label {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
 }
 .vital__value {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--fg-dim);
   font-variant-numeric: tabular-nums;
@@ -1681,18 +1774,20 @@ table.data-table {
 }
 .standby-stage .standby { min-height: 100%; }
 
-/* ── Floating surfaces adopt the website theme ─────────────────────
+/* ── Floating surfaces — edges only ────────────────────────────────
  * Every surface the launcher floats over its home board — the inspector
- * card, the ⌘K palette, the tutorial overlay, and the coachmark — takes
- * the website's emerald accent and its 0.10 / 0.20 white-alpha hairlines.
- * Scoped to these roots ONLY (never :root): the home board keeps its white
- * accent and renders identically outside the floating surfaces. */
+ * card, the ⌘K palette, the tutorial overlay, and the coachmark — carries
+ * slightly firmer hairlines than the canvas, because a floater has to
+ * announce its own edge against a live board behind it.
+ *
+ * These roots used to re-point --accent/--accent-soft/--accent-text at the
+ * website's old emerald here. Emerald is RETIRED as a brand colour, and the
+ * accent is now the same Nous-blue on every surface — a floating panel does
+ * not get its own brand. Green survives only as --ok (health), which these
+ * overrides never touched. */
 .insp-scrim, .insp-stage, .insp,
 .cmdk-scrim, .cmdk,
 .tut-overlay, .coach-scrim {
-  --accent:      #10b981;
-  --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-text: #10b981;
   --line:        rgba(255, 255, 255, 0.1);
   --line-strong: rgba(255, 255, 255, 0.2);
 }
@@ -1813,7 +1908,7 @@ table.data-table {
 }
 
 .kbd-hint {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-muted);
 }
@@ -1825,7 +1920,7 @@ table.data-table {
   right: 0;
   bottom: 18px;
   text-align: center;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-faint);
   pointer-events: none;
@@ -1869,10 +1964,10 @@ table.data-table {
   outline: 0;
   color: var(--fg);
   font-size: 14px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
 }
 .cmdk__tag {
-  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 500 10px/1 var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--fg-muted);
@@ -1898,17 +1993,19 @@ table.data-table {
 .cmdk__title { font-size: 13px; color: var(--fg); display: flex; align-items: center; gap: 8px; }
 .cmdk__item.sel .cmdk__title { color: var(--accent-text); }
 .cmdk__danger {
-  font: 500 9px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 500 9px/1 var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  /* Website danger red (#ef4444) for parity. */
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  /* The launcher's own danger red — this used to hardcode the website's
+     #ef4444 "for parity", which is the same drift that gave these floating
+     surfaces an emerald accent. One --err across every surface. */
+  color: var(--err);
+  border: 1px solid var(--err-dim);
   border-radius: 4px;
   padding: 3px 5px;
 }
 .cmdk__group {
-  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 500 10px/1 var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--fg-faint);
@@ -1917,7 +2014,7 @@ table.data-table {
 .cmdk__foot {
   padding: 9px 15px;
   border-top: 1px solid var(--line);
-  font: 400 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 400 10px/1 var(--font-mono);
   color: var(--fg-faint);
 }
 @keyframes cmdk-pop {
@@ -1931,7 +2028,7 @@ table.data-table {
   border: 1px solid var(--line);
   border-radius: 7px;
   padding: 10px 12px;
-  font: 400 11px/1.55 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 400 11px/1.55 var(--font-mono);
   color: var(--fg-dim);
   white-space: pre-wrap;
   word-break: break-word;
@@ -1952,7 +2049,7 @@ table.data-table {
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 7px 10px;
-  font: 400 11px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 400 11px/1.45 var(--font-mono);
   color: var(--fg-dim);
   text-align: left;
   opacity: 0;
@@ -1981,7 +2078,7 @@ table.data-table {
 }
 .standby__agent:hover { border-color: var(--line-strong); background: var(--surface-2); }
 .standby__agent-label {
-  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 500 10px/1 var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
@@ -2002,7 +2099,7 @@ table.data-table {
   gap: 7px;
 }
 .unblockers__title {
-  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 500 10px/1 var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
@@ -2013,7 +2110,7 @@ table.data-table {
 .belt {
   display: flex;
   margin-top: 4px;
-  font: 500 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 500 10px/1 var(--font-mono);
 }
 .belt__seg {
   flex: 1;
@@ -2068,7 +2165,7 @@ table.data-table {
   width: 20px; height: 20px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font: 500 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  font: 500 11px/1 var(--font-mono);
   background: var(--accent-soft); color: var(--accent-text);
 }
 .coach__beat div { font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
@@ -2232,13 +2329,12 @@ table.data-table {
 .shell-standby .standby-stage {
   background: transparent;
 }
-/* The white pill is now the --accent token itself, so the base
-   .standby__actuator rule (background: var(--accent); color: var(--accent-ink))
-   already renders it — this screen no longer needs to force it by hand. That
-   hand-forced white was the ONLY place the launcher actually looked white
-   while every other surface stayed blue, which is how the IDE came to "match
-   the launcher" by adopting a blue the launcher's own front door didn't use.
-   Only the disabled treatment is still specific to this control. */
+/* The verb takes the accent from the base .standby__actuator rule
+   (background: var(--accent); color: var(--accent-ink)) — Nous-blue with a
+   white label, the same primary as every other surface. This screen used to
+   force a white pill by hand, which made the launcher's own front door the
+   one place in the product that wasn't on brand. Only the disabled treatment
+   is still specific to this control. */
 .shell-standby .standby__actuator:disabled {
   background: rgba(255, 255, 255, 0.1);
   color: var(--fg-muted);

@@ -74,7 +74,11 @@ export const SignInPage = ({
                 className="space-y-6 text-center"
               >
                 <div className="space-y-1">
-                  <h1 className="text-[2.5rem] font-bold leading-[1.1] tracking-tight text-white">
+                  {/* font-normal, not bold: this h1 inherits the display serif
+                      from the element rule in app.css, and the display face is
+                      never set bold (design system §2.2 — the serif already
+                      reads heavier than the sans at the same weight). */}
+                  <h1 className="text-[2.5rem] font-normal leading-[1.1] tracking-tight text-white">
                     Welcome to Auracle
                   </h1>
                   <p className="text-[1.8rem] text-white/70 font-light">
