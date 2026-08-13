@@ -1,0 +1,66 @@
+Auracle Desktop — bundled type: licences and provenance
+=======================================================
+
+The launcher ships three typefaces inside the application binary. Nothing is
+fetched at runtime: there is no CDN link, no Google Fonts request, no network
+access of any kind involved in rendering text. The woff2 files are pulled from
+the npm packages listed below at build time and emitted into the app bundle by
+Vite, so every platform target (dmg / msi / deb / rpm / appimage) renders the
+same faces, offline, on first paint.
+
+All three faces are licensed under the SIL Open Font License, Version 1.1
+(OFL-1.1) — a permissive licence that allows bundling inside a commercial,
+closed-source application. The one obligation that touches us: the fonts may
+not be sold on their own, and this notice must travel with the software.
+Full licence text: http://scripts.sil.org/OFL
+
+Faces
+-----
+
+1. Fraunces  ·  role: display serif  ·  OFL-1.1
+   Copyright 2020 The Fraunces Project Authors
+   https://github.com/undercasetype/Fraunces
+   Package: @fontsource-variable/fraunces@5.3.0
+   Bundled file: files/fraunces-latin-opsz-normal.woff2   (~66 KB)
+   Variable axes shipped: wght 100–900, opsz 9–144. SOFT and WONK are fixed
+   at their 0 defaults by this axis cut, which is exactly the setting the
+   design system asks for.
+   Used for: the home verdict line, page titles. Never for body, labels or
+   data; never bold.
+
+2. Inter  ·  role: UI sans  ·  OFL-1.1
+   Copyright 2016 The Inter Project Authors
+   https://github.com/rsms/inter
+   Package: @fontsource-variable/inter@5.3.0
+   Bundled file: files/inter-latin-wght-normal.woff2      (~47 KB)
+   Variable axes shipped: wght 100–900.
+   Used for: body copy, buttons, prose. Stylistic sets ss01/cv01 are enabled
+   globally on html,body.
+
+3. JetBrains Mono  ·  role: data mono  ·  OFL-1.1
+   Copyright 2020 The JetBrains Mono Project Authors
+   https://github.com/JetBrains/JetBrainsMono
+   Package: @fontsource/jetbrains-mono@5.3.0
+   Bundled files: files/jetbrains-mono-latin-400-normal.woff2  (~21 KB)
+                  files/jetbrains-mono-latin-500-normal.woff2  (~21 KB)
+   Static weights only — Regular (400) and Medium (500), the two the label
+   and ledger registers actually set.
+   Used for: the ledger, chips, micro-labels, logs, container names,
+   versions, pairing codes, the palette input. Always with tabular-nums.
+
+Subsetting
+----------
+
+Only the **latin** subset of each face is bundled. The fontsource packages'
+own CSS entrypoints also declare latin-ext and vietnamese cuts; importing them
+would roughly triple the on-disk cost for glyph ranges this UI has no copy
+for. So `src/styles/app.css` declares the @font-face rules by hand and points
+them at the specific latin woff2 files inside those packages — the packages
+stay the source of truth for provenance and updates, while the bundle carries
+only what renders.
+
+Total bundled type: ~155 KB across four woff2 files (design budget: 350 KB).
+
+The @fontsource packages themselves are MIT-licensed tooling; the font files
+they redistribute carry the OFL-1.1 terms above. Per-face licence texts ship
+verbatim in node_modules/<package>/LICENSE.
