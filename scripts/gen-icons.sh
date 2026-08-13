@@ -52,10 +52,17 @@ fi
 ICONS=src-tauri/icons
 echo "Generating icons → $ICONS/"
 
+# These are exactly tauri.conf.json's `bundle.icon` list, and nothing else.
+#
+# There is deliberately NO tray.png here. The menu-bar icon is not an asset:
+# it is rasterised at runtime from the orbital mark, in status colour, by
+# `render_orbital` in src-tauri/src/commands/tray.rs. A 22×22 PNG emitted
+# beside these would be a second, silent source of truth for the mark that no
+# code loads — and the first person to "fix" the tray by editing it would
+# change nothing at all.
 $IM "$SOURCE" -resize 32x32   "$ICONS/32x32.png"
 $IM "$SOURCE" -resize 128x128 "$ICONS/128x128.png"
 $IM "$SOURCE" -resize 256x256 "$ICONS/128x128@2x.png"
-$IM "$SOURCE" -resize 22x22   "$ICONS/tray.png"
 $IM "$SOURCE" -resize 256x256 "$ICONS/icon.ico"
 
 # .icns generation requires iconutil (macOS only) — best done via

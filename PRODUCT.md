@@ -33,8 +33,10 @@ Premium through restraint and exactness, never through ornament.
 2. **Implied chrome, not announced** — hairline low-alpha borders; surfaces via
    tone steps, never heavy cards.
 3. **Mono + tabular for all data** — `tabular-nums` on every number-bearing row.
-4. **Surgical emerald** — `#10b981` only for live/active/long + primary buttons;
-   everything else is the grayscale ramp.
+4. **Surgical accent** — Nous-blue `#0053fd` (`--accent`) only for the one
+   primary verb, one live signal, and the focus ring: at most three per screen,
+   never filling a region. Green is health, not brand (`--ok`). Everything else
+   is the grayscale ramp. See `DESIGN.md §2.1`.
 5. **High-contrast, not glowing** — no glow/neon/gradients; restraint = the look.
 6. **One exact unified theme** — the same tokens, spacing, states everywhere; zero
    drift across surfaces.

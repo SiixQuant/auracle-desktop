@@ -105,6 +105,10 @@ export default function CommissioningInstrument({
    *  able to receive a body late without either replaying itself or leaving
    *  the newcomer parked at the SVG origin. */
   const seated = useRef(new Set<string>());
+  /** The motion-path tween each seated body is riding, kept so the reduced-
+   *  motion preference can still reach them after the ceremony has run. See
+   *  the pause/resume pass below. */
+  const rides = useRef(new Map<string, gsap.core.Tween>());
 
   const reduced = useReducedMotion();
 
@@ -189,6 +193,7 @@ export default function CommissioningInstrument({
           motionPath: { path: RING_PATH, start: body.seed, end: body.seed + 1 },
         });
         ride.timeScale(body.tempo);
+        rides.current.set(id, ride);
         // Seat it on the ring NOW rather than on the first tick — a GSAP tween
         // renders lazily, and under reduced motion (or a hidden window) that
         // first tick may never come.
@@ -205,12 +210,29 @@ export default function CommissioningInstrument({
     { dependencies: [view.assembled, seatKey, showChrome], scope: rootRef },
   );
 
+  // The preference is live, so the mechanism has to be reachable after the
+  // ceremony has already seated everything. Pausing only at creation (as this
+  // did) left a flip mid-first-run stuck both ways: turn reduce ON and the
+  // orbits kept looping for a user who had just asked them not to; turn it OFF
+  // and they stayed frozen for the rest of the run. Same pass the home makes
+  // (Orrery.tsx), for the same reason.
+  useGSAP(
+    () => {
+      rides.current.forEach((ride) => {
+        if (reduced) ride.pause();
+        else ride.resume();
+      });
+    },
+    { dependencies: [reduced, seatKey], scope: rootRef },
+  );
+
   // StrictMode double-invokes effects and useGSAP reverts the first pass's
   // tweens with it; the bookkeeping that says "this node has already arrived"
   // has to go back with them or the second pass skips the ceremony and the
   // instrument sits still (Risk 5).
   useEffect(() => () => {
     seated.current.clear();
+    rides.current.clear();
   }, []);
 
   const arc = view.arc;
