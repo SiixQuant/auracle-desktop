@@ -53,6 +53,7 @@ import {
 import { DUR, gsap, mech, revealWords, useGSAP } from "@/fx/motion";
 import { orreryFrame, type OrreryFrame } from "@/fx/orrery";
 import { engineIsUp, waitForEngineHealthy } from "@/lib/onboarding";
+import { ENGINE_DOWN_DETAIL, ENGINE_DOWN_LINE } from "@/lib/signin";
 import {
   cmd,
   onEvent,
@@ -69,6 +70,9 @@ interface OnboardingProps {
   onDone: () => void;
   onGoogleSignIn?: () => void;
   googleWaiting?: boolean;
+  /** True when the local engine isn't answering, so the browser sign-in
+   *  can't start. Station 2 carries the same verdict the threshold does. */
+  engineDown?: boolean;
 }
 
 /** Where the instrument's core sits down the window, as a fraction of the
@@ -104,6 +108,7 @@ export default function Onboarding({
   onDone,
   onGoogleSignIn,
   googleWaiting,
+  engineDown,
 }: OnboardingProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [licenseKey, setLicenseKey] = useState("");
@@ -198,6 +203,7 @@ export default function Onboarding({
                   onNext={() => goto(3)}
                   onGoogleSignIn={onGoogleSignIn}
                   googleWaiting={googleWaiting}
+                  engineDown={engineDown}
                 />
               )}
               {step === 3 && (
@@ -521,6 +527,7 @@ function Station2({
   onNext,
   onGoogleSignIn,
   googleWaiting,
+  engineDown,
 }: {
   licenseKey: string;
   setLicenseKey: (v: string) => void;
@@ -529,6 +536,7 @@ function Station2({
   onNext: () => void;
   onGoogleSignIn?: () => void;
   googleWaiting?: boolean;
+  engineDown?: boolean;
 }) {
   return (
     <Station
@@ -569,6 +577,14 @@ function Station2({
           {googleWaiting && (
             <p className="comm-note mt-2">
               Finish signing in in your browser, then return here.
+            </p>
+          )}
+          {/* The sign-in page is served by the local engine, so with the
+              engine down the click opens nothing (see @/lib/signin) — the
+              same verdict the threshold gives, in this station's voice. */}
+          {engineDown && (
+            <p className="comm-note mt-2" role="status">
+              {ENGINE_DOWN_LINE} {ENGINE_DOWN_DETAIL}
             </p>
           )}
           <div className="comm-divider">
