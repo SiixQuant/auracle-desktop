@@ -2,13 +2,8 @@ import { useRef } from "react";
 
 import { cn } from "@/lib/utils";
 import { AuracleGlyph } from "@/components/AuracleGlyph";
-import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect";
+import DotField from "@/fx/DotField";
 import { DUR, enter, useGSAP } from "@/fx/motion";
-
-// The animated dot-matrix backdrop lives in canvas-reveal-effect.tsx so the
-// launcher home (ShellBackground) renders the EXACT same motion from one
-// source. Re-export it so any external importer of this module keeps working.
-export { CanvasRevealEffect };
 
 interface SignInPageProps {
   className?: string;
@@ -58,23 +53,13 @@ export const SignInPage = ({
         className
       )}
     >
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0">
-          <CanvasRevealEffect
-            animationSpeed={3}
-            containerClassName="bg-black"
-            colors={[
-              [255, 255, 255],
-              [255, 255, 255],
-            ]}
-            dotSize={6}
-            reverse={false}
-          />
-        </div>
-
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,1)_0%,_transparent_100%)]" />
-        <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-black to-transparent" />
-      </div>
+      {/* Ambient stage — the same canvas, ink and power law the home runs, so
+          the threshold and the room behind it read as one chamber. The black
+          veil + vignette that used to sit on top of it are gone with the
+          shader they were tuned against: at α.05 the field needs no taming,
+          and every one of those layers was black over black everywhere the
+          shader wasn't. */}
+      <DotField className="z-0" />
 
       {/* Content Layer */}
       <div className="relative z-10 flex flex-col flex-1">

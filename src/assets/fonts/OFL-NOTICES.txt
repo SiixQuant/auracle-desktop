@@ -64,3 +64,35 @@ Total bundled type: ~155 KB across four woff2 files (design budget: 350 KB).
 The @fontsource packages themselves are MIT-licensed tooling; the font files
 they redistribute carry the OFL-1.1 terms above. Per-face licence texts ship
 verbatim in node_modules/<package>/LICENSE.
+
+Third-party code vendored into the app
+--------------------------------------
+
+Type is not the only thing bundled from outside. One source file in `src/` is
+an adapted copy of someone else's work rather than a dependency, and carries
+its own terms:
+
+1. src/fx/DotField.tsx  ·  the ambient dot-field behind the home and sign-in
+   Adapted from react-bits, Copyright (c) 2026 David Haz
+   https://github.com/DavidHDev/react-bits
+   Upstream path: src/ts-default/Backgrounds/DotField/DotField.tsx (@ c7109dc)
+   Licence: MIT + Commons Clause License Condition v1.0
+
+   The MIT grant is extended to cover use, modification and distribution
+   "as part of an application, website, or product", which is what this is.
+   The Commons Clause bars one thing: selling, sublicensing or redistributing
+   **the components themselves** — alone, bundled, or ported. Auracle sells a
+   trading platform, not a component library, so the condition is satisfied by
+   never publishing this file as a package or as part of one. The copyright
+   notice and licence line travel in the file's own header, as the licence
+   requires.
+
+   Adapted substantially: retyped, ink re-pointed at the house --stage-dot
+   tokens, sparkle / cursor-glow / gradient layers removed, geometry pinned to
+   the launcher's performance budget, and the render loop put under the
+   visibility/focus power law in src/fx/ambient.ts.
+
+GSAP (the motion engine, src/fx/motion.ts) is a normal dependency rather than
+vendored code, and ships under the GreenSock standard "no charge" licence —
+free inside a commercial product, barred only from being resold as a tool.
+@gsap/react is MIT.

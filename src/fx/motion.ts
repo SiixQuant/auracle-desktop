@@ -36,6 +36,10 @@ import { useSyncExternalStore } from "react";
 import { useGSAP } from "@gsap/react";
 import { gsap } from "gsap";
 
+// Relative, with the extension: this module is imported by `node --test`,
+// which resolves neither Vite's `@/` alias nor extensionless specifiers.
+import { readAmbientEnv, tickerPower, watchAmbientEnv } from "./ambient.ts";
+
 // useGSAP() is the only sanctioned way to create tweens from a component:
 // it scopes them to a gsap.context and reverts on unmount, which is what
 // keeps React 18 StrictMode's double-mounted effects from double-registering
@@ -96,6 +100,37 @@ export const MAX_DURATION = DUR.ceremony;
 gsap.registerEase(EASE.enter, gsap.parseEase("power4.out"));
 gsap.registerEase(EASE.exit, gsap.parseEase("power2.in"));
 gsap.registerEase(EASE.mech, gsap.parseEase("power2.inOut"));
+
+// ── Ticker power management (§4 tiering) ──────────────────────────
+
+/** Hold the ticker to the tier the window is in: asleep while the document is
+ *  hidden, 30fps while the window is merely blurred, 60fps when it is focused.
+ *  The launcher lives in the menu bar and is hidden most of its life, so an
+ *  awake ticker there is a battery leak with nothing to show for it.
+ *
+ *  Deferred out of the motion slice for want of a place to hang the resume
+ *  logic; it lands here, sharing one power law with the ambient stage
+ *  (`fx/ambient.ts`) so the two can never disagree about what "hidden" means.
+ *
+ *  Installed once at import — the ticker is a process-wide singleton, exactly
+ *  like the eases registered above, so its governor is too. Returns the
+ *  uninstaller for tests and for a hot-reload teardown. */
+export function governTicker(): () => void {
+  if (typeof document === "undefined") return () => {};
+  const apply = () => {
+    const power = tickerPower(readAmbientEnv());
+    if (power.sleeping) {
+      gsap.ticker.sleep();
+      return;
+    }
+    gsap.ticker.fps(power.fps);
+    gsap.ticker.wake();
+  };
+  apply();
+  return watchAmbientEnv(apply);
+}
+
+governTicker();
 
 // ── Reduced motion ────────────────────────────────────────────────
 
