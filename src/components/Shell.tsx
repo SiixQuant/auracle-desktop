@@ -20,13 +20,17 @@ import { buildCommands, type Command } from "@/lib/commands";
 import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/tauri";
 import { useEngineState } from "@/lib/useEngineState";
 
-/** Where the status lamp sits down the window, as a fraction of its height —
- *  the focus point of the ambient field's brightness ramp. The standby column
- *  is vertically centred under a 44px topbar and the lamp heads that column,
- *  which lands it above the window's middle: measured at 0.31 in the default
- *  900×700 window and 0.34 at the 600×500 minimum. One constant covers both,
- *  because the ramp is 240px wide and 20px of error is invisible inside it. */
-const INSTRUMENT_FOCUS_Y = 0.32;
+/** Where the instrument's core sits down the window, as a fraction of its
+ *  height — the focus point of the ambient field's brightness ramp. The
+ *  standby column is vertically centred under the topbar and the instrument
+ *  heads that column, which lands its centre above the window's middle.
+ *
+ *  Re-measured against the orrery (it is more than twice the lamp's height, so
+ *  the old 0.32 pointed the ramp above the new core): 0.346 at the 600×500
+ *  minimum, 0.347 in the default 900×700, 0.356 at 1200×900. One constant
+ *  covers the range — the ramp is 240px wide and 10px of error is invisible
+ *  inside it. */
+const INSTRUMENT_FOCUS_Y = 0.35;
 
 export default function Shell({
   onOpenTutorial,
@@ -46,11 +50,16 @@ export default function Shell({
   const echoTimer = useRef<number | null>(null);
   const showTips = useCallback(() => setShowCoach(true), []);
 
-  // Live container names for the palette's restart commands.
+  // The live stack: the palette's restart commands AND the instrument's
+  // bodies. Re-read on every health poll rather than on a timer of its own —
+  // the engine read is the only clock in the app, it already stands down when
+  // the window is hidden, and during a start sequence it ticks every 2s, which
+  // is what lets the orrery's bodies appear one-by-one as their containers
+  // actually report.
   const loadContainers = useCallback(() => {
     cmd.stackStatus().then((s) => setContainers(s.containers)).catch(() => {});
   }, []);
-  useEffect(() => loadContainers(), [loadContainers]);
+  useEffect(() => loadContainers(), [loadContainers, eng.state.health]);
 
   const emit = useCallback((verb: string) => {
     setEcho(verb);
@@ -178,10 +187,9 @@ export default function Shell({
 
   return (
     <div className="shell-standby">
-      {/* The ambient stage. Its brightened core sits on the status lamp rather
+      {/* The ambient stage. Its brightened core sits on the instrument rather
           than on the geometric centre of the window — the field is there to
-          seat the instrument, so it points at it. (When the lamp becomes the
-          orrery, re-measure this.) */}
+          seat the orrery, so it points at it. */}
       <DotField focusY={INSTRUMENT_FOCUS_Y} />
       <header className="topbar">
         <div className="topbar__brand">
@@ -210,6 +218,7 @@ export default function Shell({
       <main className="standby-stage">
         <StandbyHome
           eng={eng}
+          containers={containers}
           onActuator={runActuator}
           onDoor={(d) => setInspector(d)}
           onCard={(k) => setInspector(k)}
