@@ -4,6 +4,25 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.9.0]
+
+The launcher becomes the mark.
+
+### Changed
+- **A full redesign: the Orrery.** The home is now a precision instrument built from Auracle's own orbital mark — the engine at the center, each running service a body on the ring. It turns slowly while your stack is healthy, pulls the affected body amber and off-beat when something degrades, and stands still on a dashed ring when the engine is down. At rest, the instrument is the logo.
+- **One sentence, one button, one ledger.** Beneath the instrument: the verdict in words, your single next move, and a quiet mono row with the engine reading, your version (which never claims "up to date" before it has actually checked), What's new, and Help — each one a door.
+- **First-run setup is a commissioning sequence.** The instrument assembles from real install progress — the download arc is the actual percent, a stall parks visibly, and the core ignites only when the engine truly answers. When it's up, the assembled orbit becomes your home screen.
+- **Every panel is machined.** Supervision, Updates, and the rest open as one solid charcoal tray — no glass, no glow — with a miniature of the instrument at the top of Supervision. The ⌘K command bar and the first-run tips share the same finish.
+- **The menu-bar icon is the mark too**, with the core carrying engine status.
+- **Brand corrections.** The accent returns to Auracle blue with proper contrast everywhere; the type is now a bundled house set (display serif, UI, and data mono) that loads with no network at all.
+- **Faster and lighter.** The interface bundle is less than half its previous size, uses no WebGL, fully suspends when hidden, and honors Reduce Motion end-to-end — instantly, with nothing lost.
+
+### Fixed
+- A container reported as unhealthy could show a healthy green dot in Supervision.
+- The setup screen's Community description now matches what Community actually includes (paper trading on IBKR: up to 3 paper deployments, 3 schedules, one user).
+- The install log no longer disappears exactly when an install fails.
+- Reduce Motion changes now apply immediately during first-run setup instead of requiring a restart.
+
 ## [0.8.37]
 
 A calmer home.
