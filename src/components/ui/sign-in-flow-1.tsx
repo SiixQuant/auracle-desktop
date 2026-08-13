@@ -1,7 +1,9 @@
-import { motion } from "framer-motion";
+import { useRef } from "react";
+
 import { cn } from "@/lib/utils";
 import { AuracleGlyph } from "@/components/AuracleGlyph";
 import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect";
+import { DUR, enter, useGSAP } from "@/fx/motion";
 
 // The animated dot-matrix backdrop lives in canvas-reveal-effect.tsx so the
 // launcher home (ShellBackground) renders the EXACT same motion from one
@@ -35,6 +37,20 @@ export const SignInPage = ({
   onGoogleSignIn,
   googleWaiting,
 }: SignInPageProps) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // The one entrance on this screen: the card lifts in on the house enter
+  // curve. useGSAP runs it in a layout effect scoped to the card, so the
+  // "from" state is applied before the first paint (no flash) and StrictMode's
+  // double-mount reverts cleanly. Under prefers-reduced-motion the duration
+  // collapses to 0 inside `enter` — the card is simply there.
+  useGSAP(
+    () => {
+      enter(cardRef.current, { y: 20, duration: DUR.long });
+    },
+    { scope: cardRef },
+  );
+
   return (
     <div
       className={cn(
@@ -67,12 +83,7 @@ export const SignInPage = ({
         <div className="flex flex-1 flex-col lg:flex-row ">
           <div className="flex-1 flex flex-col justify-center items-center">
             <div className="w-full mt-[150px] max-w-sm">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="space-y-6 text-center"
-              >
+              <div ref={cardRef} className="space-y-6 text-center">
                 <div className="space-y-1">
                   {/* font-normal, not bold: this h1 inherits the display serif
                       from the element rule in app.css, and the display face is
@@ -133,7 +144,7 @@ export const SignInPage = ({
                   </a>
                   .
                 </p>
-              </motion.div>
+              </div>
             </div>
           </div>
         </div>
