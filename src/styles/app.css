@@ -207,7 +207,14 @@
        --accent-ink on accent ≈ 7:1   — the ink label on a filled verb;
        --accent-text on --bg  ≈ 5:1   — EVERY orange word or glyph on cream.
      The accent lands at most three times per screen (the one verb, one live
-     signal, the focus ring) and never fills a region. */
+     signal, the focus ring) and never fills a region.
+
+     THE FOCUS RING IS ONE THING: 2px solid --accent, at 2px offset. Every
+     control draws that ring — as an `outline` where it can, as a box-shadow
+     of the same weight where an outline would be clipped. There is no dim
+     tier of it any more; a focus ring that is easy to miss is a focus ring
+     that is doing half its job. --accent-dim survives for what it was
+     actually good at: resting keylines (an ON switch, an info banner). */
   --accent:      #ff9100;
   --accent-2:    #e07e00;                      /* hover/pressed tier */
   --accent-soft: rgba(255, 145, 0, 0.14);      /* tinted fill, read with --accent-text on top */
@@ -299,6 +306,12 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* The ground is light, so every native part the app does not draw itself
+     — scrollbars, the caret, form-control chrome — is told to render light
+     too. One declaration instead of a bespoke scrollbar system; the tray
+     flips it to `dark` for its own subtree, which is the only place in the
+     launcher where the ground inverts. */
+  color-scheme: light;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
@@ -402,7 +415,7 @@ h2 {
   transition: background-color 0.12s, color 0.12s;
 }
 .seg-tab:hover { color: var(--fg); }
-.seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent-dim); }
+.seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
 .seg-tab.active { background: var(--accent-soft); color: var(--accent-text); }
 
 /* ── Setup hint — the actionable "no owner account yet" affordance ─── */
@@ -460,7 +473,7 @@ button.primary:disabled { opacity: 0.4; cursor: wait; box-shadow: none; }
  * keyline against the panel, not a glow. */
 button.primary:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
 
 button.ghost {
@@ -484,7 +497,7 @@ button.ghost.danger:hover { background: var(--err-soft); }
  * keyboard-visible. */
 button.ghost:focus-visible {
   outline: none;
-  border-color: var(--accent-dim);
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
@@ -505,7 +518,7 @@ input[type="text"], input[type="password"] {
 }
 input[type="text"]:focus, input[type="password"]:focus {
   outline: none;
-  border-color: var(--accent-dim);
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
@@ -1076,7 +1089,7 @@ pre.logs.logs-compact { max-height: 200px; }
   border-color: var(--accent-dim);
 }
 .pref-switch:disabled { opacity: 0.55; cursor: default; }
-.pref-switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+.pref-switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 .pref-switch__knob {
   position: absolute;
   top: 2px;
@@ -1530,7 +1543,7 @@ pre.logs.logs-compact { max-height: 200px; }
   transition: color 0.14s;
 }
 .standby__rerun:hover { color: var(--fg-muted); text-decoration: underline; }
-.standby__rerun:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.standby__rerun:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .standby__err { color: var(--err); font-size: 12.5px; max-width: 46ch; }
 
 /* ── THE LEDGER (§3.3 Band 3) ──────────────────────────────────────
@@ -1677,7 +1690,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   color: var(--fg);
 }
 .faq-q:hover { color: var(--accent-text); }
-.faq-q:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.faq-q:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .faq-chev {
   flex: none;
   font-size: 15px;
@@ -1711,7 +1724,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   text-underline-offset: 2px;
 }
 .linklike:hover { color: var(--fg); }
-.linklike:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.linklike:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── Single-surface shell (replaces the rail) ──────────────────────
  * A thin top bar + the Standby stage. No left rail: Connections /
@@ -1798,19 +1811,47 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
  * "The back of the instrument": a full-height right tray over a dimmed —
  * never blurred — home that keeps polling behind it.
  *
- * It is a machined part, so it is built like one: an opaque --surface plane,
- * one hairline edge, one restrained floater shadow, and nothing else. No
- * glass, no gradient, no glow. The entrance and the exit are GSAP's
+ * It is a machined part, so it is built like one: an opaque plane, one
+ * hairline edge, one restrained floater shadow, and nothing else. No glass,
+ * no gradient, no glow. The entrance and the exit are GSAP's
  * (InspectorHost.tsx) — the pop keyframe this replaces could not be reversed,
- * which is why closing used to be a disappearance rather than a move. */
+ * which is why closing used to be a disappearance rather than a move.
+ *
+ * ── THE COUNTER-MATERIAL ─────────────────────────────────────────
+ * The tray is BLACK, and it is the only black surface in the launcher. That
+ * is the brand's own pairing (auracle-marketing/DESIGN.md: a cream page with
+ * full-bleed black bands), and it says the right thing here — opening an
+ * inspector is opening the machined back of an instrument whose face is
+ * daylight. The eight inspectors between them are the only depth surface
+ * that turns; the palette, the tutorial and the coachmark stay paper on
+ * cream, because they annotate the board rather than open it.
+ *
+ * HOW it turns is the point: this block re-points the TOKENS for the tray's
+ * subtree, and nothing inside it knows. Every inspector, card, row, chip,
+ * badge, banner, incident, log well and control below still reads --surface,
+ * --fg, --line, --ok/--warn/--err exactly as it did on the cream side; the
+ * values arrive black-ground-shaped because the tray declares them that way.
+ * That is what keeps §4.1's "no private colour maps in components" true
+ * across a two-ground product — a per-inspector `{bg, fg}` record would have
+ * been eight design systems, one per key.
+ *
+ * Three rules the re-point obeys:
+ *   1. Text on black is WHITE AT OPACITY STEPS (.9 / .55 / .4 — the brand's
+ *      own ramp), never a grey hex, so it composites the same over the
+ *      plane and over anything drawn on it.
+ *   2. The semantic hues keep their MEANING and change their CUT: the
+ *      bright green/amber/red that were unreadable on cream are exactly
+ *      right on black, so they come back here. Same states, same words.
+ *   3. --paper is NOT re-pointed. The QR tile has to stay white for a
+ *      scanner, and it lives in this subtree. */
 .insp-scrim {
   position: absolute;
   inset: 0;
-  /* §2.3: a scrim is a plain alpha fill at α.55. NO backdrop-filter — not
-     here, not anywhere in this app: WKWebView paints it as flat black over a
-     canvas layer, and the home behind this IS a canvas. Nothing needs blurring
-     to be unreadable through an opaque panel; the dim is for the parts of the
-     board the tray doesn't cover. */
+  /* §2.3: a scrim is a plain alpha fill, and there is exactly one — --scrim.
+     NO backdrop-filter, not here and not anywhere in this app: WKWebView
+     paints it as flat black over a canvas layer, and the home behind this IS
+     a canvas. Nothing needs blurring to be unreadable through an opaque
+     panel; the dim is for the parts of the board the tray doesn't cover. */
   background: var(--scrim);
   z-index: 40;
 }
@@ -1826,6 +1867,56 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   pointer-events: none;
 }
 .insp {
+  /* The counter-material, declared once for the whole subtree. Read the
+     block above this rule before changing a single value here. */
+  /* The tray body scrolls, and so do the log wells inside it. Without this
+     the UA would paint a light scrollbar on a black plane — the one piece
+     of this surface the stylesheet does not draw, drawn wrong. */
+  color-scheme: dark;
+  /* The plane is #000; a well inside it can only LIFT, so --bg (which every
+     log / changelog / diagnostics block reads as "one step off the plane")
+     goes a hair above it rather than below. Only the tokens the subtree
+     actually consumes are re-pointed — --bg-rail and --bg-elev have no
+     consumer inside a tray, and a token declared for nobody is the same
+     dead weight as a class with no TSX. */
+  --bg:          #0d0d0d;   /* wells inside the tray (logs, changelog, diag) */
+  --surface:     #000000;   /* the tray plane itself */
+  --surface-2:   rgba(255, 255, 255, 0.07);  /* hover / recessed control */
+  --surface-3:   rgba(255, 255, 255, 0.12);  /* pressed / neutral chip fill */
+  /* White at opacity steps, per the brand's black bands. --fg-faint is the
+     fourth step the launcher needs and the site does not: ticks, separators
+     and placeholders, present but never carrying a word. */
+  --fg:          rgba(255, 255, 255, 0.9);
+  --fg-dim:      rgba(255, 255, 255, 0.55);
+  --fg-muted:    rgba(255, 255, 255, 0.4);
+  --fg-faint:    rgba(255, 255, 255, 0.22);
+  /* Hairlines go back to white alphas here, for the reason they left the
+     cream side: on black a solid warm grey line is a stripe, an alpha is a
+     hairline. */
+  --line:        rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  /* --elev-card and --hairline-top are deliberately NOT re-pointed: nothing
+     floats above the plane inside a tray (the tray IS the elevation), and
+     the two rules that would have read them — `.insp .card` and its hover —
+     already flatten themselves to `box-shadow: none` a few lines below.
+     Re-pointing a shadow token to `none` would also have been a dormant
+     bug: `none` inside a comma-separated box-shadow list is invalid, and
+     the declaration it appears in is dropped whole. */
+  /* The accent's text tier: the raw accent reads at ≈9:1 on black, so the
+     burnt cream-side cut would be the unreadable one here. */
+  --accent-text: #ff9100;
+  --accent-soft: rgba(255, 145, 0, 0.18);
+  /* The semantic hues, in their bright cuts (rule 2 above). */
+  --ok:          #34d399;
+  --warn:        #fbbf24;
+  --err:         #f87171;
+  --ok-soft:     rgba(52, 211, 153, 0.14);
+  --ok-dim:      rgba(52, 211, 153, 0.32);
+  --warn-soft:   rgba(251, 191, 36, 0.14);
+  --warn-dim:    rgba(251, 191, 36, 0.32);
+  --err-soft:    rgba(248, 113, 113, 0.14);
+  --err-dim:     rgba(248, 113, 113, 0.32);
+
   position: relative;
   pointer-events: auto;
   width: 420px;
@@ -2217,7 +2308,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 .belt__station:hover .belt__label,
 .belt__station:hover .belt__count { color: var(--fg); }
 .belt__station:focus-visible {
-  outline: 2px solid var(--accent-dim);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
