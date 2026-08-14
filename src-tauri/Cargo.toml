@@ -112,7 +112,7 @@ urlencoding = "2"
 # uuid generates the per-install random suffix that's mixed into
 # the password so reinstalls produce a fresh vault.
 sha2 = "0.10"
-machine-uid = "0.5"
+machine-uid = "0.6"
 uuid = { version = "1.10", features = ["v4"] }
 
 [features]
