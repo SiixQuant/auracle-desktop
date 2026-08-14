@@ -1345,14 +1345,34 @@ pre.logs.logs-compact { max-height: 200px; }
  *                   so the verdict + verb sit optically centred in the middle
  *                   of the chamber instead of riding up under the instrument.
  *   auto            the ledger: exactly its own height, pinned to the floor. */
+/* THE COMPOSITION. Two columns and two rows, which is the whole of it:
+ *
+ *   ┌──────────────┬──────────────┐
+ *   │              │              │  the instrument spans both rows, so it
+ *   │              │  INSTRUMENT  │  centres on the WINDOW rather than on
+ *   ├──────────────┤   (key art)  │  whatever the words happen to need
+ *   │ verdict/verb │              │
+ *   └──────────────┴──────────────┘
+ *
+ * The cluster and the figure never share a cell, so the words can never end up
+ * over the drawing at any window this product opens in — the key-art look
+ * without the key-art legibility problem. The instrument lands centred in the
+ * right column, roughly 70% across the window: right of centre, the way a
+ * launcher seats its art, and clear of the corner it would look pinned to.
+ *
+ * Margins are generous and scale with the window (the clamps), because the
+ * silence around three objects is what makes them read as three objects. */
 .standby {
   height: 100%;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
-  row-gap: var(--s-6);
-  justify-items: center;
-  text-align: center;
-  padding: var(--s-5) var(--s-5) var(--s-6);
+  column-gap: var(--s-6);
+  row-gap: var(--s-5);
+  /* Top clears the overlay title bar's traffic lights AND the pill that
+     floats under them; the sides and floor are the composition's air. */
+  padding: calc(var(--chrome-top) + var(--s-5)) clamp(var(--s-5), 5vw, 64px)
+    clamp(var(--s-5), 6vh, 56px);
 }
 
 /* The key art — the instrument. A COLUMN flex box, so the orrery's size is
@@ -1361,6 +1381,8 @@ pre.logs.logs-compact { max-height: 200px; }
    are entitled to treat as indefinite, and which left the instrument at its
    ceiling inside a shorter band. */
 .standby__figure {
+  grid-column: 2;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1369,18 +1391,40 @@ pre.logs.logs-compact { max-height: 200px; }
   min-height: 0;
 }
 
-/* The cluster — the verdict, the one verb, and the one quiet line.
+/* The cluster — the verdict, the one verb, and the one quiet line. Bottom
+ * left, ranged left: this is the only text on the home, so it does not need
+ * the centre to be found.
  *
  * No `min-height: 0` here, deliberately: this cell's automatic minimum is what
  * tells the grid how much room the words actually need, and therefore how much
- * the instrument above must give back. The figure carries the `min-height: 0`
- * instead — it is the one that yields, because it is a second reading of a
- * verdict already stated in words. Under pressure the words win. */
+ * the instrument beside it must give back. The figure carries the
+ * `min-height: 0` instead — it is the one that yields, because it is a second
+ * reading of a verdict already stated in words. Under pressure the words win. */
 .standby__cluster {
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
+  text-align: left;
   gap: var(--s-4);
+}
+
+/* Narrow windows: two columns of a 600px chamber are two slivers, so the
+   composition folds back into one centred column — instrument, then words.
+   Nothing is dropped; the seating is what gives. */
+@media (max-width: 860px) {
+  .standby {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+  .standby__figure { grid-column: 1; grid-row: 1; }
+  .standby__cluster {
+    grid-column: 1;
+    grid-row: 2;
+    align-items: center;
+    text-align: center;
+  }
 }
 
 /* The one quiet line: a failure the machine reported in its own words, or the
@@ -1400,8 +1444,8 @@ pre.logs.logs-compact { max-height: 200px; }
    instrument (§3.9: density holds at min size). */
 @media (max-height: 620px) {
   .standby {
-    row-gap: var(--s-5);
-    padding-top: var(--s-4);
+    row-gap: var(--s-4);
+    padding-top: calc(var(--chrome-top) + var(--s-2));
   }
   .standby__cluster { gap: var(--s-3); }
 }
@@ -1419,24 +1463,34 @@ pre.logs.logs-compact { max-height: 200px; }
  *     used to wear a drop-shadow; it is an animated layer, and §4 budgets it
  *     at zero. The 20px soft ring at α.13 does that job with a fill. */
 .orrery {
-  /* The instrument fills its band. Slice 4 had to budget it against a fixed
-     column of stacked rows (`100vh - 450px`); the ledger merge retired those
-     rows, so it now simply takes what §3.3's band gives it. Measured: 300px —
-     the ceiling, where one SVG unit is one CSS pixel and the 8px core / 5px
-     bodies are literal — in the default 900×700 and above, 232px at the
-     600×500 minimum, both clear of §3.9's 180px floor. The one place that
-     floor gives is the down state at the minimum window, where the incident
-     card takes the room (see the row template above for why).
+  /* KEY-ART SCALE. The instrument used to be capped at 300px, which is where
+     one SVG unit is one CSS pixel and the 8px core / 5px bodies are literal.
+     It shared the chamber with a verdict, a verb and a ledger row then; it
+     shares it with a verdict and a verb now, in its own column, so the cap
+     rises to 460 and the instrument becomes what a launcher puts on its stage
+     — the largest thing in the room by a distance.
 
-     Height: the 300px ceiling as a flex basis, free to shrink to the band.
-     Width: the band, capped at the same 300. The two need not agree — the
-     drawing is a 300-unit square viewBox that letterboxes itself
-     (preserveAspectRatio), so the orbit stays circular at every band height. */
-  flex: 0 1 300px;
+     It stays a hairline instrument at every size. The ring and the seam carry
+     `vector-effect: non-scaling-stroke` (Orrery.tsx), so 460px of drawing is
+     still ONE pixel of chrome: bigger mark, same mechanism, no thickening into
+     a graphic. What does grow with the box is the core, the bodies and their
+     flags, which is the point — they are the parts that carry a reading.
+
+     The cap tracks the window's HEIGHT (58vh), because that is the dimension
+     the instrument competes with the words for: 460 at 793px and up, 406 in
+     the default 900×700 (where the column caps it at 389), 290 at the 600×500
+     minimum — all clear of §3.9's 180px floor.
+
+     Height: the cap as a flex basis, free to shrink to the cell. Width: the
+     cell, capped at the same value. The two need not agree — the drawing is a
+     300-unit square viewBox that letterboxes itself (preserveAspectRatio), so
+     the orbit stays circular at every size. */
+  --orrery-cap: clamp(220px, 58vh, 460px);
+  flex: 0 1 var(--orrery-cap);
   min-height: 0;
-  max-height: 300px;
+  max-height: var(--orrery-cap);
   width: 100%;
-  max-width: 300px;
+  max-width: var(--orrery-cap);
   display: block;
   padding: 0;
   background: transparent;
@@ -1499,16 +1553,21 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .orrery__body:hover .orrery__flag { opacity: 1; }
 
-/* THE VERDICT (§3.3 Band 2) — the display register, and the only sentence on the
- * screen. The per-word entrance lives in fx/motion.ts (`revealWords`); nothing
- * here may hide it, so no CSS animation and no opacity of its own. */
+/* THE VERDICT — the display register, and the only sentence on the screen. The
+ * per-word entrance lives in fx/motion.ts (`revealWords`); nothing here may
+ * hide it, so no CSS animation and no opacity of its own.
+ *
+ * 34ch rather than the centred layout's 24: ranged left in its own column, the
+ * longest sentence the aggregator can produce ("Engine's down — start it to
+ * continue.", 38 chars) sits on one line at every window this composition uses
+ * two columns in. `balance` is what keeps the fold graceful when it doesn't. */
 .standby__verdict {
   font-family: var(--font-display);
   font-size: var(--t-verdict);
   font-weight: var(--fw-display);
   color: var(--fg);
   margin: 0;
-  max-width: 24ch;
+  max-width: 34ch;
   line-height: 1.2;
   text-wrap: balance;
 }
@@ -1519,18 +1578,28 @@ pre.logs.logs-compact { max-height: 200px; }
   display: inline-block;
 }
 
+/* THE ONE VERB. The only accent on the home and the only thing to press, so it
+ * is drawn as the one thing to press: a large orange slab with an ink label,
+ * set in the mono register, uppercase and tracked out. Mono because this is a
+ * machine's own word for what happens next, and the launcher spells machine
+ * words in mono everywhere else it spells them (§2.2); large because a
+ * launcher has exactly one primary action and hiding it inside a 44px control
+ * would be the composition apologising for it. */
 .standby__actuator {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
-  padding: 0 22px;
+  min-height: 54px;
+  padding: 0 var(--s-5);
   background: var(--accent);
   color: var(--accent-ink);
   border: 0;
   border-radius: var(--r-md);
-  font-size: 15px;
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
   cursor: pointer;
   transition: background-color 0.15s ease-out, transform 0.1s ease-out;
 }
