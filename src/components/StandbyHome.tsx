@@ -1,12 +1,12 @@
-// StandbyHome — the launcher home, as three bands on one charcoal chamber.
+// StandbyHome — the launcher home, as three bands on one cream chamber.
 //
 // Design authority: launcher-redesign-direction.md §1 (the chamber sketch) and
 // §3.3 ("Home — The Orrery"). Slice 5 of the redesign.
 //
 //     ┌──────────────────────────────────────────────┐
 //     │                THE INSTRUMENT                │  ~55% of the stage
-//     │            Everything's ready.               │  THE VERDICT (serif)
-//     │              [ Open workspace ]              │  one Nous-blue verb
+//     │            Everything's ready.               │  THE VERDICT (display)
+//     │              [ Open workspace ]              │  one accent verb
 //     │ engine Healthy · v0.8.37 · What's new · Help │  THE LEDGER (mono)
 //     └──────────────────────────────────────────────┘
 //
@@ -153,7 +153,7 @@ export default function StandbyHome({
 
 // ── Band 2 — The Verdict ────────────────────────────────────────────
 
-/** The system line, in the display serif, arriving word by word (§2.4).
+/** The system line, in the display register, arriving word by word (§2.4).
  *
  *  React owns the text and the `key` retires the whole element on a change, so
  *  the split markup can never outlive the sentence it was made from: the DOM
@@ -256,7 +256,7 @@ function LedgerVital({ cell, onOpen }: { cell: VitalCell; onOpen?: () => void })
 /** The version / update cell — the truth ladder (`lib/ledger.ts`), inked.
  *
  *  On the one rung where an update is genuinely waiting, the cell goes bright
- *  and a blue underline sweeps out from the left. Once. It is a fact arriving,
+ *  and an accent underline sweeps out from the left. Once. It is a fact arriving,
  *  not an animation running: §2.4 allows the sweep exactly because it happens
  *  when the machine learns something, and forbids it from ever looping. */
 function LedgerVersion({ cell, onOpen }: { cell: VersionCell; onOpen: () => void }) {

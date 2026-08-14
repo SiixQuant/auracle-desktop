@@ -1,7 +1,7 @@
 // InspectorHost — the tray. The back of the instrument.
 //
 // Design authority: launcher-redesign-direction.md §1 (depth surfaces are
-// "machined parts of the same instrument: opaque charcoal planes, hairline
+// "machined parts of the same instrument: opaque planes, hairline
 // edges, no glass, no glow") and §3.4 ("The Tray — inspectors"). Slice 6 of
 // the redesign.
 //

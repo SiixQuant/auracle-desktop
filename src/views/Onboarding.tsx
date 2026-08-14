@@ -15,7 +15,7 @@
 //
 // Design authority: launcher-redesign-direction.md §3.2. The horizontal
 // stepper becomes a commissioning rail down the left with three stations, and
-// the wizard's card becomes the same charcoal chamber the sign-in and the home
+// the wizard's card becomes the same cream chamber the sign-in and the home
 // stand in — with the instrument itself at the top, being BUILT. The ring is
 // dim until a real Docker runtime answers; the arc is the installer's own
 // percent; the core stays unlit through the entire build and ignites only when
@@ -303,7 +303,7 @@ function Rail({ stations }: { stations: RailStation[] }) {
 
 // ── The handover (§3.2 — the ceremony's last frame) ─────────────
 
-/** What the chamber says at the moment it becomes the home: one display-serif
+/** What the chamber says at the moment it becomes the home: one display
  *  line and the sentence that has always followed it. The wizard's own 1.8s
  *  timer bounces the browser and calls `onDone()` from where it always did —
  *  this surface is what is on screen while that happens, and it is not a gate
@@ -555,9 +555,9 @@ function Station2({
       </p>
       {onGoogleSignIn && (
         <>
-          {/* The threshold's own control, unchanged: the one deliberately
-              non-charcoal surface in the app, because the Google affordance is
-              a trust signal (§3.1). */}
+          {/* The threshold's own control, unchanged: the Google affordance
+              is a trust signal, so the pill is reproduced as its owner draws
+              it — white, with the unmodified mark (§3.1). */}
           <button
             type="button"
             className="comm-google"

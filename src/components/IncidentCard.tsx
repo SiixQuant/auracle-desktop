@@ -17,7 +17,7 @@ import { useState } from "react";
 
 /** The chip that leads the card. `info` is not a fault and has no status hue
  *  of its own — the accent tint belongs to the banner (`.banner.info`), and a
- *  second accent inside it would spend the screen's blue on a notice. So its
+ *  second accent inside it would spend the screen's accent on a notice. So its
  *  chip stays neutral, which is also the honest reading: "info" is not a state
  *  the machine is in. */
 const CHIP: Record<"info" | "warn" | "err", string> = {

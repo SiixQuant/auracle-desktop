@@ -1,72 +1,96 @@
 /* Auracle Desktop — design tokens aligned with auracle-engine.com.
  *
- * The marketing site, Houston web UI, and this launcher all share one
- * palette so the customer's eye doesn't have to recalibrate when they
- * jump between surfaces. If you change a token here, mirror it in
- * auracle-marketing/css/site.css and auracle/houston/web/static/style.css.
+ * The BRAND AUTHORITY for every material in this file is
+ * auracle-marketing/DESIGN.md ("The Ledger"): cream ground, ink text, black
+ * as the counter-material, one orange accent, Geist Sans + Geist Mono. The
+ * site and this launcher share that palette so the customer's eye doesn't
+ * have to recalibrate when they jump between surfaces; if you change a
+ * token here, it is because the authority changed first.
+ *
+ * What this file does NOT own: the laws. Composition, motion vocabulary and
+ * the honesty rules live in DESIGN.md at the repo root and are unchanged by
+ * the material — the instrument reads the same, in daylight.
  */
 
 /* ── Bundled type (OFL 1.1) ───────────────────────────────────────────
- * Three faces ship inside the app as woff2 — no CDN, no runtime fetch, no
+ * Two faces ship inside the app as woff2 — no CDN, no runtime fetch, no
  * system-font lottery. The files come from the @fontsource* packages in
  * package.json (Vite fingerprints and emits them into dist/assets), and we
  * declare the faces by hand rather than importing the packages' own CSS so
- * that ONLY the latin subset and ONLY the axes/weights the design system
- * uses get bundled — the package entrypoints also drag in latin-ext and
- * vietnamese, roughly tripling the on-disk cost for glyphs this UI has no
- * copy for. Licences + provenance: src/assets/fonts/OFL-NOTICES.txt.
+ * that ONLY the latin subset and ONLY the weights the design system uses get
+ * bundled — the package entrypoints also drag in latin-ext and vietnamese,
+ * roughly tripling the on-disk cost for glyphs this UI has no copy for.
+ * Licences + provenance: src/assets/fonts/OFL-NOTICES.txt.
+ *
+ * Geist Sans and Geist Mono are the brand's two faces (auracle-marketing's
+ * DESIGN.md — "The Ledger"): no serif, no third family. The retired trio
+ * (Fraunces / Inter / JetBrains Mono) left with the charcoal ground.
+ *
+ * Static cuts, not variable: only three sans weights and two mono weights
+ * are ever set, and five static latin files (~123 KB) come in under the one
+ * variable pair.
  *
  * font-display: block — the files are local, so "loading" is a sub-frame
- * event; blocking avoids a flash of the fallback serif on the verdict line.
+ * event; blocking avoids a flash of the fallback face on the verdict line.
  * CSP: default-src 'self' covers font-src, and these resolve to app-local
  * asset URLs, so nothing leaves the machine.
  * ──────────────────────────────────────────────────────────────────── */
 
-/* Display — Fraunces (wght + opsz axes; SOFT/WONK fixed at their 0 default). */
+/* UI sans + display — Geist Sans. Regular (body), Medium (the verdict, the
+ * station titles, every control label), SemiBold (the few 600 registers). */
 @font-face {
-  font-family: "Fraunces Variable";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: block;
-  src: url("@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2")
-    format("woff2-variations");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
-    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* UI sans — Inter (wght axis only; ss01/cv01 are set on html,body). */
-@font-face {
-  font-family: "Inter Variable";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: block;
-  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
-    format("woff2-variations");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
-    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* Data mono — JetBrains Mono, Regular + Medium only (the two weights the
- * ledger/chip/label register actually sets). */
-@font-face {
-  font-family: "JetBrains Mono";
+  font-family: "Geist Sans";
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2")
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-400-normal.woff2")
     format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
     U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: "Geist Sans";
   font-style: normal;
   font-weight: 500;
   font-display: block;
-  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2")
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-500-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Geist Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-600-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Data mono — Geist Mono, Regular + Medium only (the two weights the
+ * ledger/chip/label register actually sets). */
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("@fontsource/geist-mono/files/geist-mono-latin-500-normal.woff2")
     format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
@@ -74,26 +98,48 @@
 }
 
 :root {
-  /* Surface — Percept terminal, charcoal elevation ladder. Depth comes
-     from OPAQUE tone steps (not 2% white washes that vanish on pure black)
-     + crisp hairlines. Four reliable planes: rail recedes < canvas <
-     card/container lifts < interactive control. Still unmistakably dark. */
-  --bg:          #0b0c0e;   /* canvas — charcoal floor to lift surfaces from */
-  --bg-rail:     #08090b;   /* chrome/sidebar — recedes below the canvas */
-  --bg-elev:     #181b20;   /* elevated wells / popovers */
-  --surface:     #131519;   /* cards + containers — reads clearly above canvas */
-  --surface-2:   #1b1e23;   /* interactive controls / hover */
-  --surface-3:   #23272d;   /* pressed / neutral fill */
+  /* Surface — the cream ladder (auracle-marketing/DESIGN.md, "The Ledger",
+     is the brand authority for every value in this block). Depth comes from
+     OPAQUE tone steps + crisp hairlines, exactly as it did on charcoal; what
+     inverted is the direction. On cream a plane LIFTS toward paper white and
+     RECEDES toward warm grey, so the ladder reads: rail recedes < canvas <
+     card/container lifts to paper < interactive control settles back down.
+
+     Daylight, not "light mode": there is one ground, and it is cream. The
+     counter-material — the black tray — is scoped further down (§THE TRAY),
+     where the same token names are re-pointed for that one surface. */
+  --bg:          #f1eee7;   /* canvas — the cream ground */
+  --bg-rail:     #eae6dd;   /* chrome/topbar — recedes below the canvas */
+  --bg-elev:     #ffffff;   /* elevated wells / popovers — paper */
+  --surface:     #ffffff;   /* cards + containers — paper, lifted off cream */
+  --surface-2:   #eae6dd;   /* interactive controls / hover / recessed wells */
+  --surface-3:   #e0dbd0;   /* pressed / neutral fill */
+  /* Paper — pure white, and the one surface token that means WHITE rather
+     than "a plane above the ground". The tray re-points every token above
+     this line to its black counter-material; --paper is deliberately left
+     out of that override, because the two surfaces that use it are white
+     for a functional reason and are white on every ground: the QR tile (a
+     scanner needs dark modules on a light field, and that tile lives inside
+     the tray) and the Google pill (a third-party mark reproduced as its
+     owner draws it). Never reach for it as "a lighter card". */
+  --paper:       #ffffff;
 
   /* Ambient stage — the dot-field behind the home and the sign-in screen.
      Derived ink, no new hue: --fg at a whisper. The field brightens toward
      --stage-dot-near within 240px of the instrument, precomputed per dot in
      src/fx/ambient.ts (NOT a CSS gradient — the canvas owns the falloff).
      These two tokens are the only declaration of the ambient's colour; the
-     canvas resolves them at mount. Raise them at your peril: the stage is
-     texture, and anything brighter starts competing with the type. */
-  --stage-dot:      rgba(230, 237, 243, 0.05);
-  --stage-dot-near: rgba(230, 237, 243, 0.09);
+     canvas resolves them at mount.
+
+     Ink on cream now, and QUIETER than the white-on-charcoal field it
+     replaces: dark dots on a bright ground read harder than light dots on a
+     dark one at the same alpha, so the alphas come down to hold the same
+     whisper. Raise them at your peril: the stage is texture, and anything
+     stronger starts competing with the type. (The matching fallback pair
+     lives in src/fx/ambient.ts — STAGE_INK_FALLBACK — for the one frame
+     before the tokens resolve.) */
+  --stage-dot:      rgba(35, 35, 35, 0.04);
+  --stage-dot-near: rgba(35, 35, 35, 0.075);
 
   /* The Orrery — the home instrument. Derived, no new hue, and deliberately
      achromatic: the ring is CHROME (it is the mechanism, not a reading) and a
@@ -103,72 +149,108 @@
   --orbit-ring: var(--line-strong);
   --orbit-body: var(--fg-dim);
 
-  /* Foreground — Percept ramp (primary → muted), high-contrast not glowing */
-  --fg:          #e6edf3;
-  --fg-dim:      #9da7b3;
-  /* Tertiary ink — used for 10–13px mono micro-labels (section heads,
-     method tags, "coming soon" pills, legend, version). Set to #7c8694 so
-     those small labels clear ~4.5:1 AA on the lifted charcoal cards
-     (#6b7480 was only ~3.9:1 — fine for large text, short for micro-text).
-     Still clearly a recede tone, not a primary. */
-  --fg-muted:    #7c8694;
-  --fg-faint:    #3a4049;
+  /* Foreground — the ink ramp (primary → faint), measured on the cream
+     ground. --fg is the brand's ink; --fg-muted is its warm grey. */
+  --fg:          #232323;   /* ink — ≈14:1 on cream */
+  --fg-dim:      #45443f;   /* secondary prose — ≈8:1 */
+  /* Tertiary ink — the 10–13px mono micro-label register (section heads,
+     keys, legends, versions). The brand's warm grey, ≈5.7:1 on cream, so
+     the smallest type in the product still clears AA. A recede tone, never
+     a primary. */
+  --fg-muted:    #5b5a56;
+  /* Faint — ticks, separators, placeholders, the ghost re-run line: present
+     but barely, ≈2:1, the same "there if you look" tier the charcoal
+     #3a4049 held. Never carries a word that has to be read. */
+  --fg-faint:    #a8a49b;
 
-  /* Lines — implied chrome: hairline low-alpha, whispered not announced.
-     Nudged up from 0.06/0.10 so containers keep crisp edges on the
-     charcoal ladder (the divider IS the depth cue, so it must read). */
-  --line:        rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.14);
+  /* Lines — the brand hairline on cream, and one step firmer where a
+     divider is doing structural work. Solid warm greys rather than white
+     alphas: on a bright ground an alpha line lightens toward the paper it
+     sits on and disappears exactly where a card needs its edge. */
+  --line:        #dedede;
+  --line-strong: #c9c6bf;
 
-  /* Elevation — restrained per the locked language (anti-ref: heavy
-     drop-shadow + glow). Depth is carried by the tone ladder + hairlines;
-     this only adds a whisper of float + a lit-from-above top edge so a
-     card reads as a distinct plane, never as a glossy SaaS card. */
-  --elev-card:    0 1px 2px rgba(0, 0, 0, 0.45);
-  --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  /* Elevation — restrained (anti-ref: heavy drop-shadow + glow). Depth is
+     carried by the tone ladder + hairlines; this only adds a whisper of
+     float. On the cream ladder the shadow is INK at a low alpha, an order
+     of magnitude lighter than the charcoal one — a dark drop on a bright
+     ground reads as dirt, not as lift. The lit top edge survives as a
+     near-no-op on paper and a whisper on the warm steps; the hairline
+     border is what does the work now. */
+  --elev-card:    0 1px 2px rgba(35, 35, 35, 0.07);
+  --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  /* The one floater shadow — the tray, the palette, the tutorial card.
+     Named rather than repeated: it was the same four hand-written values in
+     four places, which is how a second elevation system starts. */
+  --elev-floater: 0 8px 24px rgba(35, 35, 35, 0.14);
 
-  /* Accent — Nous-blue on the charcoal base. THE brand accent, shared by the
-     launcher, the IDE, the marketing site, and Houston ("Hermes-on-dark").
-     Two retired values you may still see referenced in older comments:
-     emerald (retired as a BRAND colour — green now means health and only
-     health) and white (a white "accent" is not an accent, it is ink).
+  /* Scrim — the one dim value in the app (tray, palette, tutorial,
+     coachmark). INK at .38, not black at .55: the tray it dims behind is
+     itself black now, and a heavier black wash would swallow the tray's own
+     edge instead of separating it from the board. Still a plain alpha fill
+     — never a backdrop-filter, here or anywhere (§2.3). */
+  --scrim:        rgba(35, 35, 35, 0.38);
 
-     BRAND ONLY. Status stays chromatic — a lamp core "keeps its semantic
-     colour (green = ready / red = needs you) ... a functional signal, not
-     decoration". Never point --ok/--warn/--err at --accent; a blue health
-     dot conveys nothing.
+  /* Accent — orange on cream. THE brand accent (auracle-marketing/DESIGN.md
+     locks the value at #FF9100). Nous-blue is RETIRED on this surface, as
+     emerald and the white "accent" were before it; if you find any of the
+     three in a comment or a class name, it is drift.
 
-     Contrast law, verified against --bg #0b0c0e:
-       #0053fd on --bg        ≈ 3.4:1 — fills / borders / graphics ONLY,
-                                        never small text;
-       --accent-ink on accent ≈ 5.7:1 — the label on a filled verb button;
-       --accent-text on --bg  ≈ 7:1   — EVERY blue text or glyph on dark.
-     Blue lands at most three times per screen (the one primary verb, one
-     live signal, the focus ring) and never fills a region. */
-  --accent:      #0053fd;
-  --accent-2:    #0042cc;                      /* hover/pressed tier */
-  --accent-soft: rgba(0, 83, 253, 0.16);       /* tinted fill, read with --accent-text on top */
-  /* Dim tier — keylines, control borders, focus rings. Derived from the
-     READABLE blue rather than the raw accent on purpose: #0053fd is dark
-     (~0.13 luma), so at a hairline alpha it composites straight into the
-     charcoal and the focus ring vanishes. At 0.55 this clears 3:1 on --bg
-     (the retiring white-α.24 tier only managed ~2.1:1). */
-  --accent-dim:  rgba(122, 162, 255, 0.55);
-  --accent-ink:  #ffffff;                      /* text ON a filled accent */
-  /* Accent as TEXT/glyph on dark or on --accent-soft. #0053fd fails AA as
-     small text on charcoal, so blue type always takes this brightened tier. */
-  --accent-text: #7aa2ff;
-  --ok:          #34d399;                       /* desaturated success */
-  --warn:        #fbbf24;                       /* desaturated amber */
-  --err:         #f87171;                       /* desaturated red */
-  /* Status soft/dim fills — derived from the desaturated states above so
-     every pill/chip/badge/banner fill matches its text token (one source). */
-  --ok-soft:     rgba(52, 211, 153, 0.12);
-  --ok-dim:      rgba(52, 211, 153, 0.30);
-  --warn-soft:   rgba(251, 191, 36, 0.12);
-  --warn-dim:    rgba(251, 191, 36, 0.30);
-  --err-soft:    rgba(248, 113, 113, 0.12);
-  --err-dim:     rgba(248, 113, 113, 0.30);
+     BRAND ONLY, and rationed harder than ever: the accent marks THE ONE
+     VERB of a view and nothing else. Status stays chromatic on its own
+     hues — never point --ok/--warn/--err at --accent; an orange health dot
+     conveys nothing.
+
+     Contrast law, verified against --bg #f1eee7:
+       #ff9100 on --bg        ≈ 1.9:1 — FILLS / borders / graphics ONLY,
+                                        never text, never a hairline alone;
+       --accent-ink on accent ≈ 7:1   — the ink label on a filled verb;
+       --accent-text on --bg  ≈ 5:1   — EVERY orange word or glyph on cream.
+     The accent lands at most three times per screen (the one verb, one live
+     signal, the focus ring) and never fills a region.
+
+     THE FOCUS RING IS ONE THING: 2px solid --accent, at 2px offset. Every
+     control draws that ring — as an `outline` where it can, as a box-shadow
+     of the same weight where an outline would be clipped. There is no dim
+     tier of it any more; a focus ring that is easy to miss is a focus ring
+     that is doing half its job. --accent-dim survives for what it was
+     actually good at: resting keylines (an ON switch, an info banner). */
+  --accent:      #ff9100;
+  --accent-2:    #e07e00;                      /* hover/pressed tier */
+  --accent-soft: rgba(255, 145, 0, 0.14);      /* tinted fill, read with --accent-text on top */
+  /* Dim tier — keylines, control borders, focus rings. The raw accent at a
+     hairline alpha, which works here where it did not on charcoal: #ff9100
+     is BRIGHT (~0.42 luma), so it separates from cream by hue and value
+     rather than needing a lightened cut to survive the composite. */
+  --accent-dim:  rgba(255, 145, 0, 0.55);
+  /* Text ON a filled accent. Ink, not white: white on #ff9100 is ≈2.3:1 and
+     unreadable — the brand's own pairing is ink on orange. */
+  --accent-ink:  #232323;
+  /* Accent as TEXT/glyph on cream or on --accent-soft. #ff9100 fails AA as
+     small text on a bright ground, so orange type always takes this burnt
+     tier — the same law --accent-text has always encoded, one ground over. */
+  --accent-text: #a04e00;
+
+  /* Status — the semantic hues. These are NOT brand colours and they do not
+     follow the accent: healthy is green, degraded is amber, down is red, on
+     every ground this product has ever had. What the cream ground changes is
+     the CUT, not the hue: these tokens are set as text as often as they are
+     set as a dot (a chip's word, a stale reading, an error line), and the
+     charcoal-era values were tuned to glow on black — on cream they wash
+     out and drop under 2:1. So each one takes its readable cut here, and
+     the bright cuts return inside the black tray, where they read again
+     (§THE TRAY). One hue, two grounds, no new meanings. */
+  --ok:          #15703a;                       /* success  — ≈5.3:1 on cream */
+  --warn:        #8a5b00;                       /* amber    — ≈5.0:1 on cream */
+  --err:         #cf222e;                       /* red      — ≈4.6:1 on cream */
+  /* Status soft/dim fills — derived from the states above so every
+     pill/chip/badge/banner fill matches its text token (one source). */
+  --ok-soft:     rgba(21, 112, 58, 0.12);
+  --ok-dim:      rgba(21, 112, 58, 0.30);
+  --warn-soft:   rgba(138, 91, 0, 0.12);
+  --warn-dim:    rgba(138, 91, 0, 0.30);
+  --err-soft:    rgba(207, 34, 46, 0.12);
+  --err-dim:     rgba(207, 34, 46, 0.30);
 
   /* Radius — locked design: soft 6 / 8 / 10 (owner refinement) */
   --r-sm: 6px;
@@ -191,37 +273,32 @@
   --t-md: 16px;
   --t-lg: 18px;
   --t-xl: 24px;
-  /* Display steps — the two places the serif is allowed to be big. */
+  /* Display steps — the two places the display register is allowed to be big. */
   --t-verdict: clamp(22px, 3.4vw, 30px);  /* the home verdict line */
   --t-station: 20px;                      /* onboarding station titles (consumer lands with the commissioning rail) */
 
   /* Fonts — bundled OFL faces lead every role (see the @font-face block at
-     the top of this file); the system stacks are fallbacks only. Inter used
-     to lead --font-sans unbundled, which meant it silently fell through to
-     -apple-system on most machines; SF Mono used to lead --font-mono, which
-     meant the msi/deb/rpm builds got a different data face than the mac
-     build, and the Bodoni/Didot display stack simply did not exist off-mac.
-     Bundling settles all three: the launcher renders identically on macOS,
-     Windows, and Linux, offline, on first paint. tabular-nums on data. */
-  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans",
-               "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco,
+     the top of this file); the system stacks are fallbacks only, and are
+     what the launcher would render if a woff2 ever failed to emit.
+     Bundling is why the launcher renders identically on macOS, Windows and
+     Linux, offline, on first paint. tabular-nums on data. */
+  --font-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial,
+               sans-serif;
+  --font-mono: "Geist Mono", "SF Mono", ui-monospace, Menlo, Monaco,
                "Cascadia Mono", Consolas, "Courier New", monospace;
-  /* Display serif (Hermes DNA) — big dramatic headline faces for the verdict
-     line + page titles, nowhere else, never bold. Fraunces is the bundled
-     stand-in for Hermes' proprietary "Collapse": same high-contrast drama,
-     OFL-licensed, fully offline. The old system serifs stay as fallbacks. */
-  --font-display: "Fraunces Variable", "Bodoni 72", "Didot", "Didot LT STD",
-               "Playfair Display", "Times New Roman", Georgia, serif;
-  /* Fraunces' variable axes for the display role. opsz 72 is the direct
-     analogue of the face this replaces — "Bodoni 72" is named for its 72pt
-     optical size — so the drama (fine hairlines, high stroke contrast)
-     carries over instead of drifting toward a text cut. SOFT 0 keeps the
-     sharp terminal rather than the rounded one. Pair with weight 400: the
-     serif already reads heavier than the sans, and this face is never set
-     bold. Harmlessly ignored by the fallback serifs, which have no axes. */
-  --fvs-display: "opsz" 72, "SOFT" 0;
+  /* The display register is the SAME face as the body, one step up in
+     weight (500) with tight leading — the brand has two faces and no serif
+     (auracle-marketing DESIGN.md). The token stays because the ROLE stays:
+     the verdict line, the station titles and the page titles are the only
+     places allowed to set it, and pointing it somewhere else is a one-line
+     change here rather than six. */
+  --font-display: var(--font-sans);
+  /* The display weight. 500 is the brand's display cut; the body sits at
+     400, so the verdict reads as a step up in the same voice rather than as
+     a second typeface. Never bolder — 600 is a control-label register, not
+     a headline one. */
+  --fw-display: 500;
 }
 
 * { box-sizing: border-box; }
@@ -229,11 +306,16 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* The ground is light, so every native part the app does not draw itself
+     — scrollbars, the caret, form-control chrome — is told to render light
+     too. One declaration instead of a bespoke scrollbar system; the tray
+     flips it to `dark` for its own subtree, which is the only place in the
+     launcher where the ground inverts. */
+  color-scheme: light;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
   font-size: var(--t-base);
-  font-feature-settings: "ss01" on, "cv01" on;
   height: 100%;
   letter-spacing: -0.005em;
 }
@@ -260,12 +342,11 @@ main {
 }
 
 h1 {
-  /* Display serif (Hermes DNA) — page titles get the dramatic high-contrast
-     serif; the weight drops because serifs read heavier than the sans. */
+  /* The display register — page titles are the body face one weight up,
+     set tight. There is no second family to reach for. */
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: 28px;
-  font-weight: 400;
+  font-weight: var(--fw-display);
   letter-spacing: -0.01em;
   margin: 0 0 var(--s-4);
 }
@@ -295,7 +376,7 @@ h2 {
 
 .card:hover {
   border-color: var(--line-strong);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), var(--hairline-top);
+  box-shadow: 0 2px 6px rgba(35, 35, 35, 0.1), var(--hairline-top);
 }
 
 .row {
@@ -334,7 +415,7 @@ h2 {
   transition: background-color 0.12s, color 0.12s;
 }
 .seg-tab:hover { color: var(--fg); }
-.seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent-dim); }
+.seg-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
 .seg-tab.active { background: var(--accent-soft); color: var(--accent-text); }
 
 /* ── Setup hint — the actionable "no owner account yet" affordance ─── */
@@ -392,12 +473,12 @@ button.primary:disabled { opacity: 0.4; cursor: wait; box-shadow: none; }
  * keyline against the panel, not a glow. */
 button.primary:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
 
 button.ghost {
   /* A resting surface + hairline so it reads as a pressable control on
-     the charcoal ladder (transparent made it look like plain text). */
+     the cream ladder (transparent made it look like plain text). */
   background: var(--surface);
   color: var(--fg);
   border: 1px solid var(--line-strong);
@@ -416,7 +497,7 @@ button.ghost.danger:hover { background: var(--err-soft); }
  * keyboard-visible. */
 button.ghost:focus-visible {
   outline: none;
-  border-color: var(--accent-dim);
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
@@ -437,7 +518,7 @@ input[type="text"], input[type="password"] {
 }
 input[type="text"]:focus, input[type="password"]:focus {
   outline: none;
-  border-color: var(--accent-dim);
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
@@ -460,7 +541,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 .badge.err  { background: var(--err-soft);       color: var(--err); }
 
 /* ── Commissioning — the first run (redesign §3.2) ────────────────
- * The wizard's 640px card becomes the same charcoal chamber the threshold
+ * The wizard's 640px card becomes the same cream chamber the threshold
  * and the home stand in: the ambient field behind, the instrument at the
  * top being BUILT, and underneath it a vertical hairline rail with three
  * stations. The horizontal stepper, the card, the nested panels and the
@@ -490,14 +571,13 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 .commissioning .topbar {
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line);
 }
 /* The window title area (§3.2), in the display face. */
 .commissioning__title {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-md);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   letter-spacing: -0.01em;
   color: var(--fg);
 }
@@ -664,9 +744,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 .comm-station__title {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-station);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   line-height: 1.25;
   letter-spacing: -0.01em;
   /* The base h2 is the mono-label register (uppercase, tracked, muted); a
@@ -741,8 +820,12 @@ input[type="text"]:focus, input[type="password"]:focus {
 .comm-check + .comm-check { border-top: 1px solid var(--line); }
 .comm-check__name { font-size: var(--t-sm); font-weight: 500; color: var(--fg); }
 
-/* The threshold's own control (§3.1/§3.2): the one deliberately non-charcoal
-   surface in the app, because the Google affordance is a trust signal. */
+/* The threshold's own control (§3.1/§3.2): the Google affordance is a trust
+   signal, so the pill is reproduced as Google draws it — white, pill, the
+   unmodified mark. On charcoal that made it the one light surface in the
+   app; on cream it is a paper plane a half-step above the ground, which is
+   why it now carries the same hairline every other paper surface does.
+   Without that edge a white pill on cream is an invisible control. */
 .comm-google {
   width: 100%;
   display: flex;
@@ -751,17 +834,17 @@ input[type="text"]:focus, input[type="password"]:focus {
   gap: 10px;
   min-height: 44px;
   padding: 0 16px;
-  background: #fff;
-  color: #111;
+  background: var(--paper);
+  color: var(--fg);
   font-family: inherit;
   font-size: var(--t-sm);
   font-weight: 500;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: var(--r-pill);
   cursor: pointer;
   transition: background-color 0.15s ease-out;
 }
-.comm-google:hover:not(:disabled) { background: rgba(255, 255, 255, 0.9); }
+.comm-google:hover:not(:disabled) { background: var(--surface-2); }
 .comm-google:disabled { opacity: 0.6; cursor: default; }
 .comm-google:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -793,7 +876,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 
 /* ── The handover (§3.2) ────────────────────────────────────────
  * The last frame of the first run and the first frame of the home: one
- * display-serif line under the assembled instrument, in the home's own
+ * display line under the assembled instrument, in the home's own
  * verdict register, while the wizard's 1.8s timer bounces the browser and
  * hands the window over. */
 .commissioning__handover {
@@ -807,9 +890,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 .commissioning__verdict {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-verdict);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   line-height: 1.2;
   color: var(--fg);
   margin: 0;
@@ -934,7 +1016,7 @@ pre.logs.logs-compact { max-height: 200px; }
 .btn-sm { font-size: 12px; padding: 4px 10px; }
 
 /* A verb that owns its whole column — the tray's one primary action (§3.4:
- * "the one blue verb Update Auracle full-width"). */
+ * "the one accent verb Update Auracle full-width"). */
 .btn-block { display: block; width: 100%; }
 
 .fs-2xs { font-size: 10px; }          /* chip/log tier for fine print */
@@ -1007,7 +1089,7 @@ pre.logs.logs-compact { max-height: 200px; }
   border-color: var(--accent-dim);
 }
 .pref-switch:disabled { opacity: 0.55; cursor: default; }
-.pref-switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+.pref-switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 .pref-switch__knob {
   position: absolute;
   top: 2px;
@@ -1088,8 +1170,8 @@ pre.logs.logs-compact { max-height: 200px; }
 
 
 /* ── Tutorial — the orientation card (redesign §3.6) ────────────────
- * "An orientation card bottom-center above the ledger: mono step label, [display
- * serif] title, dots become station ticks on a hairline." Machined like every
+ * "An orientation card bottom-center above the ledger: mono step label,
+ * [display] title, dots become station ticks on a hairline." Machined like every
  * other depth surface (§1): an opaque plane on the elevation ladder, ONE
  * canonical hairline, one floater shadow, no glass and no glow.
  *
@@ -1101,7 +1183,7 @@ pre.logs.logs-compact { max-height: 200px; }
   inset: 0;
   /* §2.3: the one scrim value in the app. This surface used to mix its own
      (rgba(5,7,10,.66)), which read as a different room. */
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--scrim);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1119,7 +1201,7 @@ pre.logs.logs-compact { max-height: 200px; }
   background: var(--bg-elev);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--elev-floater);
   padding: var(--s-5) var(--s-5) var(--s-4);
   text-align: left;
 }
@@ -1134,9 +1216,8 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .tut-title {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-station);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   line-height: 1.2;
   color: var(--fg);
   margin: var(--s-2) 0 var(--s-2);
@@ -1156,8 +1237,8 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 /* Station ticks on a hairline spine (§3.6) — the same commissioning language
  * §3.2 gives the onboarding rail: pending is faint, the current station is
- * bright and taller. No accent here; the card already spends its one blue on
- * the primary verb. */
+ * bright and taller. No accent here; the card already spends its one accent
+ * on the primary verb. */
 .tut-ticks {
   position: relative;
   display: flex;
@@ -1211,7 +1292,7 @@ pre.logs.logs-compact { max-height: 200px; }
 /* ── The Standby home — three bands (redesign §1, §3.3) ────────────
  * The calm panel of an already-running machine, as a chamber rather than a
  * stack: THE INSTRUMENT (~55%), THE VERDICT + one verb, THE LEDGER. Emptiness
- * is the success state — generous negative space, charcoal floor, the core the
+ * is the success state — generous negative space, cream floor, the core the
  * only colour when all-green. Everything derives from deriveBoard().
  *
  * The row template is the whole composition, so it is worth reading:
@@ -1294,8 +1375,8 @@ pre.logs.logs-compact { max-height: 200px; }
  * the tweens live in src/components/Orrery.tsx. This is the ink only.
  *
  * Two laws are enforced here rather than in JS:
- *   · the ring is CHROME and a body is INK — neither is ever accent-blue, so
- *     the screen's three permitted blues stay the core, the verb and the
+ *   · the ring is CHROME and a body is INK — neither is ever the accent, so
+ *     the screen's three permitted accents stay the core, the verb and the
  *     focus ring (§2.1);
  *   · nothing on this surface carries a filter or a blurred shadow. The core
  *     used to wear a drop-shadow; it is an animated layer, and §4 budgets it
@@ -1381,14 +1462,13 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .orrery__body:hover .orrery__flag { opacity: 1; }
 
-/* THE VERDICT (§3.3 Band 2) — the display serif, and the only sentence on the
+/* THE VERDICT (§3.3 Band 2) — the display register, and the only sentence on the
  * screen. The per-word entrance lives in fx/motion.ts (`revealWords`); nothing
  * here may hide it, so no CSS animation and no opacity of its own. */
 .standby__verdict {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-verdict);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   color: var(--fg);
   margin: 0;
   max-width: 24ch;
@@ -1463,7 +1543,7 @@ pre.logs.logs-compact { max-height: 200px; }
   transition: color 0.14s;
 }
 .standby__rerun:hover { color: var(--fg-muted); text-decoration: underline; }
-.standby__rerun:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.standby__rerun:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .standby__err { color: var(--err); font-size: 12.5px; max-width: 46ch; }
 
 /* ── THE LEDGER (§3.3 Band 3) ──────────────────────────────────────
@@ -1472,7 +1552,7 @@ pre.logs.logs-compact { max-height: 200px; }
  * cell a discrete control, every reading still carrying its dot, its
  * freshness and its provenance.
  *
- * Register (§2.2): JetBrains Mono; KEYS are the 10.5px/0.08em uppercase
+ * Register (§2.2): Geist Mono; KEYS are the 10.5px/0.08em uppercase
  * mono-label the type system defines and consumers were left to apply;
  * VALUES stay sentence-case at reading size, because "Healthy" and "What's
  * new" are words the user reads, not labels they scan. */
@@ -1537,7 +1617,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 /* An update is waiting: the cell goes bright and takes the one-time
    underline sweep. The rule is scaled from the left by GSAP (once, never a
    loop — §2.4); it is 1px of accent under one cell, well inside the
-   three-blues-per-screen budget since the core is calm in this state. */
+   three-accents-per-screen budget since the core is calm in this state. */
 .ledger__cell.is-waiting .ledger__value { color: var(--fg); }
 .ledger__sweep {
   position: absolute;
@@ -1610,7 +1690,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   color: var(--fg);
 }
 .faq-q:hover { color: var(--accent-text); }
-.faq-q:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.faq-q:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .faq-chev {
   flex: none;
   font-size: 15px;
@@ -1644,7 +1724,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   text-underline-offset: 2px;
 }
 .linklike:hover { color: var(--fg); }
-.linklike:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+.linklike:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── Single-surface shell (replaces the rail) ──────────────────────
  * A thin top bar + the Standby stage. No left rail: Connections /
@@ -1716,7 +1796,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
  * edge"; the tray left that list in slice 6 and slice 7 empties it.
  *
  * The reason is §1's depth law: a depth surface is a MACHINED PART of the same
- * instrument — an opaque charcoal plane with a hairline edge — so it separates
+ * instrument — an opaque plane with a hairline edge — so it separates
  * from the board by TONE, not by a louder line. Boosting --line inside a panel
  * also boosts every divider the panel contains, which made the same rule read
  * one step brighter here than it does three pixels away in the tray. §2.1
@@ -1731,20 +1811,48 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
  * "The back of the instrument": a full-height right tray over a dimmed —
  * never blurred — home that keeps polling behind it.
  *
- * It is a machined part, so it is built like one: an opaque --surface plane,
- * one hairline edge, one restrained floater shadow, and nothing else. No
- * glass, no gradient, no glow. The entrance and the exit are GSAP's
+ * It is a machined part, so it is built like one: an opaque plane, one
+ * hairline edge, one restrained floater shadow, and nothing else. No glass,
+ * no gradient, no glow. The entrance and the exit are GSAP's
  * (InspectorHost.tsx) — the pop keyframe this replaces could not be reversed,
- * which is why closing used to be a disappearance rather than a move. */
+ * which is why closing used to be a disappearance rather than a move.
+ *
+ * ── THE COUNTER-MATERIAL ─────────────────────────────────────────
+ * The tray is BLACK, and it is the only black surface in the launcher. That
+ * is the brand's own pairing (auracle-marketing/DESIGN.md: a cream page with
+ * full-bleed black bands), and it says the right thing here — opening an
+ * inspector is opening the machined back of an instrument whose face is
+ * daylight. The eight inspectors between them are the only depth surface
+ * that turns; the palette, the tutorial and the coachmark stay paper on
+ * cream, because they annotate the board rather than open it.
+ *
+ * HOW it turns is the point: this block re-points the TOKENS for the tray's
+ * subtree, and nothing inside it knows. Every inspector, card, row, chip,
+ * badge, banner, incident, log well and control below still reads --surface,
+ * --fg, --line, --ok/--warn/--err exactly as it did on the cream side; the
+ * values arrive black-ground-shaped because the tray declares them that way.
+ * That is what keeps §4.1's "no private colour maps in components" true
+ * across a two-ground product — a per-inspector `{bg, fg}` record would have
+ * been eight design systems, one per key.
+ *
+ * Three rules the re-point obeys:
+ *   1. Text on black is WHITE AT OPACITY STEPS (.9 / .55 / .4 — the brand's
+ *      own ramp), never a grey hex, so it composites the same over the
+ *      plane and over anything drawn on it.
+ *   2. The semantic hues keep their MEANING and change their CUT: the
+ *      bright green/amber/red that were unreadable on cream are exactly
+ *      right on black, so they come back here. Same states, same words.
+ *   3. --paper is NOT re-pointed. The QR tile has to stay white for a
+ *      scanner, and it lives in this subtree. */
 .insp-scrim {
   position: absolute;
   inset: 0;
-  /* §2.3: a scrim is a plain alpha fill at α.55. NO backdrop-filter — not
-     here, not anywhere in this app: WKWebView paints it as flat black over a
-     canvas layer, and the home behind this IS a canvas. Nothing needs blurring
-     to be unreadable through an opaque panel; the dim is for the parts of the
-     board the tray doesn't cover. */
-  background: rgba(0, 0, 0, 0.55);
+  /* §2.3: a scrim is a plain alpha fill, and there is exactly one — --scrim.
+     NO backdrop-filter, not here and not anywhere in this app: WKWebView
+     paints it as flat black over a canvas layer, and the home behind this IS
+     a canvas. Nothing needs blurring to be unreadable through an opaque
+     panel; the dim is for the parts of the board the tray doesn't cover. */
+  background: var(--scrim);
   z-index: 40;
 }
 /* The stage docks the tray to the right edge. It is click-through
@@ -1759,6 +1867,56 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   pointer-events: none;
 }
 .insp {
+  /* The counter-material, declared once for the whole subtree. Read the
+     block above this rule before changing a single value here. */
+  /* The tray body scrolls, and so do the log wells inside it. Without this
+     the UA would paint a light scrollbar on a black plane — the one piece
+     of this surface the stylesheet does not draw, drawn wrong. */
+  color-scheme: dark;
+  /* The plane is #000; a well inside it can only LIFT, so --bg (which every
+     log / changelog / diagnostics block reads as "one step off the plane")
+     goes a hair above it rather than below. Only the tokens the subtree
+     actually consumes are re-pointed — --bg-rail and --bg-elev have no
+     consumer inside a tray, and a token declared for nobody is the same
+     dead weight as a class with no TSX. */
+  --bg:          #0d0d0d;   /* wells inside the tray (logs, changelog, diag) */
+  --surface:     #000000;   /* the tray plane itself */
+  --surface-2:   rgba(255, 255, 255, 0.07);  /* hover / recessed control */
+  --surface-3:   rgba(255, 255, 255, 0.12);  /* pressed / neutral chip fill */
+  /* White at opacity steps, per the brand's black bands. --fg-faint is the
+     fourth step the launcher needs and the site does not: ticks, separators
+     and placeholders, present but never carrying a word. */
+  --fg:          rgba(255, 255, 255, 0.9);
+  --fg-dim:      rgba(255, 255, 255, 0.55);
+  --fg-muted:    rgba(255, 255, 255, 0.4);
+  --fg-faint:    rgba(255, 255, 255, 0.22);
+  /* Hairlines go back to white alphas here, for the reason they left the
+     cream side: on black a solid warm grey line is a stripe, an alpha is a
+     hairline. */
+  --line:        rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  /* --elev-card and --hairline-top are deliberately NOT re-pointed: nothing
+     floats above the plane inside a tray (the tray IS the elevation), and
+     the two rules that would have read them — `.insp .card` and its hover —
+     already flatten themselves to `box-shadow: none` a few lines below.
+     Re-pointing a shadow token to `none` would also have been a dormant
+     bug: `none` inside a comma-separated box-shadow list is invalid, and
+     the declaration it appears in is dropped whole. */
+  /* The accent's text tier: the raw accent reads at ≈9:1 on black, so the
+     burnt cream-side cut would be the unreadable one here. */
+  --accent-text: #ff9100;
+  --accent-soft: rgba(255, 145, 0, 0.18);
+  /* The semantic hues, in their bright cuts (rule 2 above). */
+  --ok:          #34d399;
+  --warn:        #fbbf24;
+  --err:         #f87171;
+  --ok-soft:     rgba(52, 211, 153, 0.14);
+  --ok-dim:      rgba(52, 211, 153, 0.32);
+  --warn-soft:   rgba(251, 191, 36, 0.14);
+  --warn-dim:    rgba(251, 191, 36, 0.32);
+  --err-soft:    rgba(248, 113, 113, 0.14);
+  --err-dim:     rgba(248, 113, 113, 0.32);
+
   position: relative;
   pointer-events: auto;
   width: 420px;
@@ -1766,12 +1924,20 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   display: flex;
   flex-direction: column;
   background: var(--surface);
+  /* LOAD-BEARING. Re-pointing --fg only changes the rules that READ it, and
+     `color` is inherited: without this line every element in the tray that
+     has no colour rule of its own — `<div>Engine</div>`, the pairing steps,
+     the account rows — would inherit the BODY's ink and render #232323 on
+     black, i.e. invisible. The cream side gets its default the same way, from
+     `html, body`. A scoped ground must set its own ink, not just its own
+     tokens. */
+  color: var(--fg);
   border-left: 1px solid var(--line-strong);
   /* Square on the window edge, --r-lg on the inner corner only (§2.3): the
      tray is flush with the chassis on three sides and finished on the one
      side that faces into the room. */
   border-radius: var(--r-lg) 0 0 var(--r-lg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--elev-floater);
   overflow: hidden;
 }
 /* §3.9: below 720px the tray becomes a 92% sheet rather than squeezing the
@@ -1916,9 +2082,10 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   position: fixed;
   inset: 0;
   z-index: 60;
-  /* §2.3: a scrim is a plain alpha fill at α.55. No backdrop-filter, here or
-     anywhere — WKWebView paints it black over the home's canvas. */
-  background: rgba(0, 0, 0, 0.55);
+  /* §2.3: a scrim is a plain alpha fill, and --scrim is the only one. No
+     backdrop-filter, here or anywhere — WKWebView paints it black over the
+     home's canvas. */
+  background: var(--scrim);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -1931,7 +2098,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   /* §2.3's radius ladder tops out at --r-lg; 12px was off it. */
   border-radius: var(--r-lg);
   /* The one floater shadow (§2.3) — the same one the tray wears. */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--elev-floater);
   overflow: hidden;
 }
 .cmdk__input {
@@ -1985,7 +2152,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 }
 /* §3.5: the selected row is --surface-2 with an inset 1px --accent hairline —
    the focus law, drawn on the row itself. The title stays --fg: the hairline is
-   already one of the screen's three permitted blues (§2.1), and tinting the
+   already one of the screen's three permitted accents (§2.1), and tinting the
    words as well would spend a second one saying the same thing. */
 .cmdk__item.sel {
   background: var(--surface-2);
@@ -2150,7 +2317,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 .belt__station:hover .belt__label,
 .belt__station:hover .belt__count { color: var(--fg); }
 .belt__station:focus-visible {
-  outline: 2px solid var(--accent-dim);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
@@ -2175,7 +2342,7 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   z-index: 70;
   /* §2.3's one scrim. It dims the bands without hiding them — this overlay
      exists to point at them, so they have to stay readable underneath. */
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--scrim);
 }
 /* One overlay at a time. Both of these auto-show once on a first run, and the
  * tour is a window-level modal that lands straight on top of the callouts —
@@ -2376,15 +2543,16 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   Home (Standby) — the same chamber as the sign-in screen: the charcoal
-   floor with the ambient dot-field behind the chrome. Scoped to
-   .shell-standby so the rest of the app keeps the charcoal system.
+   Home (Standby) — the same chamber as the sign-in screen: the cream floor
+   with the ambient dot-field behind the chrome. Scoped to .shell-standby,
+   though there is no longer a second system for it to differ from: the
+   whole product stands on one ground, and the only counter-material is the
+   tray.
 
-   The floor was #000 — the last hex left over from the WebGL era, when the
-   shader needed pure black behind it to composite against. §2.1's canvas
-   ladder starts at --bg, and the dot-field is ink on charcoal like every
-   other surface, so the home now stands on the same floor as the rest of
-   the product (slice 3 flagged this as slice 5's to move).
+   This floor has been three things — pure black (the WebGL era, when a
+   shader needed black to composite against), charcoal (§2.1's canvas
+   ladder), and now cream. Each time the rule was the same: the home stands
+   on --bg, whatever --bg is, and the dot-field is ink on it.
    ────────────────────────────────────────────────────────────────── */
 .shell-standby {
   position: relative;
@@ -2405,10 +2573,10 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
 /* Transparent chrome so the shader reads through the whole surface. */
 .shell-standby .topbar {
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line);
 }
 .shell-standby .topbar__btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-2);
 }
 .shell-standby .standby-stage {
   background: transparent;
@@ -2424,18 +2592,17 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   margin: 0;
 }
 /* The verb takes the accent from the base .standby__actuator rule
-   (background: var(--accent); color: var(--accent-ink)) — Nous-blue with a
-   white label, the same primary as every other surface. This screen used to
-   force a white pill by hand, which made the launcher's own front door the
-   one place in the product that wasn't on brand. Its disabled treatment used
-   to be re-specified here in raw white alpha for the black chamber; on the
-   charcoal floor the base rule's --surface-2 + hairline is exactly §3.3's
-   spec, so the override is gone with the black. */
+   (background: var(--accent); color: var(--accent-ink)) — orange with an ink
+   label, the same primary as every other surface, and the one place on the
+   home the accent is spent. This screen used to force a white pill by hand,
+   which made the launcher's own front door the one place in the product
+   that wasn't on brand; there is no override here now, deliberately. */
 
 /* ── Pair a phone (M5) ────────────────────────────────────────────────
-   QR scanners want dark modules on a light field, so the tile is the one
-   deliberately-light surface in the app — a functional exception, not
-   decoration. */
+   QR scanners want dark modules on a light field, so the tile is --paper on
+   every ground — a functional exception, not decoration. It matters more
+   now than it did on charcoal: this tile lives inside the tray, which is
+   black, and it is the one thing in there that does not turn with it. */
 .pair-qr-wrap {
   display: flex;
   gap: 16px;
@@ -2443,7 +2610,7 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   flex-wrap: wrap;
 }
 .pair-qr-tile {
-  background: #fff;
+  background: var(--paper);
   border-radius: 10px;
   padding: 10px;
   line-height: 0;

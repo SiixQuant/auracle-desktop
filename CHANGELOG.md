@@ -4,6 +4,16 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.10.0]
+
+The instrument turns to daylight.
+
+### Changed
+- **A new material, not a new instrument.** The launcher now stands on the brand's cream ground in ink, with a single orange for the one action a screen is asking you to take. The orrery, the verdict, the ledger, the first-run sequence and every panel are exactly where they were and say exactly what they said — this is a change of finish, not of behaviour.
+- **The panels are the back of the instrument, and they look it.** Supervision, Updates and the rest now open as a black tray against the daylight home: the machined side of the same object.
+- **New type throughout.** One sans and one mono, bundled with the app and loading with no network at all, replacing the previous three faces. The verdict line is now set in the same face as everything else, one weight up.
+- **Health colours still mean what they meant.** Green is healthy, amber is degraded, red is down — on both the light and the dark side of the app, each in the shade that is actually readable there. Status is never drawn in the brand colour, and the keyboard focus ring is now one visible, consistent outline everywhere.
+
 ### Fixed
 - Sign-in no longer waits for something that can't happen. With the engine stopped, the sign-in screen says so and names your next move instead of opening a browser page that can't load and waiting on it; the moment the engine answers, the normal sign-in comes back.
 

@@ -2,8 +2,8 @@
 //
 // Design authority: launcher-redesign-direction.md §3.6 ("Tutorial") — the five
 // steps keep their order and their one interactive embed, and the card becomes
-// an "orientation card" at the foot of the chamber: mono step label, display-
-// serif title, and the dots redrawn as station ticks on a hairline. Slice 7 of
+// an "orientation card" at the foot of the chamber: mono step label, display
+// title, and the dots redrawn as station ticks on a hairline. Slice 7 of
 // the redesign.
 //
 // A handful of steps, no jargon. Shown once after install (gated on a

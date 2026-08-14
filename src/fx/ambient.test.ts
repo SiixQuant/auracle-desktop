@@ -161,8 +161,13 @@ test("the lattice is centred in its box", () => {
 // ── The ink ramp (§2.1) ───────────────────────────────────────────
 
 test("the whisper-dim alphas are the ones the design doc specifies", () => {
-  assert.equal(STAGE_INK_FALLBACK.base.a, 0.05);
-  assert.equal(STAGE_INK_FALLBACK.near.a, 0.09);
+  // Cream ground (v0.10.0): the field is INK now, and dark dots on a bright
+  // ground carry further than light dots on a dark one at the same alpha, so
+  // the pair came down to hold the same whisper. Must stay in step with
+  // --stage-dot / --stage-dot-near in app.css and with DESIGN.md §2.1.
+  assert.equal(STAGE_INK_FALLBACK.base.a, 0.04);
+  assert.equal(STAGE_INK_FALLBACK.near.a, 0.075);
+  assert.equal(STAGE_INK_FALLBACK.base.r, 35, "the field is ink, not chrome");
   assert.equal(FIELD.focusRadius, 240);
 });
 
