@@ -1,11 +1,14 @@
 // Settings cards — the launcher's control-plane controls.
 //
 // "The Standby" home dissolves the old Settings PAGE into right-docked
-// inspectors reached by pressing the status they govern (status-is-the-
-// door) or the top-bar gear/agent. This module is now the shared library
-// of those cards; the InspectorHost composes them into inspectors. There
-// is no Settings page anymore — you fix a thing by pressing the thing
-// that told you it's wrong.
+// inspectors reached from the nav pill or by pressing the status they govern
+// (status-is-the-door). This module is the shared library of those cards; the
+// InspectorHost composes them into inspectors. There is no Settings page
+// anymore — you fix a thing by pressing the thing that told you it's wrong.
+//
+// Where each card is composed today: LicenseCard + GithubCard in the Account
+// tray (they are identity), GeneralCard + AdvancedDrawer in Settings,
+// IntelligenceCard in its own ⌘K-reachable tray.
 //
 // HONESTY laws (carried over verbatim): configured-flags come from the
 // engine; saving a key shows "Saved", never "connected"; a Test gates
@@ -25,19 +28,14 @@ import {
   agentIdFromEngineProvider,
   buildAiModelPatch,
 } from "@/lib/intelligence";
-import { waitForEngineHealthy } from "@/lib/onboarding";
 import { useSettings } from "@/lib/settings";
 import {
   cmd,
   needsOwnerSetup,
-  onEvent,
   openInBrowser,
   type DockerStatus,
   type HealthSnapshot,
-  type IdeUpdateInfo,
-  type IdeUpdateProgressEvent,
   type PreflightReport,
-  type UpdateInfo,
 } from "@/lib/tauri";
 
 // ── License ──────────────────────────────────────────────────────
@@ -317,358 +315,23 @@ function PrefToggle({
   );
 }
 
-// ── Update Auracle — one action for the whole stack ─────────────────
+// ── Updating ────────────────────────────────────────────────────
 //
-// The hub's Updates home. A SINGLE "Update Auracle" button brings every
-// piece of the local stack current in one pass: the trading-engine images,
-// the Auracle IDE, and the launcher itself (applied LAST, because the
-// launcher self-update restarts the app). The rows beneath are read-only
-// status — the one button drives all of them, so the panel never shows more
-// than one update control.
-
-type StepState = "run" | "done" | "skip" | "fail";
-
-export function UpdatesInspector() {
-  const [loading, setLoading] = useState(true);
-  const [unavailable, setUnavailable] = useState(false);
-  const [engineInstalled, setEngineInstalled] = useState<boolean | null>(null);
-  const [docker, setDocker] = useState<DockerStatus | null | "error">(null);
-  const [launcherVersion, setLauncherVersion] = useState("?");
-  const [launcher, setLauncher] = useState<UpdateInfo | null>(null);
-  const [ide, setIde] = useState<IdeUpdateInfo | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [steps, setSteps] = useState<{ label: string; state: StepState }[]>([]);
-  const [result, setResult] = useState("");
-  const [resultErr, setResultErr] = useState(false);
-  // Armed consent banner: the pending pass would replace the IDE bundle
-  // while the IDE is OPEN, so it may only proceed once the user okays
-  // closing (and reopening) it. See startUpdate.
-  const [ideConsent, setIdeConsent] = useState(false);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    const [inst, dock, ver, lInfo, iInfo] = await Promise.all([
-      cmd.isInstalled().catch(() => null),
-      cmd.dockerStatus().catch(() => "error" as const),
-      cmd.currentVersion().catch(() => "?"),
-      cmd.checkForUpdate().catch(() => null),
-      cmd.ideCheckUpdate().catch(() => null),
-    ]);
-    setEngineInstalled(inst);
-    setDocker(dock);
-    setLauncherVersion(ver);
-    setLauncher(lInfo);
-    setIde(iInfo);
-    // Every probe failing means there's no Tauri backend — we're running
-    // outside the launcher. Say so plainly instead of faking status.
-    setUnavailable(
-      inst === null && lInfo === null && iInfo === null && dock === "error",
-    );
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const dockerReady =
-    docker !== null && docker !== "error" && docker.installed && docker.running;
-  const launcherUpdate = !!launcher?.available && !!launcher.version;
-  const ideUpdate =
-    !!ide?.update_available && !!ide.asset_url && !ide.unsupported_platform;
-  const engineNeedsInstall = engineInstalled === false;
-  const updateAvailable = launcherUpdate || ideUpdate || engineNeedsInstall;
-
-  // `quitIde` is the user's consent (gathered by startUpdate's banner)
-  // for the IDE step to close a running IDE right before the bundle
-  // swap and reopen it after. It is never inferred — only the banner's
-  // explicit confirm passes true.
-  const updateAll = useCallback(async (quitIde: boolean) => {
-    setBusy(true);
-    setResult("");
-    setResultErr(false);
-    const log: { label: string; state: StepState }[] = [];
-    const failures: string[] = [];
-    const add = (label: string): number => {
-      log.push({ label, state: "run" });
-      setSteps([...log]);
-      return log.length - 1;
-    };
-    const mark = (i: number, state: StepState) => {
-      log[i].state = state;
-      setSteps([...log]);
-    };
-    // Run one step independently. A failure is recorded and surfaced, but it
-    // never aborts the rest — so a flaky engine pull (e.g. an older launcher's
-    // Docker-PATH bug) can't block the launcher self-update that ships the very
-    // fix for it. Each piece gets as current as it can in a single pass.
-    const step = async (label: string, fn: () => Promise<unknown>) => {
-      const i = add(label);
-      try {
-        await fn();
-        mark(i, "done");
-      } catch (err) {
-        mark(i, "fail");
-        failures.push(`${label.toLowerCase()} (${String(err)})`);
-      }
-    };
-    try {
-      // 1. Trading-engine images (need Docker).
-      if (!dockerReady) {
-        mark(add("Trading engine — Docker not running"), "skip");
-      } else if (engineInstalled === false) {
-        await step("Installing the trading engine", async () => {
-          await cmd.runFirstInstall();
-          await waitForEngineHealthy(() => cmd.healthcheckNow()).catch(
-            () => false,
-          );
-        });
-      } else if (engineInstalled === true) {
-        // The engine was already installed and running. A failed image refresh
-        // (no newer images, a registry hiccup) does NOT take a running engine
-        // down — so don't alarm with a red error. Only treat it as a real
-        // failure if the engine actually stopped serving; otherwise report it
-        // calmly: nothing is broken.
-        const i = add("Updating the trading engine");
-        try {
-          await cmd.stackPullUpdate();
-          mark(i, "done");
-        } catch (err) {
-          const stillUp = await waitForEngineHealthy(
-            () => cmd.healthcheckNow(),
-            { attempts: 1 },
-          ).catch(() => false);
-          if (stillUp) {
-            log[i].label = "Trading engine — running on the current version";
-            mark(i, "skip");
-          } else {
-            mark(i, "fail");
-            failures.push(`trading engine (${String(err)})`);
-          }
-        }
-      }
-      // 2. Auracle IDE. The Rust side streams `ide-update-progress`
-      // while the .dmg downloads/installs — surface it live on the row
-      // so a multi-minute download never looks hung.
-      if (ideUpdate && ide) {
-        const i = add("Updating the Auracle IDE");
-        let unlisten: (() => void) | undefined;
-        try {
-          unlisten = await onEvent<IdeUpdateProgressEvent>(
-            "ide-update-progress",
-            (p) => {
-              const pct =
-                p.percent > 0 && p.percent < 100
-                  ? ` (${Math.round(p.percent)}%)`
-                  : "";
-              log[i].label = `Updating the Auracle IDE — ${p.message}${pct}`;
-              setSteps([...log]);
-            },
-          );
-          await cmd.ideDownloadAndInstall(
-            ide.asset_url as string,
-            ide.asset_size ?? null,
-            ide.latest_version ?? "",
-            quitIde,
-          );
-          log[i].label = "Updating the Auracle IDE";
-          mark(i, "done");
-        } catch (err) {
-          mark(i, "fail");
-          failures.push(`updating the auracle ide (${String(err)})`);
-        } finally {
-          unlisten?.();
-        }
-      }
-      // 3. Launcher — LAST, and ALWAYS attempted even if an earlier step
-      //    failed: installing it restarts the app, and it's what delivers fixes
-      //    to those earlier steps. The restart races the IPC close, so a
-      //    connection-dropped error here is the expected success path.
-      if (launcherUpdate) {
-        const i = add("Updating the launcher — restarting");
-        try {
-          await cmd.installUpdate();
-          mark(i, "done");
-          setResult("Restarting on the new version.");
-          return;
-        } catch (err) {
-          const msg = String(err);
-          if (/closed|connection|communicating|reset/i.test(msg)) {
-            mark(i, "done");
-            setResult("Restarting on the new version.");
-            return;
-          }
-          mark(i, "fail");
-          failures.push(`launcher (${msg})`);
-        }
-      }
-      await refresh();
-      if (failures.length > 0) {
-        setResultErr(true);
-        setResult("Some updates couldn't finish — " + failures.join("; "));
-      } else {
-        setResult(
-          log.some((s) => s.state === "done")
-            ? "Auracle is up to date."
-            : "Already up to date.",
-        );
-      }
-    } finally {
-      setBusy(false);
-    }
-  }, [docker, dockerReady, engineInstalled, ide, ideUpdate, launcherUpdate, refresh]);
-
-  // The IDE step replaces the app bundle in /Applications — never under
-  // a live process. If the IDE is open right now, arm an explicit
-  // consent banner instead of starting; the pass runs with quit consent
-  // only from the banner's confirm. (The Rust side re-checks at swap
-  // time regardless, so a race here fails that step honestly instead of
-  // swapping under a running IDE.)
-  const startUpdate = useCallback(async () => {
-    if (ideUpdate && (await cmd.ideRunning().catch(() => false))) {
-      setIdeConsent(true);
-      return;
-    }
-    await updateAll(false);
-  }, [ideUpdate, updateAll]);
-
-  return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">Update Auracle</span>
-        {!loading &&
-          !unavailable &&
-          (updateAvailable ? (
-            <span className="chip warn">update available</span>
-          ) : (
-            <span className="chip ok">up to date</span>
-          ))}
-      </div>
-
-      {unavailable ? (
-        <div className="muted fs-xs">
-          Updates are managed by the launcher. Open Auracle from the launcher
-          app to check for and install updates.
-        </div>
-      ) : (
-        <>
-          <div className="muted fs-xs mb-2">
-            One action brings the whole stack current — trading engine, IDE,
-            and launcher.
-          </div>
-
-          <button
-            type="button"
-            className="primary btn-block"
-            disabled={loading || busy || ideConsent}
-            onClick={() => void startUpdate()}
-          >
-            {busy ? "Updating…" : loading ? "Checking…" : "Update Auracle"}
-          </button>
-
-          {ideConsent && (
-            <div className="banner warn hstack mt-2">
-              <span style={{ flex: 1 }}>
-                <strong>The Auracle IDE is open.</strong> Updating closes it,
-                installs the new version, then reopens it.
-              </span>
-              <button
-                type="button"
-                className="ghost danger btn-sm"
-                onClick={() => {
-                  setIdeConsent(false);
-                  void updateAll(true);
-                }}
-              >
-                Close IDE &amp; update
-              </button>
-              <button
-                type="button"
-                className="ghost btn-sm"
-                onClick={() => setIdeConsent(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {steps.length > 0 && (
-            <div className="mt-2">
-              {steps.map((s, i) => (
-                <div key={i} className="row fs-xs">
-                  <span className="muted">{s.label}</span>
-                  <span
-                    className={s.state === "fail" ? "err-text" : "muted mono"}
-                  >
-                    {s.state === "run"
-                      ? "…"
-                      : s.state === "done"
-                        ? "done"
-                        : s.state === "fail"
-                          ? "failed"
-                          : "skipped"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          {result && (
-            <div className={resultErr ? "err-text fs-xs mt-2" : "muted fs-xs mt-2"}>
-              {result}
-            </div>
-          )}
-
-          <div className="mt-4">
-            <div className="row">
-              <span>Trading engine</span>
-              <span className={`chip ${engineInstalled ? "ok" : "neutral"}`}>
-                {engineInstalled === null
-                  ? "checking"
-                  : engineInstalled
-                    ? "installed"
-                    : "will install"}
-              </span>
-            </div>
-            <div className="row">
-              <span>Docker</span>
-              <DockerChip status={docker} />
-            </div>
-            <div className="row">
-              <span className="hstack">
-                <span>Launcher</span>
-                <span className="muted mono fs-xs">v{launcherVersion}</span>
-              </span>
-              {launcherUpdate ? (
-                <span className="chip warn">v{launcher!.version}</span>
-              ) : (
-                <span className="chip ok">current</span>
-              )}
-            </div>
-            <div className="row">
-              <span className="hstack">
-                <span>Auracle IDE</span>
-                <span className="muted mono fs-xs">
-                  {ide?.installed
-                    ? ide.version_tracked
-                      ? `v${ide.installed_version}`
-                      : "installed"
-                    : "not installed"}
-                </span>
-              </span>
-              {ideUpdate ? (
-                <span className="chip warn">
-                  {ide?.installed ? `v${ide.latest_version}` : "install"}
-                </span>
-              ) : ide?.installed ? (
-                <span className="chip ok">current</span>
-              ) : null}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+// There is no update control here, and there is none anywhere else in the
+// launcher. Auracle installs its own updates: the launcher self-updates on a
+// weekly check (src-tauri/src/commands/scheduled_update.rs) and restarts on the
+// new version, and `useEngineState` still runs `check_for_update` on load so
+// the Status tray's version ladder can say which rung the machine is on.
+//
+// What was deleted is the "Update Auracle" surface — one button that pulled the
+// engine images, swapped the IDE bundle and installed the launcher in a single
+// pass, with a step log and an IDE-quit consent banner. It was the launcher's
+// most-used dead end: an action the customer had to remember to take for a
+// product that had already decided to take it for them. The Rust commands it
+// drove (`install_update`, `ide_download_and_install`, `ide_running`,
+// `stack_pull_update`) are untouched and still registered; the stack's own
+// `Pull update` verb lives on in the Status tray's Stack card, where it is an
+// operator's supervision control rather than a customer's update chore.
 
 /** Glance tier: the chip that lives in the Docker row's right cell. The
  *  full incident readout + retry lives in the Advanced drawer. */
