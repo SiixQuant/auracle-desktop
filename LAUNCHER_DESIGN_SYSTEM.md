@@ -7,11 +7,17 @@ first**. This file answers "which shape do I reach for?".
 
 Concept: **The Orrery**. Everything below is what shipped.
 
+> **v0.10.0 re-materialed this inventory; it did not change it.** Every
+> component, rule and anti-pattern below is the one that shipped in v0.9.0.
+> What moved is the palette and the type they are drawn in — see `DESIGN.md
+> §2.1/§2.2`, and `auracle-marketing/DESIGN.md` for the brand authority behind
+> those values.
+
 > **Retired.** `.launch-card` and the launch grid · the left `.rail` and
 > `.nav-item` tabs · `.hero` · `.kpi` tiles · `.tiles`/`.tile` ·
-> `.section-head` / `.pane-head` · emerald as an accent · the white accent · the
-> Lamp. These were deleted, not deprecated. If you find one referenced, it is
-> drift.
+> `.section-head` / `.pane-head` · Nous-blue as the accent · emerald as an
+> accent · the white accent · the Lamp. These were deleted, not deprecated. If
+> you find one referenced, it is drift.
 
 ---
 
@@ -22,19 +28,27 @@ Values and rationale live in `src/styles/app.css :root`; the table is in
 
 | Group | Tokens |
 |---|---|
-| Canvas / surfaces | `--bg` · `--bg-rail` · `--bg-elev` · `--surface` / `-2` / `-3` |
-| Text | `--fg` · `--fg-dim` · `--fg-muted` · `--fg-faint` |
-| Lines | `--line` α.08 · `--line-strong` α.14 |
-| Accent (brand only) | `--accent #0053fd` · `--accent-2` · `--accent-soft` · `--accent-dim` · `--accent-text #7aa2ff` · `--accent-ink` |
+| Canvas / surfaces | `--bg` cream · `--bg-rail` · `--bg-elev` · `--surface` / `-2` / `-3` · `--paper` |
+| Text | `--fg` ink · `--fg-dim` · `--fg-muted` warm grey · `--fg-faint` |
+| Lines | `--line #dedede` · `--line-strong #c9c6bf` |
+| Accent (brand only) | `--accent #ff9100` · `--accent-2` · `--accent-soft` · `--accent-dim` · `--accent-text #a04e00` · `--accent-ink` ink |
 | Status | `--ok` · `--warn` · `--err` (+ `-soft` α.12 / `-dim` α.30) |
+| Depth | `--elev-card` · `--hairline-top` · `--elev-floater` · `--scrim` |
 | Geometry | radii 6/8/10/pill · spacing 4→32 · type 11/13/14/16/18/24 + `--t-verdict` / `--t-station` |
-| Fonts | `--font-display` Fraunces · `--font-sans` Inter · `--font-mono` JetBrains Mono |
+| Fonts | `--font-sans` Geist Sans · `--font-mono` Geist Mono · `--font-display` → `--font-sans` at `--fw-display` 500 |
 
 **Tint rule:** soft fills are the token at a fixed alpha — `.12` for
 chips/badges, `.08` for banners — never a different hue.
 
-**Accent rule:** `--accent` is brand, never status. Blue text always takes
-`--accent-text`. At most three blue elements per screen.
+**Accent rule:** `--accent` is brand, never status. Orange text always takes
+`--accent-text`. At most three accent elements per screen. The focus ring is
+2px solid `--accent`, everywhere.
+
+**Two grounds, one set of names.** The tray (`.insp`) re-points these tokens
+to the black counter-material for its own subtree. Components never learn
+which ground they are on: they name the token, the ground supplies the value.
+If you find yourself writing a `{light, dark}` record in a component, the
+answer is a scoped token re-point, not a second palette (§4.1).
 
 ---
 
@@ -44,7 +58,7 @@ chips/badges, `.08` for banners — never a different hue.
 |---|---|---|
 | `.card` + `.row` | Content blocks inside a tray; rows auto-divide | nesting cards in cards |
 | `.card-head` (+`--action-only`) | A block's own title/badge line | repeating the tray's own title (the tray **is** the container) |
-| `.standby__actuator` | **The one verb.** Exactly one per screen, Nous-blue fill, `--accent-ink` label | two primaries; any secondary action |
+| `.standby__actuator` | **The one verb.** Exactly one per screen, `--accent` fill, `--accent-ink` label | two primaries; any secondary action |
 | `button.ghost` (+`.danger`) | Every secondary/destructive action | primary-styled destructive acts |
 | `.chip` `ok/warn/err/neutral` | Mono/uppercase machine states (container health, tier, docker state) | free-form colours; new hues |
 | `.badge` `ok/warn/err` | Sentence-case status words in prose | machine-state words (use a chip) |
@@ -78,12 +92,12 @@ you are inventing a third shape, use `IncidentCard`.
 | Surface | Shape |
 |---|---|
 | **Home** | Three bands: instrument (`minmax(0,55%)`), verdict + one verb, ledger. Ambient dot-field behind. |
-| **Tray** (8 inspectors) | Full-height right dock, 420px (or a 92%-width sheet under 720px), opaque `--surface`, 1px `--line-strong` left edge. Header = mono-uppercase title + `esc` keycap. One at a time; home keeps polling behind it. Motion: x +16→0, 240ms `aur-mech`; scrim to α.55. Home dims, never blurs. |
-| **⌘K palette** | Centred, top third, 560px, `--bg-elev`. Mono input, `live-sourced` tag, mono-uppercase group labels. Selected row = `--surface-2` + inset 1px `--accent`. Destructive rows carry a `live` tag; double-Enter arms. Footer states the honesty rule. |
+| **Tray** (8 inspectors) | Full-height right dock, 420px (or a 92%-width sheet under 720px), the **black** counter-material, 1px `--line-strong` left edge. Header = mono-uppercase title + `esc` keycap. One at a time; home keeps polling behind it. Motion: x +16→0, 240ms `aur-mech`; scrim to `--scrim`. Home dims, never blurs. |
+| **⌘K palette** | Centred, top third, 560px, `--bg-elev` (paper on cream — it annotates the board, so it does not take the tray's black). Mono input, `live-sourced` tag, mono-uppercase group labels. Selected row = `--surface-2` + inset 1px `--accent`. Destructive rows carry a `live` tag; double-Enter arms. Footer states the honesty rule. |
 | **Tutorial** | Orientation card, bottom-centre: mono step label, display-serif title, station ticks on a hairline. |
 | **Coachmark** | Three sequential hairline callouts pointing at the real bands — instrument → verb → ledger. Anchors are deterministic because the bands are fixed. |
 | **Commissioning** | Left hairline spine with three stations (Environment · Sign in · Install), right station content, the instrument above. |
-| **Sign-in** | Ambient field, 64px glyph, display-serif welcome, one white Google pill (the single intentionally non-charcoal control — the Google affordance is a trust signal). |
+| **Sign-in** | Ambient field, 64px glyph, display welcome, one white Google pill on a hairline (the mark is reproduced as its owner draws it — the Google affordance is a trust signal). |
 
 The eight inspector keys are `supervision · updates · system · intelligence ·
 changelog · help · lifecycle · pair`. Adding a ninth means adding a key to
@@ -119,7 +133,7 @@ one idea.
 
 ## 5. Contribution checklist
 
-- [ ] Colours: tokens/variants only. `grep -rnE '#[0-9a-fA-F]{3,8}' src/views src/components --include='*.tsx'` returns **only** the four `fill=` values of the Google "G" mark (a third-party logo reproduced exactly, in `Onboarding.tsx` and `ui/sign-in-flow-1.tsx`). Any other hit is drift.
+- [ ] Colours: tokens/variants only. `grep -rnE '#[0-9a-fA-F]{3,8}' src/views src/components --include='*.tsx'` returns **only** the four `fill=` values of the Google "G" mark (a third-party logo reproduced exactly, in `Onboarding.tsx` and `ui/sign-in-flow-1.tsx`). Any other hit is drift. The sign-in's Tailwind utilities count: they name tokens (`text-[var(--fg)]`), never colours.
 - [ ] Status maps to `ok`/`warn`/`err`/`neutral`; faults render as `IncidentCard` or an inline line.
 - [ ] Motion imports `EASE`/`DUR` from `src/fx/motion.ts`; no raw milliseconds, no second library, no new `@keyframes`.
 - [ ] Any raw `gsap` loop holds its tween in a ref and pauses/resumes it from an effect with `reduced` in the deps.

@@ -1,20 +1,32 @@
 # DESIGN.md — Auracle Desktop
 
 The visual and behavioural system of the launcher, **as built**. Concept: **The
-Orrery**. Design authority: `launcher-redesign-direction.md` (external); this
-file is the record of what actually landed, including where the build
-deliberately departed from that document and why.
+Orrery**. Design authority: `launcher-redesign-direction.md` (external) for the
+composition and the laws; **`auracle-marketing/DESIGN.md` ("The Ledger") for the
+materials** — that file is the brand authority for the palette and the type on
+both the site and this launcher, and it is what v0.10.0 re-materialed against.
+This file is the record of what actually landed, including where the build
+deliberately departed from those documents and why.
 
 Single source of truth for values is `src/styles/app.css :root` — every token
 there carries its own rationale in a comment. This file is the map and the law;
 the stylesheet is the values.
 
-> **Retired vocabulary.** Three things appear in older commits, comments and
-> screenshots and are *gone*: **emerald as a brand colour** (green now means
-> health and only health — `--ok`), **the white accent** (a white "accent" is
-> not an accent, it is ink), and **the Lamp** (the 108px status orb the
-> instrument replaced). If you find any of them in a doc or a class name, it is
-> drift — delete it.
+> **v0.10.0 — "the cream Orrery".** The ground turned from charcoal to cream,
+> the tray to black, the accent from Nous-blue to orange, and the type from
+> Fraunces/Inter/JetBrains Mono to Geist Sans + Geist Mono. **That is the whole
+> change.** The composition (three bands, the tray, the palette), the motion
+> vocabulary (§2.4), the power law (§3), the honesty laws (§4) and the
+> reduced-motion kill switch (§5) are byte-for-byte the system they were. If
+> you are reading this file for behaviour, nothing below §2 moved.
+
+> **Retired vocabulary.** Four things appear in older commits, comments and
+> screenshots and are *gone*: **Nous-blue as the accent** (v0.10.0 — the accent
+> is orange, and blue means nothing here now), **emerald as a brand colour**
+> (green means health and only health — `--ok`), **the white accent** (a white
+> "accent" is not an accent, it is ink), and **the Lamp** (the 108px status orb
+> the instrument replaced). If you find any of them in a doc or a class name,
+> it is drift — delete it.
 
 ---
 
@@ -31,9 +43,10 @@ unmistakable and calm.
 
 The resting state of the instrument — core plus two chrome dots — reproduces the
 logo. Opening the launcher on a stopped machine shows the mark, at rest. Opening
-Supervision is opening the back of the instrument.
+Supervision is opening the back of the instrument — and since v0.10.0 the back
+is *black*, the brand's counter-material, behind a face made of daylight.
 
-The window is three fixed bands on one charcoal chamber:
+The window is three fixed bands on one cream chamber:
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -42,16 +55,18 @@ The window is three fixed bands on one charcoal chamber:
 │                THE INSTRUMENT                │  orbit stage, minmax(0,55%)
 │           (orrery: core + bodies)            │  ambient dot-field behind
 │                                              │
-│            Everything's ready.               │  THE VERDICT (display serif)
-│              [ Open workspace ]              │  one Nous-blue verb
+│            Everything's ready.               │  THE VERDICT (display)
+│              [ Open workspace ]              │  one orange verb
 │                                              │
 │ engine Healthy · v0.8.37 · What's new · Help │  THE LEDGER (mono meta row)
 └──────────────────────────────────────────────┘
 ```
 
 Depth surfaces — the inspector tray, the ⌘K palette, the tutorial and coachmark
-— are machined parts of the same instrument: opaque charcoal planes, hairline
-edges. No glass, no glow, no `backdrop-filter` anywhere.
+— are machined parts of the same instrument: opaque planes, hairline edges. No
+glass, no glow, no `backdrop-filter` anywhere. The **tray** is the one that
+turns black; the palette, tutorial and coachmark stay paper on cream, because
+they annotate the board rather than open its back.
 
 ---
 
@@ -59,30 +74,56 @@ edges. No glass, no glow, no `backdrop-filter` anywhere.
 
 ### 2.1 Colour
 
-The launcher adds no hue. It subtracts. Full values and rationale live in
-`app.css :root`.
+The launcher adds no hue. It subtracts. Values come from the brand authority
+(`auracle-marketing/DESIGN.md`); full rationale lives in `app.css :root`.
+
+**The ground — cream.**
 
 | Group | Tokens |
 |---|---|
-| Canvas ladder | `--bg #0b0c0e` · `--bg-rail #08090b` · `--bg-elev #181b20` |
-| Surfaces | `--surface #131519` · `--surface-2 #1b1e23` (hover) · `--surface-3 #23272d` (pressed) |
-| Text ramp | `--fg #e6edf3` · `--fg-dim #9da7b3` · `--fg-muted #7c8694` · `--fg-faint #3a4049` |
-| Lines | `--line` white α.08 · `--line-strong` white α.14 |
-| Accent | `--accent #0053fd` · `--accent-2 #0042cc` · `--accent-soft` α.16 · `--accent-dim` · `--accent-text #7aa2ff` · `--accent-ink #fff` |
-| Status | `--ok #34d399` · `--warn #fbbf24` · `--err #f87171` (+ `-soft` α.12 / `-dim` α.30) |
-| Elevation | `--elev-card 0 1px 2px rgba(0,0,0,.45)` + `--hairline-top` — nothing more |
-| Ambient | `--stage-dot` α.05 · `--stage-dot-near` α.09 |
+| Canvas ladder | `--bg #f1eee7` (cream) · `--bg-rail #eae6dd` · `--bg-elev #ffffff` |
+| Surfaces | `--surface #ffffff` (paper) · `--surface-2 #eae6dd` (hover/well) · `--surface-3 #e0dbd0` (pressed) |
+| Paper | `--paper #ffffff` — white *because a function needs white* (QR tile, Google pill). Never re-pointed, not even by the tray |
+| Text ramp | `--fg #232323` (ink) · `--fg-dim #45443f` · `--fg-muted #5b5a56` (warm grey) · `--fg-faint #a8a49b` |
+| Lines | `--line #dedede` · `--line-strong #c9c6bf` |
+| Accent | `--accent #ff9100` · `--accent-2 #e07e00` · `--accent-soft` α.14 · `--accent-dim` α.55 · `--accent-text #a04e00` · `--accent-ink #232323` |
+| Status | `--ok #15703a` · `--warn #8a5b00` · `--err #cf222e` (+ `-soft` α.12 / `-dim` α.30) |
+| Elevation | `--elev-card 0 1px 2px rgba(35,35,35,.07)` + `--hairline-top` + `--elev-floater` — nothing more |
+| Scrim | `--scrim rgba(35,35,35,.38)` — the one dim value in the app |
+| Ambient | `--stage-dot` ink α.04 · `--stage-dot-near` ink α.075 |
 | Instrument | `--orbit-ring: var(--line-strong)` · `--orbit-body: var(--fg-dim)` |
 
-**Three laws, all enforced by the token names themselves:**
+**The counter-material — the tray, and only the tray.** `.insp` re-points the
+tokens above for its own subtree, so every inspector, card, chip and control
+inside it keeps reading `--surface` / `--fg` / `--line` and gets the black
+treatment for free. There are no per-component colour maps (§9).
 
-1. **Blue is brand, never status.** Never point `--ok`/`--warn`/`--err` at
-   `--accent`. A blue health dot conveys nothing.
-2. **Contrast is a token choice, not a judgement call.** `#0053fd` on `--bg` is
-   ≈3.4:1 — fills, borders and graphics only. Blue *text* always takes
-   `--accent-text` (≈7:1). White on filled accent is ≈5.7:1.
-3. **Blue lands at most three times per screen** (the one verb, one live
-   signal, the focus ring) and never fills a region.
+| Group | Inside `.insp` |
+|---|---|
+| Plane / wells | `--surface #000` · `--bg #0d0d0d` (a well can only lift off black) |
+| Steps | `--surface-2` white α.07 · `--surface-3` white α.12 |
+| Text ramp | white at **α.9 / .55 / .4** (`--fg` / `--fg-dim` / `--fg-muted`) + `--fg-faint` α.22 |
+| Lines | white α.12 / α.22 (on black a solid grey line is a stripe) |
+| Accent | `--accent-text #ff9100` — the raw accent reads ≈9:1 here |
+| Status | the bright cuts: `#34d399` · `#fbbf24` · `#f87171` |
+| Native chrome | `color-scheme: dark` (scrollbars, caret) |
+
+**Four laws, all enforced by the token names themselves:**
+
+1. **The accent is brand, never status.** Never point `--ok`/`--warn`/`--err`
+   at `--accent`. An orange health dot conveys nothing.
+2. **Semantic hues keep their meaning and change their cut.** Green/amber/red
+   mean healthy/degraded/down on every ground this product has had. Cream gets
+   the readable cut, black gets the bright one. A hue never changes *meaning*
+   to suit a background, and a status colour is never replaced by the accent.
+3. **Contrast is a token choice, not a judgement call.** `#ff9100` on `--bg` is
+   ≈1.9:1 — fills, borders and graphics only. Orange *text* always takes
+   `--accent-text` (≈5:1). Ink on filled accent is ≈7:1; white on it is 2.3:1,
+   which is why `--accent-ink` is ink.
+4. **The accent lands at most three times per screen** (the one verb, one live
+   signal, the focus ring) and never fills a region. **The focus ring is one
+   thing: 2px solid `--accent` at 2px offset**, drawn as an `outline` wherever
+   an outline is not clipped.
 
 The instrument is deliberately achromatic: the ring is **chrome** (it is the
 mechanism, not a reading), a body is neutral **ink** until its own container
@@ -91,15 +132,24 @@ one status colour on screen instead of a constellation.
 
 ### 2.2 Type
 
-Three OFL faces are **bundled** (`@fontsource*`, served from `'self'`), so the
-launcher renders identically on macOS, Windows and Linux, offline, on first
-paint. The system stacks are fallbacks only.
+Two OFL faces are **bundled** (`@fontsource/geist-sans`, `@fontsource/geist-mono`,
+served from `'self'`), so the launcher renders identically on macOS, Windows and
+Linux, offline, on first paint. The system stacks are fallbacks only. **There is
+no serif and no third family** — the brand has two faces.
 
 | Role | Face | Used for |
 |---|---|---|
-| Display | **Fraunces Variable** (`--font-display`, `--fvs-display: "opsz" 72, "SOFT" 0`, weight 400) | The verdict line, station titles, sign-in welcome. Nowhere else. **Never bold.** |
-| UI sans | **Inter Variable** (`--font-sans`) | Body, buttons, prose. |
-| Data mono | **JetBrains Mono** (`--font-mono`) | Ledger, chips, labels, logs, container names, versions, codes, palette input. `tabular-nums` on every number. |
+| Display | **Geist Sans** at `--fw-display: 500` (`--font-display`, which points at `--font-sans`) | The verdict line, station titles, page titles, sign-in welcome. Nowhere else. Tight leading, sentence case with a terminal period. **Never bolder.** |
+| UI sans | **Geist Sans** (`--font-sans`) — 400 body, 500 controls, 600 the few semibold registers | Body, buttons, prose. |
+| Data mono | **Geist Mono** (`--font-mono`) — 400 + 500 | Ledger, chips, labels, logs, container names, versions, codes, palette input. `tabular-nums` on every number. |
+
+Static cuts, not variable: five latin woff2 files, ~123 KB (budget 350 KB).
+Provenance and licences: `src/assets/fonts/OFL-NOTICES.txt`.
+
+The display register is the body face one weight up, which is why
+`--font-display` is a *pointer* rather than a second stack: the role is what is
+named, so moving it later is one line. Its weight lives in `--fw-display`, and
+the six rules that set the register read both.
 
 Scale: `--t-xs 11 / --t-sm 13 / --t-base 14 / --t-md 16 / --t-lg 18 / --t-xl 24`,
 plus two display steps — `--t-verdict: clamp(22px, 3.4vw, 30px)` and
@@ -110,7 +160,10 @@ UPPERCASE, `--fg-muted`) is the app's section-head voice.
 
 Spacing `--s-1…--s-6` (4/8/12/16/24/32). Radius 6/8/10/pill. Exactly two
 elevation levels above the canvas: cards (`--elev-card` + top hairline) and
-floaters (tray/palette). Scrims are plain `rgba(0,0,0,.55)`.
+floaters (`--elev-floater`, the tray/palette). Scrims are a plain alpha fill,
+and there is exactly one of them: `--scrim`, ink at α.38. It is lighter than
+the charcoal era's black α.55 on purpose — the tray it dims behind is black
+now, and a heavier wash would swallow the tray's own edge.
 
 **No `filter` and no `backdrop-filter`, anywhere.** WKWebView renders
 `backdrop-filter` as flat black over canvas layers — a documented project scar.
@@ -143,7 +196,7 @@ create a second animation system.
 ### 2.5 The mark
 
 `AuracleGlyph` is the one source of the logotype and renders in `--fg` at rest —
-never blue (blue is spent on the verb). The home instrument is *not* the glyph
+never the accent (the accent is spent on the verb). The home instrument is *not* the glyph
 scaled up: it is purpose-built SVG whose resting geometry quotes the mark
 exactly. `MARK` in `src/fx/orrery.ts` records how it was measured off the traced
 vectors, and why the size difference between the two dots is perspective rather
@@ -294,6 +347,13 @@ Native, and the only part of the system outside `src/`
 
 - 36px buffer, `set_icon_as_template(false)` (the core must keep its hue).
 - Ring radius 13, stroke ≈1.5px, drawn in chrome `#e6edf3` at α.9.
+  **This value did NOT turn with the app in v0.10.0, deliberately.** It is not
+  the app's ink; it is menu-bar chrome, and the menu bar is not our ground —
+  it is the OS's, light or dark, and the user's wallpaper under it. Chrome +
+  a dark rim is what holds the mark on both. Re-drawing it in ink `#232323`
+  would leave a dark mark with a black rim on a dark menu bar: invisible.
+  The Rust file carries no brand colour and never did — no accent appears in
+  it, and the only palette it owns is the status one below.
 - Core radius 5 — **the only chromatic part**, carrying the status hue
   (healthy/degraded/down/checking).
 - One satellite, 2**pt** diameter, riding the ring at 45° — in the mark's own
@@ -368,8 +428,10 @@ true; everything above only draws it.
 
 ## 9. Anti-patterns (auto-fail)
 
-Emerald or white as a brand accent · blue used for status · blue as small text
-(use `--accent-text`) · a second animation library · `@keyframes` for anything
+Emerald, white or Nous-blue as a brand accent · the accent used for status ·
+a status hue replaced by the accent · the raw accent as small text (use
+`--accent-text`) · a per-component colour map instead of a scoped token
+re-point · a second animation library · `@keyframes` for anything
 that is not already `act-progress` · `filter` / `backdrop-filter` / glow /
 gradient / neon · nested cards · a tweened number, count or percentage · a
 progress bar that moves without real progress · a body on the ring without a
