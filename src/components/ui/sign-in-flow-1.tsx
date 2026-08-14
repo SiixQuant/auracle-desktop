@@ -20,12 +20,17 @@ interface SignInPageProps {
   engineDown?: boolean;
 }
 
-/** Minimal Auracle wordmark — the orbital mark from the design, no nav chrome. */
+/** Minimal Auracle wordmark — the orbital mark from the design, no nav chrome.
+ *
+ *  The utilities here name TOKENS rather than colours (`text-[var(--fg)]`), so
+ *  this screen turns with the rest of the product instead of holding a private
+ *  palette. It is the same law the hand-built stylesheet follows; Tailwind is
+ *  only how this one component spells it. */
 function AuracleMark() {
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5">
-      <AuracleGlyph className="w-6 h-6 text-white/90" />
-      <span className="text-sm font-semibold tracking-wide text-white/90">
+      <AuracleGlyph className="w-6 h-6 text-[var(--fg)]" />
+      <span className="text-sm font-semibold tracking-wide text-[var(--fg)]">
         Auracle
       </span>
     </div>
@@ -55,16 +60,15 @@ export const SignInPage = ({
   return (
     <div
       className={cn(
-        "auracle-signin flex w-[100%] flex-col min-h-screen bg-black relative",
+        "auracle-signin flex w-[100%] flex-col min-h-screen bg-[var(--bg)] relative",
         className
       )}
     >
       {/* Ambient stage — the same canvas, ink and power law the home runs, so
-          the threshold and the room behind it read as one chamber. The black
-          veil + vignette that used to sit on top of it are gone with the
-          shader they were tuned against: at α.05 the field needs no taming,
-          and every one of those layers was black over black everywhere the
-          shader wasn't. */}
+          the threshold and the room behind it read as one chamber. The veil +
+          vignette that used to sit on top of it are gone with the shader they
+          were tuned against: the field is a whisper of ink on the cream
+          ground and needs no taming. */}
       <DotField className="z-0" />
 
       {/* Content Layer */}
@@ -76,14 +80,14 @@ export const SignInPage = ({
             <div className="w-full mt-[150px] max-w-sm">
               <div ref={cardRef} className="space-y-6 text-center">
                 <div className="space-y-1">
-                  {/* font-normal, not bold: this h1 inherits the display serif
-                      from the element rule in app.css, and the display face is
-                      never set bold (design system §2.2 — the serif already
-                      reads heavier than the sans at the same weight). */}
-                  <h1 className="text-[2.5rem] font-normal leading-[1.1] tracking-tight text-white">
+                  {/* The display register (§2.2): this h1 inherits the
+                      display face from the element rule in app.css, and the
+                      weight it is set at — 500, tight — is the same one the
+                      home's verdict takes. Never bolder. */}
+                  <h1 className="text-[2.5rem] font-medium leading-[1.1] tracking-tight text-[var(--fg)]">
                     Welcome to Auracle
                   </h1>
-                  <p className="text-[1.8rem] text-white/70 font-light">
+                  <p className="text-[1.8rem] text-[var(--fg-dim)] font-normal">
                     Sign in to your workspace
                   </p>
                 </div>
@@ -93,7 +97,7 @@ export const SignInPage = ({
                     type="button"
                     onClick={() => onGoogleSignIn?.()}
                     disabled={googleWaiting || !onGoogleSignIn}
-                    className="w-full flex items-center justify-center gap-3 bg-white text-black font-medium rounded-full py-3.5 px-4 hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full flex items-center justify-center gap-3 bg-[var(--paper)] text-[var(--fg)] border border-[var(--line)] font-medium rounded-full py-3.5 px-4 hover:bg-[var(--surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {!googleWaiting && (
                       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -115,15 +119,15 @@ export const SignInPage = ({
                       clears itself the moment the engine answers. */}
                   {engineDown ? (
                     <div className="space-y-1" role="status">
-                      <p className="text-sm text-white/70">
+                      <p className="text-sm text-[var(--fg-dim)]">
                         {ENGINE_DOWN_LINE}
                       </p>
-                      <p className="text-xs text-white/45">
+                      <p className="text-xs text-[var(--fg-muted)]">
                         {ENGINE_DOWN_DETAIL}
                       </p>
                     </div>
                   ) : (
-                    <p className="text-xs text-white/45">
+                    <p className="text-xs text-[var(--fg-muted)]">
                       {googleWaiting
                         ? "Finish signing in in your browser, then return here."
                         : "Opens a secure Auracle sign-in in your browser."}
@@ -131,13 +135,13 @@ export const SignInPage = ({
                   )}
                 </div>
 
-                <p className="text-xs text-white/40 pt-10">
+                <p className="text-xs text-[var(--fg-muted)] pt-10">
                   By continuing, you agree to the{" "}
                   <a
                     href="https://auracle-engine.com/terms"
                     target="_blank"
                     rel="noreferrer"
-                    className="underline text-white/40 hover:text-white/60 transition-colors"
+                    className="underline text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors"
                   >
                     Terms
                   </a>{" "}
@@ -146,7 +150,7 @@ export const SignInPage = ({
                     href="https://auracle-engine.com/privacy"
                     target="_blank"
                     rel="noreferrer"
-                    className="underline text-white/40 hover:text-white/60 transition-colors"
+                    className="underline text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors"
                   >
                     Privacy Policy
                   </a>
