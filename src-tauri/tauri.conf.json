@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Auracle Desktop",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "identifier": "com.auracle.desktop",
 
   "build": {
@@ -23,6 +23,8 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
         "transparent": false,
         "url": "index.html"
       }

@@ -141,6 +141,25 @@
   --stage-dot:      rgba(35, 35, 35, 0.04);
   --stage-dot-near: rgba(35, 35, 35, 0.075);
 
+  /* Ambient stage, the character field (src/fx/AsciiField.tsx) — the same
+     stage on the signed-in home, drawn as the mark rasterised into a grid of
+     monospaced characters. Same ink, same discipline, three steps instead of
+     two: the faintest character at rest, the densest character at rest, and
+     the ceiling a character reaches directly under the pointer.
+
+     The site's field is white on black and runs .14 → .30, lifting to .85.
+     This one is ink on cream and sits BEHIND live UI rather than under a
+     heading, so the whole ramp comes down by more than half. The rest alpha
+     is the one that governs loudness — it is what the sparse floor is drawn
+     at across the whole box — and at α.05 on a fifth of the cells the field
+     lays down less ink per pixel than the dot lattice it replaces. The top of
+     the ramp is brighter than --stage-dot-near, but it is spent only where
+     the mark actually is. (Fallbacks: ASCII_INK_FALLBACK in
+     src/fx/ascii.ts, for the one frame before the tokens resolve.) */
+  --stage-ascii:      rgba(35, 35, 35, 0.05);
+  --stage-ascii-near: rgba(35, 35, 35, 0.12);
+  --stage-ascii-lift: rgba(35, 35, 35, 0.35);
+
   /* The Orrery — the home instrument. Derived, no new hue, and deliberately
      achromatic: the ring is CHROME (it is the mechanism, not a reading) and a
      body is neutral INK until its own container reports otherwise. Only the
@@ -265,6 +284,20 @@
   --s-4: 16px;
   --s-5: 24px;
   --s-6: 32px;
+
+  /* The window's own chrome. The main window runs with macOS's OVERLAY title
+     bar (tauri.conf.json → app.windows[0].titleBarStyle): the bar itself is
+     gone, the traffic lights are not — they float over the top-left of our
+     own content, and nothing of ours may sit under them.
+
+     --chrome-lights is how wide that reserved corner is (three 12px buttons
+     on a 20px pitch from a 20px inset ≈ 78px, rounded up to a round number
+     with air). --chrome-top is the strip we keep clear at the top of the
+     window: tall enough to contain the buttons, and the thing you drag the
+     window by (`data-tauri-drag-region`). Windows and Linux draw their own
+     decorations, so both values only ever cost a little air there. */
+  --chrome-lights: 86px;
+  --chrome-top: 40px;
 
   /* Type scale */
   --t-xs: 11px;
@@ -572,6 +605,11 @@ input[type="text"]:focus, input[type="password"]:focus {
 .commissioning .topbar {
   background: transparent;
   border-bottom: 1px solid var(--line);
+  /* Same reserved corner as the home's: the overlay title bar applies to the
+     window, not to one screen, so every full-window surface keeps clear of
+     the traffic lights. */
+  min-height: var(--chrome-top);
+  padding-left: var(--chrome-lights);
 }
 /* The window title area (§3.2), in the display face. */
 .commissioning__title {
@@ -1015,9 +1053,8 @@ pre.logs.logs-compact { max-height: 200px; }
  * with seg-tabs. The ONLY place this size is defined. */
 .btn-sm { font-size: 12px; padding: 4px 10px; }
 
-/* A verb that owns its whole column — the tray's one primary action (§3.4:
- * "the one accent verb Update Auracle full-width"). */
-.btn-block { display: block; width: 100%; }
+/* `.btn-block` (a verb that owned its whole column) went with the only thing
+ * that ever wore it: the tray's "Update Auracle" button. */
 
 .fs-2xs { font-size: 10px; }          /* chip/log tier for fine print */
 .err-text { color: var(--err); }
@@ -1170,14 +1207,14 @@ pre.logs.logs-compact { max-height: 200px; }
 
 
 /* ── Tutorial — the orientation card (redesign §3.6) ────────────────
- * "An orientation card bottom-center above the ledger: mono step label,
- * [display] title, dots become station ticks on a hairline." Machined like every
- * other depth surface (§1): an opaque plane on the elevation ladder, ONE
- * canonical hairline, one floater shadow, no glass and no glow.
+ * "An orientation card bottom-center: mono step label, [display] title, dots
+ * become station ticks on a hairline." Machined like every other depth surface
+ * (§1): an opaque plane on the elevation ladder, ONE canonical hairline, one
+ * floater shadow, no glass and no glow.
  *
- * It sits at the foot of the chamber rather than dead centre so the thing each
- * step is describing — the instrument, the verb, the ledger — stays visible
- * above it while it is read. */
+ * It sits low in the chamber rather than dead centre so the thing each step is
+ * describing — the instrument, the verb — stays visible above it while it is
+ * read. */
 .tut-overlay {
   position: fixed;
   inset: 0;
@@ -1187,8 +1224,7 @@ pre.logs.logs-compact { max-height: 200px; }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  /* Clears the ledger row and the re-run ghost line under it. */
-  padding: var(--s-5) var(--s-5) 88px;
+  padding: var(--s-5) var(--s-5) var(--s-6);
   z-index: 50;
 }
 .tut-card {
@@ -1289,41 +1325,50 @@ pre.logs.logs-compact { max-height: 200px; }
   }
 }
 
-/* ── The Standby home — three bands (redesign §1, §3.3) ────────────
- * The calm panel of an already-running machine, as a chamber rather than a
- * stack: THE INSTRUMENT (~55%), THE VERDICT + one verb, THE LEDGER. Emptiness
+/* ── The Standby home (redesign §1, §3.3) ──────────────────────────
+ * The calm panel of an already-running machine, composed the way a launcher
+ * composes: full-bleed art, one instrument, one sentence, one verb. Emptiness
  * is the success state — generous negative space, cream floor, the core the
  * only colour when all-green. Everything derives from deriveBoard().
  *
- * The row template is the whole composition, so it is worth reading:
+ * THE COMPOSITION. Two columns and two rows, which is the whole of it:
  *
- *   minmax(0, 55%)  the instrument takes §3.3's band WHEN THERE IS ROOM. Its
- *                   base size is 0 and its cap is the band, so it grows into
- *                   the space the other two bands don't need — and yields when
- *                   they need more (the down state's incident card at the
- *                   600×500 minimum). The instrument is a second reading of a
- *                   verdict already stated in words below it; under pressure
- *                   the words win. That is the honest give.
- *   1fr             the verdict band: at least its content, then all the slack,
- *                   so the verdict + verb sit optically centred in the middle
- *                   of the chamber instead of riding up under the instrument.
- *   auto            the ledger: exactly its own height, pinned to the floor. */
+ *   ┌──────────────┬──────────────┐
+ *   │              │              │  the instrument spans both rows, so it
+ *   │              │  INSTRUMENT  │  centres on the WINDOW rather than on
+ *   ├──────────────┤   (key art)  │  whatever the words happen to need
+ *   │ verdict/verb │              │
+ *   └──────────────┴──────────────┘
+ *
+ * The cluster and the figure never share a cell, so the words can never end up
+ * over the drawing at any window this product opens in — the key-art look
+ * without the key-art legibility problem. The instrument lands centred in the
+ * right column, roughly 70% across the window: right of centre, the way a
+ * launcher seats its art, and clear of the corner it would look pinned to.
+ *
+ * Margins are generous and scale with the window (the clamps), because the
+ * silence around three objects is what makes them read as three objects. */
 .standby {
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(0, 55%) 1fr auto;
-  row-gap: var(--s-6);
-  justify-items: center;
-  text-align: center;
-  padding: var(--s-5) var(--s-5) var(--s-4);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: var(--s-6);
+  row-gap: var(--s-5);
+  /* The pill's band sits above this in the shell's column and already clears
+     the overlay title bar's traffic lights, so the top here is just air under
+     the capsule; the sides and floor are the composition's own. */
+  padding: var(--s-5) clamp(var(--s-5), 5vw, 64px) clamp(var(--s-5), 6vh, 56px);
 }
 
-/* Band 1 — the instrument stage. A COLUMN flex box, so the orrery's size is
-   settled by flex arithmetic (basis 300, shrink 1, min 0) rather than by a
+/* The key art — the instrument. A COLUMN flex box, so the orrery's size is
+   settled by flex arithmetic (basis, shrink 1, min 0) rather than by a
    percentage against a grid row the layout is still resolving — which browsers
    are entitled to treat as indefinite, and which left the instrument at its
-   300px ceiling inside a shorter band. */
-.standby__instrument {
+   ceiling inside a shorter band. */
+.standby__figure {
+  grid-column: 2;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1332,41 +1377,63 @@ pre.logs.logs-compact { max-height: 200px; }
   min-height: 0;
 }
 
-/* Band 2 — the verdict and the one verb. Top-aligned, not centred: the sketch
- * reads instrument → verdict → verb → (space) → ledger, so the verdict follows
- * the instrument at one --s-6 and the slack collects above the floor. */
-.standby__verdict-band {
+/* The cluster — the verdict, the one verb, and the one quiet line. Bottom
+ * left, ranged left: this is the only text on the home, so it does not need
+ * the centre to be found.
+ *
+ * No `min-height: 0` here, deliberately: this cell's automatic minimum is what
+ * tells the grid how much room the words actually need, and therefore how much
+ * the instrument beside it must give back. The figure carries the
+ * `min-height: 0` instead — it is the one that yields, because it is a second
+ * reading of a verdict already stated in words. Under pressure the words win. */
+.standby__cluster {
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--s-5);
-  width: 100%;
-  /* No `min-height: 0` here, deliberately: this band's automatic minimum is
-     what tells the grid how much room the verdict, the verb, an error line and
-     an incident card actually need, and therefore how much the instrument
-     above must give back. Suppress it and the down state's card slides under
-     the ledger. The instrument band carries the `min-height: 0` instead — it
-     is the one that yields. */
+  align-items: flex-start;
+  text-align: left;
+  gap: var(--s-4);
 }
 
-/* Band 3 — the ledger, on the floor of the chamber. */
-.standby__ledger-band {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--s-2);
+/* Narrow windows: two columns of a 600px chamber are two slivers, so the
+   composition folds back into one centred column — instrument, then words.
+   Nothing is dropped; the seating is what gives. */
+@media (max-width: 860px) {
+  .standby {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+  .standby__figure { grid-column: 1; grid-row: 1; }
+  .standby__cluster {
+    grid-column: 1;
+    grid-row: 2;
+    align-items: center;
+    text-align: center;
+  }
 }
 
-/* Short windows — the 600×500 minimum and anything near it. The chamber keeps
-   all three bands and every reading in them; what tightens is the RHYTHM, so
-   the room it buys goes to the instrument (§3.9: density holds at min size). */
+/* The one quiet line: a failure the machine reported in its own words, or the
+ * reason a disabled verb cannot act. It is the ONLY thing on this home that
+ * appears conditionally, so it is drawn quietly — mono, muted, one register
+ * below the verb — and healthy never shows it at all. */
+.standby__attention {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: var(--fg-muted);
+  max-width: 52ch;
+}
+
+/* Short windows — the 600×500 minimum and anything near it. The home keeps
+   every reading; what tightens is the RHYTHM, so the room it buys goes to the
+   instrument (§3.9: density holds at min size). */
 @media (max-height: 620px) {
   .standby {
-    row-gap: var(--s-5);
-    padding-top: var(--s-4);
+    row-gap: var(--s-4);
+    padding-top: var(--s-3);
   }
-  .standby__verdict-band { gap: var(--s-4); }
+  .standby__cluster { gap: var(--s-3); }
 }
 
 /* ── The Orrery — the instrument (redesign §3.3) ───────────────────
@@ -1382,24 +1449,34 @@ pre.logs.logs-compact { max-height: 200px; }
  *     used to wear a drop-shadow; it is an animated layer, and §4 budgets it
  *     at zero. The 20px soft ring at α.13 does that job with a fill. */
 .orrery {
-  /* The instrument fills its band. Slice 4 had to budget it against a fixed
-     column of stacked rows (`100vh - 450px`); the ledger merge retired those
-     rows, so it now simply takes what §3.3's band gives it. Measured: 300px —
-     the ceiling, where one SVG unit is one CSS pixel and the 8px core / 5px
-     bodies are literal — in the default 900×700 and above, 232px at the
-     600×500 minimum, both clear of §3.9's 180px floor. The one place that
-     floor gives is the down state at the minimum window, where the incident
-     card takes the room (see the row template above for why).
+  /* KEY-ART SCALE. The instrument used to be capped at 300px, which is where
+     one SVG unit is one CSS pixel and the 8px core / 5px bodies are literal.
+     It shared the chamber with a verdict, a verb and a ledger row then; it
+     shares it with a verdict and a verb now, in its own column, so the cap
+     rises to 460 and the instrument becomes what a launcher puts on its stage
+     — the largest thing in the room by a distance.
 
-     Height: the 300px ceiling as a flex basis, free to shrink to the band.
-     Width: the band, capped at the same 300. The two need not agree — the
-     drawing is a 300-unit square viewBox that letterboxes itself
-     (preserveAspectRatio), so the orbit stays circular at every band height. */
-  flex: 0 1 300px;
+     It stays a hairline instrument at every size. The ring and the seam carry
+     `vector-effect: non-scaling-stroke` (Orrery.tsx), so 460px of drawing is
+     still ONE pixel of chrome: bigger mark, same mechanism, no thickening into
+     a graphic. What does grow with the box is the core, the bodies and their
+     flags, which is the point — they are the parts that carry a reading.
+
+     The cap tracks the window's HEIGHT (58vh), because that is the dimension
+     the instrument competes with the words for: 460 at 793px and up, 406 in
+     the default 900×700 (where the column caps it at 389), 290 at the 600×500
+     minimum — all clear of §3.9's 180px floor.
+
+     Height: the cap as a flex basis, free to shrink to the cell. Width: the
+     cell, capped at the same value. The two need not agree — the drawing is a
+     300-unit square viewBox that letterboxes itself (preserveAspectRatio), so
+     the orbit stays circular at every size. */
+  --orrery-cap: clamp(220px, 58vh, 460px);
+  flex: 0 1 var(--orrery-cap);
   min-height: 0;
-  max-height: 300px;
+  max-height: var(--orrery-cap);
   width: 100%;
-  max-width: 300px;
+  max-width: var(--orrery-cap);
   display: block;
   padding: 0;
   background: transparent;
@@ -1462,16 +1539,21 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .orrery__body:hover .orrery__flag { opacity: 1; }
 
-/* THE VERDICT (§3.3 Band 2) — the display register, and the only sentence on the
- * screen. The per-word entrance lives in fx/motion.ts (`revealWords`); nothing
- * here may hide it, so no CSS animation and no opacity of its own. */
+/* THE VERDICT — the display register, and the only sentence on the screen. The
+ * per-word entrance lives in fx/motion.ts (`revealWords`); nothing here may
+ * hide it, so no CSS animation and no opacity of its own.
+ *
+ * 34ch rather than the centred layout's 24: ranged left in its own column, the
+ * longest sentence the aggregator can produce ("Engine's down — start it to
+ * continue.", 38 chars) sits on one line at every window this composition uses
+ * two columns in. `balance` is what keeps the fold graceful when it doesn't. */
 .standby__verdict {
   font-family: var(--font-display);
   font-size: var(--t-verdict);
   font-weight: var(--fw-display);
   color: var(--fg);
   margin: 0;
-  max-width: 24ch;
+  max-width: 34ch;
   line-height: 1.2;
   text-wrap: balance;
 }
@@ -1482,24 +1564,28 @@ pre.logs.logs-compact { max-height: 200px; }
   display: inline-block;
 }
 
-.standby__actuator-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
+/* THE ONE VERB. The only accent on the home and the only thing to press, so it
+ * is drawn as the one thing to press: a large orange slab with an ink label,
+ * set in the mono register, uppercase and tracked out. Mono because this is a
+ * machine's own word for what happens next, and the launcher spells machine
+ * words in mono everywhere else it spells them (§2.2); large because a
+ * launcher has exactly one primary action and hiding it inside a 44px control
+ * would be the composition apologising for it. */
 .standby__actuator {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
-  padding: 0 22px;
+  min-height: 54px;
+  padding: 0 var(--s-5);
   background: var(--accent);
   color: var(--accent-ink);
   border: 0;
   border-radius: var(--r-md);
-  font-size: 15px;
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
   cursor: pointer;
   transition: background-color 0.15s ease-out, transform 0.1s ease-out;
 }
@@ -1528,115 +1614,27 @@ pre.logs.logs-compact { max-height: 200px; }
   0% { left: -40%; }
   100% { left: 100%; }
 }
-.standby__act-reason { font-size: 12px; color: var(--fg-muted); max-width: 38ch; }
-/* Quiet "re-run the first-run stack setup" escape — a ghost line UNDER the
- * ledger (§3.3), which is the quietest thing on the screen that is still a
- * control. */
-.standby__rerun {
-  background: none;
-  border: none;
-  color: var(--fg-faint);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 3px 8px;
-  border-radius: var(--r-sm);
-  transition: color 0.14s;
-}
-.standby__rerun:hover { color: var(--fg-muted); text-decoration: underline; }
-.standby__rerun:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.standby__err { color: var(--err); font-size: 12.5px; max-width: 46ch; }
-
-/* ── THE LEDGER (§3.3 Band 3) ──────────────────────────────────────
- * One mono row that used to be three: the vitals row, the footer links, and
- * the update status. `engine Healthy · v0.8.37 · What's new · Help` — every
- * cell a discrete control, every reading still carrying its dot, its
- * freshness and its provenance.
+/* ── THE MONO-LABEL REGISTER ───────────────────────────────────────
+ * The one place the launcher spells a KEY rather than a word: 10.5px, 0.08em,
+ * uppercase, muted (§2.2). It was `.ledger__key` while the home carried a
+ * ledger; the row is gone and the register is not, so it keeps its own name
+ * and its one consumer in the Status tray.
  *
- * Register (§2.2): Geist Mono; KEYS are the 10.5px/0.08em uppercase
- * mono-label the type system defines and consumers were left to apply;
- * VALUES stay sentence-case at reading size, because "Healthy" and "What's
- * new" are words the user reads, not labels they scan. */
-.ledger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 2px;
+ * The rest of `.ledger*` — the row, the cells, the dots, the values, the
+ * update sweep — left with the markup that used them. So did
+ * `.standby__err`, `.standby__act-reason`, `.standby__actuator-wrap`,
+ * `.standby__ledger-band`, `.standby__rerun` and `.standby__incident`: the
+ * home now says a failure, a reason and a red lamp through ONE line
+ * (`.standby__attention`), and the re-run escape is a ⌘K command. Every
+ * reading they carried is in the Status tray or the palette; what was deleted
+ * is the second and third way of saying the same thing. */
+.key-label {
   font-family: var(--font-mono);
-}
-.ledger__sep {
-  color: var(--fg-faint);
-  opacity: 0.5;
-  font-size: 11.5px;
-  padding: 0 2px;
-  user-select: none;
-}
-.ledger__cell {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-sm);
-  padding: 5px 8px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background-color 0.15s ease-out, border-color 0.15s ease-out,
-    color 0.15s ease-out;
-}
-.ledger__cell.is-static { cursor: default; }
-button.ledger__cell:hover { background: var(--surface); border-color: var(--line); }
-.ledger__cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ledger__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--fg-faint);
-  flex: none;
-}
-.ledger__dot.ok { background: var(--ok); }
-.ledger__dot.warn { background: var(--warn); }
-.ledger__dot.err { background: var(--err); }
-.ledger__dot.accent { background: var(--accent); }
-/* The mono-label register — the one place the launcher spells a KEY. */
-.ledger__key {
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
 }
-.ledger__value {
-  font-size: 11.5px;
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-}
-button.ledger__cell:hover .ledger__value { color: var(--fg); }
-/* A reading too old to stand behind says so, in the colour of a warning. */
-.ledger__cell.is-stale .ledger__value { color: var(--warn); }
-/* An update is waiting: the cell goes bright and takes the one-time
-   underline sweep. The rule is scaled from the left by GSAP (once, never a
-   loop — §2.4); it is 1px of accent under one cell, well inside the
-   three-accents-per-screen budget since the core is calm in this state. */
-.ledger__cell.is-waiting .ledger__value { color: var(--fg); }
-.ledger__sweep {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 2px;
-  height: 1px;
-  background: var(--accent-text);
-  transform-origin: left center;
-  pointer-events: none;
-}
-
-/* The 2×2 grid of translucent tiles that used to sit under the verb (Updates /
- * Changelog / FAQ / Support) is gone: slice 5 folded those destinations into
- * the ledger row, and slice 6 takes its styles with it — including the one
- * rule that still reached for `.vital__dot`, a class the ledger merge had
- * already retired. The tiles were also the launcher's last translucent
- * surface; §1's depth law is opaque planes and hairlines, which is what the
- * tray below is built from. */
 
 /* ── Tray content — the inspector bodies ──────────────────────────────
  * Everything below lives INSIDE the tray (`.insp`), whose own chassis is
@@ -1726,14 +1724,104 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 .linklike:hover { color: var(--fg); }
 .linklike:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ── Single-surface shell (replaces the rail) ──────────────────────
- * A thin top bar + the Standby stage. No left rail: Connections /
- * Supervision / Account are reached by pressing a vital (status-is-the-
- * door); Intelligence + System live in the top bar. */
+/* ── Single-surface shell ──────────────────────────────────────────
+ * The nav pill + the Standby stage. No left rail and no top bar: Status and
+ * Settings are the pill's two words, the instrument is a door to Status
+ * (status-is-the-door), and everything else is ⌘K. */
 .shell-standby {
   display: flex;
   flex-direction: column;
   height: 100vh;
+}
+
+/* ── THE NAV PILL ──────────────────────────────────────────────────
+ * The site's menu grammar, launcher-sized: one black capsule floating
+ * top-centre on the cream ground. It carries the mark, two words and an
+ * account chip, and that is the launcher's entire navigation.
+ *
+ * The BAND around it is the window's drag strip (the overlay title bar leaves
+ * the traffic lights floating over our own top-left corner), so it stands at
+ * least as tall as those buttons and keeps their corner clear. The band draws
+ * nothing itself — no fill, no hairline — so the capsule reads as floating over
+ * the ascii stage rather than sitting on a bar. */
+.pill-bar {
+  position: relative;
+  z-index: 1;
+  /* Promote to its own compositing layer so WebKit paints it ABOVE the ambient
+     canvas — the same rule the stage below it needs. Invisible in Chromium. */
+  transform: translateZ(0);
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: var(--chrome-top);
+  padding: var(--s-2) var(--chrome-lights) 0;
+}
+
+/* The capsule. It re-points the tokens for its own subtree exactly the way the
+ * tray does (§4.1: a scoped token re-point, never a private colour map), so the
+ * items inside it name --fg / --fg-muted / --line and get the black
+ * counter-material's values for free. */
+.pill {
+  /* On black, white at opacity steps — the brand's own ramp, and the tray's. */
+  --fg:       rgba(255, 255, 255, 0.9);
+  --fg-muted: rgba(255, 255, 255, 0.45);
+  color-scheme: dark;
+
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  width: min(520px, 100%);
+  padding: 5px 6px 5px 12px;
+  background: #000;
+  /* DOTTED, not solid: the site's own nav edge. On black a solid hairline is a
+     stripe; a dotted one is a seam, which is what a capsule wants. */
+  border: 1px dotted rgba(255, 255, 255, 0.35);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+}
+/* The mark, small and white — the launcher saying its own name. */
+.pill__mark {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--fg);
+  margin-right: var(--s-2);
+}
+.pill__item,
+.pill__account {
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+.pill__item { color: var(--fg); }
+.pill__item:hover { background: rgba(255, 255, 255, 0.1); }
+/* The account chip: right-aligned, and one register quieter than the two
+   destinations beside it — it names who you are, not where to go. Never
+   uppercased: an email's local part is a string the machine was given, and
+   this product does not restyle other people's strings. */
+.pill__account {
+  margin-left: auto;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.pill__account:hover { color: var(--fg); background: rgba(255, 255, 255, 0.1); }
+.pill__item:focus-visible,
+.pill__account:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .topbar {
   display: flex;
@@ -1763,21 +1851,9 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   flex-shrink: 0;
   color: var(--fg);
 }
-.topbar__actions { display: flex; align-items: center; gap: 4px; }
-.topbar__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: transparent;
-  border: 0;
-  border-radius: 7px;
-  padding: 7px 10px;
-  color: var(--fg-muted);
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: background-color 0.15s ease-out, color 0.15s ease-out;
-}
-.topbar__btn:hover { background: var(--surface); color: var(--fg); }
+/* `.topbar` survives for the commissioning screen, which still wants a titled
+   strip while it walks you through a first run. Its ACTIONS do not: the search
+   and gear buttons were the signed-in home's, and the pill replaced them. */
 
 .standby-stage {
   position: relative;
@@ -2043,14 +2119,8 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 }
 .orrery-echo .orrery__svg { width: auto; height: auto; }
 
-.kbd-hint {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg-muted);
-}
-
 /* Transient command echo (echo-to-teach) — names the verb you just ran.
- * Floats just above the ledger, which owns the floor of the chamber now.
+ * Floats at the foot of the chamber.
  *
  * Its arrival is a GSAP entrance (Shell.tsx), not a keyframe: §2.4 lists the
  * echo line among the things that animate, and this app has ONE engine. The
@@ -2208,40 +2278,10 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 }
 
 
-/* Interrogable provenance — hover/focus the engine cell to audit the green
- * dot. The native `title` says the same thing, but only to a pointer; this is
- * what keeps the audit reachable from the keyboard. Opens UPWARD, because the
- * ledger sits on the floor of the chamber. */
-.ledger__prov {
-  position: absolute;
-  bottom: calc(100% + 7px);
-  left: 50%;
-  transform: translateX(-50%) translateY(3px);
-  width: max-content;
-  max-width: 240px;
-  background: var(--bg-elev);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  padding: 7px 10px;
-  font: 400 11px/1.45 var(--font-mono);
-  color: var(--fg-dim);
-  text-align: left;
-  text-transform: none;
-  letter-spacing: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
-  z-index: 30;
-}
-.ledger__cell:hover .ledger__prov,
-.ledger__cell:focus-visible .ledger__prov {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-/* Inline incident on the home (progressive escalation). Spacing comes from the
- * verdict band's gap now, not from a margin — the band owns its rhythm. */
-.standby__incident { width: min(440px, 92vw); text-align: left; }
+/* The engine cell's interrogable provenance tooltip left with the cell. The
+ * reading it audited is still auditable, and now in plainer form: the engine's
+ * own state word, its last error and its containers are all written out in the
+ * Status tray rather than hidden behind a hover on the home. */
 
 
 /* ── Strategy lifecycle — six stations on one spine (§3.4) ─────────
@@ -2323,19 +2363,16 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
 }
 
 /* ── First-home coachmark (redesign §3.6) ──────────────────────────
- * "Three sequential hairline callouts that point at the real bands —
- * instrument → verb → ledger — each a small mono card with a connecting
- * hairline; 'Got it' completes."
+ * "Sequential hairline callouts that point at the real parts of the home —
+ * instrument → verb — each a small mono card with a connecting hairline;
+ * 'Got it' completes." The third callout left with the ledger it annotated.
  *
- * THE ANCHORING, which §3.6 says the fixed band layout makes deterministic:
- * this overlay is mounted INSIDE the standby stage and repeats `.standby`'s own
- * row template, so each callout lands in the band it annotates without a single
- * measurement. Rows 1 and 2 are template-sized (a percentage and a fraction),
- * so a callout that is taller than its band overflows instead of resizing it —
- * only row 3 would have grown, which is why it is pinned to 0 and its callout
- * is anchored to the floor above the ledger with a hairline pointing down at
- * it. Each callout also takes the band content's OWN alignment: the instrument
- * is centred in its band, the verdict + verb are top-aligned in theirs. */
+ * THE ANCHORING, which §3.6 says the fixed layout makes deterministic: this
+ * overlay is mounted INSIDE the standby stage and repeats `.standby`'s own row
+ * template, so each callout lands over the part it annotates without a single
+ * measurement. Row 1 is template-sized, so a callout taller than the figure
+ * overflows instead of resizing it; row 2 takes the cluster's own height, the
+ * way the cluster does. Each callout also takes its part's OWN alignment. */
 .coach-scrim {
   position: absolute;
   inset: 0;
@@ -2356,9 +2393,14 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-rows: minmax(0, 55%) 1fr 0;
-  row-gap: var(--s-6);
-  padding: var(--s-5) var(--s-5) var(--s-4);
+  /* The home's own template, so the callouts land on the home's own parts:
+     each one takes the cell OPPOSITE the part it annotates, and its hairline
+     reaches across the column gap into it. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: var(--s-6);
+  row-gap: var(--s-5);
+  padding: var(--s-5) clamp(var(--s-5), 5vw, 64px) clamp(var(--s-5), 6vh, 56px);
   /* Only the cards take the pointer: a click on the dimmed board around them
      still reaches the scrim and completes, exactly as it did before. */
   pointer-events: none;
@@ -2369,22 +2411,23 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   justify-self: start;
   min-width: 0;
 }
-.coach__callout--instrument { align-self: center; }
-/* The verb's callout takes the right margin: its band and the ledger's are the
-   bottom half of a 700px window between them, and two cards in one column there
-   would sit on top of each other. Reversed, so the hairline still reaches
-   INWARD from the card to the centred verb it is pointing at. */
-.coach__callout--verb {
-  align-self: start;
+/* The instrument is in the right column, so its callout takes the left one and
+   hugs the inner edge; the hairline runs rightward out of the card. */
+.coach__callout--instrument {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
   justify-self: end;
-  flex-direction: row-reverse;
 }
-.coach__callout--ledger {
-  flex-direction: column;
-  align-items: flex-start;
-  align-self: end;
-  /* Clears the ledger row and the re-run ghost line beneath it. */
-  margin-bottom: 52px;
+/* The cluster is in the left column, so the verb's callout mirrors that —
+   right column, inner edge, REVERSED so the hairline runs leftward out of the
+   card and into the words it is pointing at. */
+.coach__callout--verb {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  justify-self: start;
+  flex-direction: row-reverse;
 }
 /* A machined part like every other depth surface (§1): opaque plane, one
    canonical hairline, the card elevation — no glass, no glow. */
@@ -2464,12 +2507,14 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   }
   .coach__callout,
   .coach__callout--instrument,
-  .coach__callout--verb,
-  .coach__callout--ledger {
+  .coach__callout--verb {
     display: block;
-    /* The bands' own alignments (centre / start / end) are what staggered the
-       cards across their rows; in one column they have to line up. */
+    /* The parts' own alignments (centre / start / end) are what staggered the
+       cards across their cells; in one column they have to line up. */
+    grid-column: auto;
+    grid-row: auto;
     align-self: center;
+    justify-self: center;
     width: min(420px, 100%);
     margin: 0;
   }
@@ -2542,6 +2587,22 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   inset: 0;
 }
 
+/* The ascii field (src/fx/AsciiField.tsx) — the same stage, drawn as
+   characters, behind the signed-in home. Same contract in every respect:
+   full-bleed, never interactive, bottom layer, no CSS animation (the cadence
+   is src/fx/ambient.ts's, shared with the dot field). Its ink is
+   --stage-ascii / -near / -lift. */
+.ascii-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ascii-field__canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
 /* ──────────────────────────────────────────────────────────────────
    Home (Standby) — the same chamber as the sign-in screen: the cream floor
    with the ambient dot-field behind the chrome. Scoped to .shell-standby,
@@ -2559,34 +2620,26 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   background: var(--bg);
   isolation: isolate;
 }
-.shell-standby > .topbar,
+.shell-standby > .pill-bar,
 .shell-standby > .standby-stage {
   position: relative;
   z-index: 1;
   /* Promote each to its own compositing layer so WebKit (the macOS WKWebView)
      paints it ABOVE the ambient canvas. Without this, the canvas composites
-     over the instrument, the verdict, the verb and the ledger and washes them
-     out. Every band sits INSIDE this promoted stage, so they all ride above
-     the canvas with it. Invisible in Chromium; required in WKWebView. */
+     over the pill, the instrument, the verdict and the verb and washes them
+     out. Every part sits INSIDE one of these two, so they all ride above the
+     canvas with them. Invisible in Chromium; required in WKWebView. */
   transform: translateZ(0);
-}
-/* Transparent chrome so the shader reads through the whole surface. */
-.shell-standby .topbar {
-  background: transparent;
-  border-bottom: 1px solid var(--line);
-}
-.shell-standby .topbar__btn:hover {
-  background: var(--surface-2);
 }
 .shell-standby .standby-stage {
   background: transparent;
   /* The stage is a <main>, and the app's generic main rule (a centred 900px
-     column with 24/24/32 padding) is the wrong shape for a chamber: the home's
-     three bands are full-bleed and own their own margins. Its `margin: 0 auto`
-     also made the stage shrink-to-fit inside the shell's column flex, which is
-     why the chamber used to be as wide as its widest row instead of as wide as
-     the window. Neutralised here rather than on `main` itself, which every
-     other view still wants. */
+     column with 24/24/32 padding) is the wrong shape for a chamber: the home
+     is full-bleed and owns its own margins. Its `margin: 0 auto` also made the
+     stage shrink-to-fit inside the shell's column flex, which is why the
+     chamber used to be as wide as its widest row instead of as wide as the
+     window. Neutralised here rather than on `main` itself, which every other
+     view still wants. */
   padding: 0;
   max-width: none;
   margin: 0;

@@ -4,6 +4,21 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.11.0]
+
+The premium launcher.
+
+### Changed
+- **A new stage.** The mark itself, rasterised into a field of characters, runs full-bleed behind the home — texture first, image second. It seats the instrument by standing behind it.
+- **The pill is the whole navigation.** One black capsule, top-centre: the mark, Engine, Settings, and who you're signed in as. Nothing else, anywhere — the wordmark, the search button and the gear are gone, and so is the ledger of doors that used to sit on the home's floor.
+- **One verb on the home.** The instrument, the verdict in words, and the single next move. Everything the ledger used to hold moved whole into Engine, one door away.
+- **Status is one surface.** The engine reading, the containers, your version, what's new and help are now the same panel instead of five separate places.
+- **The manual update control is gone.** Auracle updates itself; a button that asked you to do it yourself was one more thing to be wrong about.
+- **The window wears the system's own chrome.** No title bar of ours: the traffic lights float over our top-left corner, every screen keeps that corner clear, and the band under them is what you move the window by.
+
+### Fixed
+- The window can be moved from every screen, and by the whole of each band — including the sign-in screen, which had nothing to grab at all.
+
 ## [0.10.0]
 
 The instrument turns to daylight.

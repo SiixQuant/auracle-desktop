@@ -169,7 +169,13 @@ export default function Onboarding({
           first run is the third room in one chamber, not a different app. */}
       <DotField focusY={INSTRUMENT_FOCUS_Y} />
 
-      <header className="topbar">
+      {/* The window carries no title bar of its own, so this strip is what you
+          drag it by — on first run as much as on the home. `deep` is Tauri's
+          own value for "anything in this subtree drags": with the bare
+          attribute the mark and the title were inert, which is the whole of
+          what this strip has to grab. A clickable child would still block the
+          drag, so a control up here (there is none) would keep its click. */}
+      <header className="topbar" data-tauri-drag-region="deep">
         <div className="topbar__brand">
           <AuracleGlyph className="topbar__mark" />
           <span className="commissioning__title">Commissioning your desk</span>

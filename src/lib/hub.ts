@@ -1,11 +1,13 @@
 // Hub surfaces — the static content + helpers behind the launcher's
 // Changelog / FAQ / Support inspectors.
 //
-// The launcher is now a global hub: Open workspace, Settings, Updates,
-// Changelog, FAQ, Support, and first-run stack setup. Connections (brokers
-// and data sources) live in the IDE. These constants + helpers keep the
-// hub's lightweight-but-REAL surfaces honest — every control resolves to a
-// concrete URL, a bundled document, or a real IPC call.
+// The launcher is a global hub: Open workspace, Status (the engine, its
+// containers, the version ladder, Changelog and Help), Settings, Account, and
+// first-run stack setup. Connections (brokers and data sources) live in the
+// IDE, and updating is the launcher's own job — there is no update control to
+// document. These constants + helpers keep the hub's lightweight-but-REAL
+// surfaces honest: every control resolves to a concrete URL, a bundled
+// document, or a real IPC call.
 
 import { cmd, openInBrowser } from "@/lib/tauri";
 
@@ -48,7 +50,7 @@ export interface FaqEntry {
 export const FAQ: FaqEntry[] = [
   {
     q: "How do I set up the trading stack?",
-    a: "The first time you open the launcher it walks you through setup: install or start Docker, pull the engine's images, and install the Auracle IDE. You can re-run that any time from the home screen's “Re-run setup”.",
+    a: "The first time you open the launcher it walks you through setup: install or start Docker, pull the engine's images, and install the Auracle IDE. You can re-run that any time from ⌘K → “Re-run setup”.",
   },
   {
     q: "Where did broker connections go?",
@@ -56,11 +58,11 @@ export const FAQ: FaqEntry[] = [
   },
   {
     q: "How do updates work?",
-    a: "The launcher updates itself and installs Auracle IDE updates for you — open Updates to check and install. The engine's Docker images update from Supervision → Pull update. You never have to update the IDE by hand.",
+    a: "Automatically, and there is nothing to press. The launcher checks once a week, installs any new version and restarts on it. Status → Version shows which version you are on. If you ever need to refresh the engine's Docker images by hand, Status → Stack has a Pull update.",
   },
   {
     q: "The engine won't start — what do I check?",
-    a: "Open Supervision from the home screen. It shows Docker's state and each container's health, with a Restart per service and Start / Stop / Pull-update for the whole stack. Most “won't start” cases are Docker not running yet.",
+    a: "Open Status — press the instrument on the home, or ENGINE in the pill. It shows Docker's state and each container's health, with a Restart per service and Start / Stop / Pull-update for the whole stack. Most “won't start” cases are Docker not running yet.",
   },
   {
     q: "Where do I get help?",

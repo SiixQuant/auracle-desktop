@@ -18,6 +18,15 @@ Concept: **The Orrery**. Everything below is what shipped.
 > `.section-head` / `.pane-head` · Nous-blue as the accent · emerald as an
 > accent · the white accent · the Lamp. These were deleted, not deprecated. If
 > you find one referenced, it is drift.
+>
+> **Also retired, by the premium-launcher slice:** the home's `.topbar` (the
+> pill replaced it, and with it the ⌘K and System buttons) · the whole
+> `.ledger*` row and `.standby__ledger-band` · `.standby__rerun` (now a ⌘K
+> command) · `.standby__err`, `.standby__act-reason` and `.standby__incident`
+> (one `.standby__attention` line says whichever of them applies) ·
+> `.btn-block` and the "Update Auracle" surface it belonged to. **There is no
+> manual update control anywhere in the launcher** — Auracle installs its own
+> updates, and re-adding one is drift, not a feature.
 
 ---
 
@@ -67,7 +76,8 @@ answer is a scoped token re-point, not a second palette (§4.1).
 | `ConfirmRow` | In-surface destructive confirm (arms, then acts) | a modal |
 | `SetupHint` | "No owner account yet — Finish setup →", wherever owner-gating fires | generic empty states |
 | `.seg-toggle` | Binary mode choices | 3+ options (use rows) |
-| `.ledger__cell` | Band 3 meta cells — each a discrete button with provenance | decorative meta text |
+| `.pill` + `.pill__item` / `.pill__account` | **The entire navigation.** Two destinations and one account chip, top-centre | a third destination; an action; anything with state |
+| `.key-label` | The mono-label register — the one place the launcher spells a KEY | a word the user reads (that is a value) |
 | `.insp-*` (tray) | Any depth surface docked right | a second simultaneous tray |
 | `.cmdk__*` | ⌘K only | a general menu system |
 | `pre.logs` | Log/terminal output | styled prose |
@@ -91,18 +101,29 @@ you are inventing a third shape, use `IncidentCard`.
 
 | Surface | Shape |
 |---|---|
-| **Home** | Three bands: instrument (`minmax(0,55%)`), verdict + one verb, ledger. Ambient dot-field behind. |
-| **Tray** (8 inspectors) | Full-height right dock, 420px (or a 92%-width sheet under 720px), the **black** counter-material, 1px `--line-strong` left edge. Header = mono-uppercase title + `esc` keycap. One at a time; home keeps polling behind it. Motion: x +16→0, 240ms `aur-mech`; scrim to `--scrim`. Home dims, never blurs. |
+| **Nav pill** | One black capsule, top-centre, `--r-pill`, 1px **dotted** white α.35, Geist Mono uppercase, max 520px. Mark · ENGINE · SETTINGS · a right-aligned account chip. Its band is the window's drag region (the title bar is an overlay). Scoped token re-point for its subtree, exactly like the tray. |
+| **Home** | Two columns × two rows: the instrument spans both rows in the right column (key-art scale, `clamp(220px, 58vh, 460px)`), the cluster — verdict, one verb, one quiet line — sits bottom-left. Full-bleed ascii field behind. Folds to one centred column under 860px. |
+| **Tray** (6 inspectors) | Full-height right dock, 420px (or a 92%-width sheet under 720px), the **black** counter-material, 1px `--line-strong` left edge. Header = mono-uppercase title + `esc` keycap. One at a time; home keeps polling behind it. Motion: x +16→0, 240ms `aur-mech`; scrim to `--scrim`. Home dims, never blurs. |
 | **⌘K palette** | Centred, top third, 560px, `--bg-elev` (paper on cream — it annotates the board, so it does not take the tray's black). Mono input, `live-sourced` tag, mono-uppercase group labels. Selected row = `--surface-2` + inset 1px `--accent`. Destructive rows carry a `live` tag; double-Enter arms. Footer states the honesty rule. |
 | **Tutorial** | Orientation card, bottom-centre: mono step label, display-serif title, station ticks on a hairline. |
-| **Coachmark** | Three sequential hairline callouts pointing at the real bands — instrument → verb → ledger. Anchors are deterministic because the bands are fixed. |
+| **Coachmark** | Two sequential hairline callouts, each in the cell OPPOSITE the part it annotates — instrument, then verb. Anchors are deterministic because it repeats the home's own grid. |
 | **Commissioning** | Left hairline spine with three stations (Environment · Sign in · Install), right station content, the instrument above. |
 | **Sign-in** | Ambient field, 64px glyph, display welcome, one white Google pill on a hairline (the mark is reproduced as its owner draws it — the Google affordance is a trust signal). |
 
-The eight inspector keys are `supervision · updates · system · intelligence ·
-changelog · help · lifecycle · pair`. Adding a ninth means adding a key to
-`InspectorKey` and a case to the switch — and asking whether the tray is still
-one idea.
+The six inspector keys are `status · account · system · intelligence ·
+lifecycle · pair`. Adding a seventh means adding a key to `InspectorKey` and a
+case to the switch — and asking whether the tray is still one idea.
+
+**Where the old eight went.** `supervision`, `updates`, `changelog` and `help`
+are now sections of one **Status** tray (the same components, stacked, behind
+one door), and `updates` lost its verb on the way in — the version ladder is a
+reading, not a control. `system` kept the name and the key, was retitled
+**Settings**, and handed its licence and GitHub cards to the new `account` key.
+`intelligence`, `lifecycle` and `pair` are unchanged and ⌘K-reachable.
+
+**Reaching them.** ENGINE → `status`; SETTINGS → `system`; the account chip →
+`account`; the instrument and the degraded verb → `status`. Everything else is
+⌘K, which lists all six by name.
 
 ---
 

@@ -29,7 +29,9 @@ export interface Command {
 export interface CommandContext {
   board: BoardState;
   containers: ContainerStatus[];
-  openInspector: (key: Door | "intelligence" | "system" | "lifecycle" | "pair") => void;
+  openInspector: (
+    key: Door | "account" | "intelligence" | "system" | "lifecycle" | "pair",
+  ) => void;
   /** The home's one verb (launch / start engine / connect / …). */
   runActuator: () => void;
   restartContainer: (name: string) => void;
@@ -37,6 +39,12 @@ export interface CommandContext {
   openIdePanel: (panel: string) => void;
   openTutorial: () => void;
   showTips: () => void;
+  /** Re-run the first-run stack setup (Docker + engine + IDE). It used to be
+   *  a ghost line under the home's ledger; the home carries no controls but
+   *  the one verb now, so it lives here — the palette is where the launcher
+   *  keeps everything a power operator might want and nobody should trip
+   *  over. */
+  rerunSetup?: () => void;
 }
 
 /** Build the full command list for the current state. The actuator command
@@ -65,12 +73,23 @@ export function buildCommands(ctx: CommandContext): Command[] {
 
   // Destinations (status-is-the-door, also reachable by name).
   const dests: Array<
-    [Door | "intelligence" | "system" | "lifecycle" | "pair", string, string, string]
+    [
+      Door | "account" | "intelligence" | "system" | "lifecycle" | "pair",
+      string,
+      string,
+      string,
+    ]
   > = [
-    ["supervision", "Open Supervision", "supervision", "engine docker containers logs"],
+    [
+      "status",
+      "Open Status",
+      "status",
+      "engine supervision docker containers logs version update changelog what's new help faq support",
+    ],
     ["lifecycle", "Open Strategy lifecycle", "lifecycle", "strategies belt draft paper live"],
     ["intelligence", "Open Intelligence", "intelligence", "agent model deepseek ai key"],
-    ["system", "Open System", "system", "license updates preferences settings"],
+    ["system", "Open Settings", "settings", "preferences system advanced diagnostics"],
+    ["account", "Open Account", "account", "sign in email licence license tier plan github"],
     ["pair", "Pair a phone (beta)", "pair phone", "ios iphone mobile qr pairing scan"],
   ];
   for (const [key, title, verb, keywords] of dests) {
@@ -144,6 +163,20 @@ export function buildCommands(ctx: CommandContext): Command[] {
     relevance: 4,
     run: ctx.openTutorial,
   });
+  if (ctx.rerunSetup) {
+    cmds.push({
+      id: "rerun-setup",
+      title: "Re-run setup",
+      verb: "rerun setup",
+      group: "Action",
+      keywords: "install first-run commissioning docker engine ide repair reinstall",
+      // It re-enters the commissioning flow over a working install, so it
+      // arms behind a confirm like every other verb that touches the stack.
+      destructive: true,
+      relevance: 2,
+      run: ctx.rerunSetup,
+    });
+  }
 
   return cmds;
 }

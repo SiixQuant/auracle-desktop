@@ -30,8 +30,10 @@ export type ActuatorAction =
   | "setup" // engine healthy but no owner account yet — finish first-run
   | "launch"; // engine ready — open the workspace
 
-/** Which inspector a status opens (status-is-the-door). */
-export type Door = "supervision" | null;
+/** Which inspector a status opens (status-is-the-door). One surface carries
+ *  every reading now — the engine's vitals, its containers, the version ladder
+ *  — so there is one door, and it is called `status`. */
+export type Door = "status" | null;
 
 /** One snapshot of everything the home derives from. Assembled by the
  *  Shell from the engine health probe. */
@@ -134,7 +136,7 @@ export function deriveBoard(s: EngineState): BoardState {
       label: "Engine degraded",
       action: "degraded",
       disabled: true,
-      reason: "Open Supervision to see which service is unhealthy.",
+      reason: "Open Status to see which service is unhealthy.",
     };
   } else if (s.needsSetup) {
     // engine healthy, but no owner account yet — first-run isn't finished.
@@ -162,7 +164,7 @@ export function deriveBoard(s: EngineState): BoardState {
       value: ew.value,
       dot: ew.dot,
       freshness: engineFresh,
-      door: "supervision",
+      door: "status",
       provenance: s.health?.last_error
         ? `last error: ${s.health.last_error}`
         : s.health?.last_ok_at
@@ -172,4 +174,34 @@ export function deriveBoard(s: EngineState): BoardState {
   ];
 
   return { lamp, pulse, systemLine, actuator, vitals };
+}
+
+/** The ONE quiet line under the verb, or null when nothing needs the owner.
+ *
+ *  The home used to stack three shapes here — a red error line, the verb's own
+ *  reason line, and an IncidentCard whenever the lamp went red. A launcher that
+ *  shows almost nothing can afford exactly one, so this collapses them by
+ *  priority and returns null the rest of the time.
+ *
+ *  It removes no state, only ceremony, because the two it drops were already
+ *  said twice: the red lamp's card ("The local engine isn't running", "Start it
+ *  to continue") is the verdict sentence and the verb, in longer words. What it
+ *  keeps is the two things that appear NOWHERE else — a failure the machine
+ *  reported in its own words, and the reason a disabled verb cannot act.
+ *
+ *  Priority: a real failure outranks a reason, because a reason explains a
+ *  button and a failure explains the machine. An in-flight verb is never a
+ *  reason: "Checking engine…" is its own explanation. */
+export function attentionLine(
+  board: BoardState,
+  errors: { engineErr?: string | null; ideError?: string | null } = {},
+): string | null {
+  const failure = errors.engineErr || errors.ideError;
+  if (failure) return failure;
+
+  const { actuator } = board;
+  const inFlight = actuator.action === "checking" || actuator.action === "starting";
+  if (actuator.disabled && !inFlight && actuator.reason) return actuator.reason;
+
+  return null;
 }

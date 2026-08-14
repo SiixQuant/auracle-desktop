@@ -105,7 +105,7 @@ export default function Orrery({
 }: {
   /** The whole instrument, as a pure value. See fx/orrery.ts. */
   frame: OrreryFrame;
-  /** Status-is-the-door: the instrument opens Supervision (§3.3). */
+  /** Status-is-the-door: the instrument opens the Status tray (§3.3). */
   onOpen?: () => void;
 }) {
   const rootRef = useRef<HTMLButtonElement>(null);
@@ -355,7 +355,7 @@ export default function Orrery({
       ref={rootRef}
       className="orrery"
       onClick={onOpen}
-      aria-label="Engine status — open Supervision"
+      aria-label="Engine status — open Status"
     >
       {/* Decorative-informational (§ACCESSIBILITY): the instrument is a second
           reading of a verdict that is already stated in words underneath it,

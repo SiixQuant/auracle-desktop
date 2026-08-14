@@ -26,47 +26,43 @@
 //     home is drawing rather than deriving a second one.
 //
 // Connections (brokers / data sources) moved to the IDE — there is no
-// connections or account inspector here. The tray keeps engine supervision,
-// the agent + system settings, and the Updates/Changelog/FAQ/Support surfaces.
+// connections inspector here.
+//
+// What the premium-launcher slice changed: the home stopped carrying
+// information, so four keys became one. `supervision`, `updates`, `changelog`
+// and `help` are now sections of a single **Status** tray
+// (`components/StatusInspector.tsx`) — the same components, stacked, behind
+// one door. The nav pill reaches Status and Settings; everything else is
+// ⌘K-reachable, which is where a power operator was already finding it.
 
 import { useEffect, useRef, useState } from "react";
 
+import AccountInspector from "@/components/AccountInspector";
 import LifecycleInspector from "@/components/LifecycleInspector";
 import PairPhoneInspector from "@/components/PairPhoneInspector";
-import SupervisionInspector from "@/components/SupervisionInspector";
-import {
-  ChangelogInspector,
-  FaqInspector,
-  SupportInspector,
-} from "@/components/HubSurfaces";
+import StatusInspector from "@/components/StatusInspector";
 import { DUR, EASE, enter, exit, gsap, useGSAP } from "@/fx/motion";
 import type { OrreryFrame } from "@/fx/orrery";
+import type { UpdateInfo } from "@/lib/tauri";
 import {
   AdvancedDrawer,
   GeneralCard,
-  GithubCard,
   IntelligenceCard,
-  LicenseCard,
-  UpdatesInspector,
 } from "@/views/Settings";
 
 export type InspectorKey =
-  | "supervision"
+  | "status"
+  | "account"
   | "intelligence"
   | "system"
-  | "updates"
-  | "changelog"
-  | "help"
   | "lifecycle"
   | "pair";
 
 const TITLES: Record<InspectorKey, string> = {
-  supervision: "Supervision",
+  status: "Status",
+  account: "Account",
   intelligence: "Intelligence",
-  system: "System",
-  updates: "Updates",
-  changelog: "Changelog",
-  help: "Help",
+  system: "Settings",
   lifecycle: "Strategy lifecycle",
   pair: "Pair a phone",
 };
@@ -79,6 +75,8 @@ const DOCK_OFFSET = 16;
 export default function InspectorHost({
   open,
   instrument,
+  update,
+  version,
   onClose,
 }: {
   open: InspectorKey | null;
@@ -86,6 +84,12 @@ export default function InspectorHost({
    *  rather than re-derived so the miniature and the board can never disagree
    *  about what the stack is doing. */
   instrument?: OrreryFrame;
+  /** The launcher self-update probe + the installed version, for Status's
+   *  version ladder. Handed down for the same reason as the frame: the Shell
+   *  already holds one reading of both, and a second probe could disagree
+   *  with it. */
+  update?: UpdateInfo | null;
+  version?: string | null;
   onClose: () => void;
 }) {
   // What is actually in the DOM: whatever is open, plus a tray that has been
@@ -162,7 +166,12 @@ export default function InspectorHost({
             </button>
           </div>
           <div className="insp__body">
-            <InspectorBody which={shown} instrument={instrument} />
+            <InspectorBody
+              which={shown}
+              instrument={instrument}
+              update={update}
+              version={version}
+            />
           </div>
         </aside>
       </div>
@@ -173,13 +182,26 @@ export default function InspectorHost({
 function InspectorBody({
   which,
   instrument,
+  update,
+  version,
 }: {
   which: InspectorKey;
   instrument?: OrreryFrame;
+  update?: UpdateInfo | null;
+  version?: string | null;
 }) {
   switch (which) {
-    case "supervision":
-      return <SupervisionInspector instrument={instrument} />;
+    case "status":
+      // Everything the home used to say along its floor: the instrument's
+      // echo, the stack, the containers, the version ladder, What's new and
+      // Help — one surface, in that order.
+      return (
+        <StatusInspector instrument={instrument} update={update} version={version} />
+      );
+    case "account":
+      // Identity, and the two things that belong to it: the licence and the
+      // GitHub sign-in, re-homed here from the settings tray.
+      return <AccountInspector />;
     case "lifecycle":
       return <LifecycleInspector />;
     case "pair":
@@ -188,27 +210,12 @@ function InspectorBody({
       return <PairPhoneInspector />;
     case "intelligence":
       return <IntelligenceCard />;
-    case "updates":
-      // The hub's update home — one "Update Auracle" action that brings the
-      // whole stack (engine, IDE, launcher) current in a single pass.
-      return <UpdatesInspector />;
-    case "changelog":
-      return <ChangelogInspector />;
-    case "help":
-      // FAQ + Support merged into one Help surface — one fewer popup.
-      return (
-        <>
-          <FaqInspector />
-          <SupportInspector />
-        </>
-      );
     case "system":
-      // Settings only — all update controls now live in the Updates surface.
+      // The settings surface: engine preferences, and the diagnostics drawer.
+      // No update control lives here (or anywhere): Auracle updates itself.
       return (
         <>
-          <LicenseCard />
           <GeneralCard />
-          <GithubCard />
           <AdvancedDrawer />
         </>
       );

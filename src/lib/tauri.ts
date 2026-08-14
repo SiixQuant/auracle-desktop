@@ -13,6 +13,13 @@
 
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 
+// The shared-session shape is declared next to the pure logic that reads it
+// (`lib/identity.ts`), so the chip's label rules can be tested without the
+// bridge. Re-exported here because this module is the boundary's vocabulary.
+import type { AccountSession } from "@/lib/identity";
+
+export type { AccountSession };
+
 /**
  * Wrap a Tauri invoke call with a typed return + a clear "not in
  * Tauri" error when running outside the launcher (e.g. opening the
@@ -250,11 +257,16 @@ export const cmd = {
    *  while this runs.
    *
    *  The bundle is NEVER swapped underneath a running IDE: `quitRunning`
-   *  is the user's consent (gathered via `ideRunning` + the Updates
-   *  card's banner) for the installer to close a live IDE right before
-   *  the swap and reopen the new bundle after. Without it, an install
-   *  that finds the IDE open at swap time rejects with a plain message
-   *  and leaves the installed app untouched. */
+   *  is the caller's explicit consent for the installer to close a live
+   *  IDE right before the swap and reopen the new bundle after. Without
+   *  it, an install that finds the IDE open at swap time rejects with a
+   *  plain message and leaves the installed app untouched — the guard is
+   *  the Rust side's, so it holds no matter who calls this.
+   *
+   *  NO UI CALLS THIS TODAY. The "Update Auracle" card that did was
+   *  retired with the rest of the manual update path (Auracle updates
+   *  itself); the binding and the Rust command stay registered, consent
+   *  contract intact, for the automatic path to grow into. */
   ideDownloadAndInstall: (
     assetUrl: string,
     expectedSize: number | null | undefined,
@@ -294,10 +306,7 @@ export const cmd = {
   /** Whether a session credential is cached on this machine. */
   signInStatus: () => invoke<boolean>("sign_in_status"),
   /** The engine's shared hosted-sign-in session — read by both apps. */
-  clerkSession: () =>
-    invoke<{ signed_in: boolean; email: string | null; tier: string | null }>(
-      "clerk_session",
-    ),
+  clerkSession: () => invoke<AccountSession>("clerk_session"),
 
   // ── Shared global settings ───────────────────────────────────
   //

@@ -9,31 +9,24 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { AuracleGlyph } from "@/components/AuracleGlyph";
 import Coachmark, { coachSeen } from "@/components/Coachmark";
 import CommandPalette from "@/components/CommandPalette";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
+import NavPill from "@/components/NavPill";
 import StandbyHome from "@/components/StandbyHome";
-import DotField from "@/fx/DotField";
+import AsciiField from "@/fx/AsciiField";
 import { DUR, enter, useGSAP } from "@/fx/motion";
 import { frameFor } from "@/fx/orrery";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
-import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/tauri";
+import {
+  cmd,
+  openEngineSetup,
+  openIdePanel,
+  type AccountSession,
+  type ContainerStatus,
+} from "@/lib/tauri";
 import { useEngineState } from "@/lib/useEngineState";
-
-/** Where the instrument's core sits down the window, as a fraction of its
- *  height — the focus point of the ambient field's brightness ramp. The field
- *  is there to seat the orrery, so it points at it rather than at the
- *  geometric centre of the window.
- *
- *  Re-measured against slice 5's three bands, where the instrument is centred
- *  in the top 55% of the stage under the 46px topbar rather than heading a
- *  centred column: (46 + 0.55·stage/2) / height — 0.342 at the 600×500
- *  minimum, 0.323 in the default 900×700, 0.312 at 1200×900. One constant
- *  covers the range: the ramp is 240px wide and 15px of error is invisible
- *  inside it. */
-const INSTRUMENT_FOCUS_Y = 0.33;
 
 export default function Shell({
   onOpenTutorial,
@@ -52,6 +45,22 @@ export default function Shell({
   const [showCoach, setShowCoach] = useState(() => !coachSeen());
   const echoTimer = useRef<number | null>(null);
   const showTips = useCallback(() => setShowCoach(true), []);
+
+  // Who is signed in, for the pill's account chip. Read once: the session is
+  // the engine's and it does not change under a running launcher — and a chip
+  // that polled would be one more clock for one word. A failed probe leaves it
+  // null, which the chip renders as the name of its own door, never as a guess.
+  const [account, setAccount] = useState<AccountSession | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    cmd
+      .clerkSession()
+      .then((s) => !cancelled && setAccount(s))
+      .catch(() => !cancelled && setAccount(null));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The live stack: the palette's restart commands AND the instrument's
   // bodies. Re-read on every health poll rather than on a timer of its own —
@@ -89,7 +98,7 @@ export default function Shell({
         void openEngineSetup();
         break;
       case "degraded":
-        setInspector("supervision");
+        setInspector("status");
         break;
       default:
         break;
@@ -110,8 +119,17 @@ export default function Shell({
         openIdePanel: (p) => void openIdePanel(p),
         openTutorial: onOpenTutorial,
         showTips,
+        rerunSetup: onRerunSetup,
       }),
-    [board, containers, runActuator, eng.refresh, onOpenTutorial, showTips],
+    [
+      board,
+      containers,
+      runActuator,
+      eng.refresh,
+      onOpenTutorial,
+      showTips,
+      onRerunSetup,
+    ],
   );
 
   const runCommand = useCallback(
@@ -160,15 +178,10 @@ export default function Shell({
                 : "launch",
           );
           break;
-        case "u":
-          e.preventDefault();
-          setInspector("updates");
-          emit("updates");
-          break;
         case "s":
           e.preventDefault();
-          setInspector("supervision");
-          emit("supervision");
+          setInspector("status");
+          emit("status");
           break;
         case "a":
           e.preventDefault();
@@ -190,33 +203,16 @@ export default function Shell({
 
   return (
     <div className="shell-standby">
-      {/* The ambient stage. Its brightened core sits on the instrument rather
-          than on the geometric centre of the window — the field is there to
-          seat the orrery, so it points at it. */}
-      <DotField focusY={INSTRUMENT_FOCUS_Y} />
-      <header className="topbar">
-        <div className="topbar__brand">
-          <AuracleGlyph className="topbar__mark" />
-          <strong>Auracle</strong>
-        </div>
-        <div className="topbar__actions">
-          <button
-            type="button"
-            className="topbar__btn"
-            onClick={() => {
-              loadContainers();
-              setPaletteOpen(true);
-            }}
-          >
-            <SearchIcon />
-            <span className="kbd-hint">⌘K</span>
-          </button>
-          <button type="button" className="topbar__btn" onClick={() => setInspector("system")}>
-            <GearIcon />
-            System
-          </button>
-        </div>
-      </header>
+      {/* The ambient stage: the mark itself, rasterised into a field of
+          characters, composed large and running off the right edge. Texture
+          first, image second — it seats the instrument by standing behind it,
+          not by pointing at it. */}
+      <AsciiField />
+      {/* The launcher's whole navigation, and the window's drag strip. The
+          window has no title bar of its own (tauri.conf.json: titleBarStyle
+          "Overlay" — decorations stay, so the traffic lights are still the
+          OS's), so this band is what you drag it by. */}
+      <NavPill account={account} onOpen={(k) => setInspector(k)} />
 
       <main className="standby-stage">
         <StandbyHome
@@ -224,22 +220,23 @@ export default function Shell({
           containers={containers}
           onActuator={runActuator}
           onDoor={(d) => setInspector(d)}
-          onCard={(k) => setInspector(k)}
-          onRerunSetup={onRerunSetup}
-          onAgent={() => setInspector("intelligence")}
         />
         {/* The tray's Supervision echo draws the SAME instrument as the home
             (§3.4). Derived once here and handed down rather than rebuilt
-            inside the tray, so the miniature and the board cannot disagree. */}
+            inside the tray, so the miniature and the board cannot disagree —
+            and the same reason the version ladder rides down with it: the
+            Shell already holds one reading of the update probe. */}
         <InspectorHost
           open={inspector}
           instrument={frameFor(board, containers)}
+          update={eng.update}
+          version={eng.version}
           onClose={() => setInspector(null)}
         />
         {echo && <EchoLine key={echo} verb={echo} />}
-        {/* The coachmark annotates the three bands, so it lives in the stage
-            that holds them (§3.6's deterministic anchoring) rather than over
-            the whole window — the same reason the tray is mounted here. */}
+        {/* The coachmark annotates the home's own parts, so it lives in the
+            stage that holds them (§3.6's deterministic anchoring) rather than
+            over the whole window — the same reason the tray is mounted here. */}
         {showCoach && <Coachmark onClose={() => setShowCoach(false)} />}
       </main>
 
@@ -279,35 +276,7 @@ function EchoLine({ verb }: { verb: string }) {
   );
 }
 
-// ── Top-bar icons (inline, no icon-font dependency) ─────────────────
-
-const iconProps = {
-  width: 15,
-  height: 15,
-  viewBox: "0 0 20 20",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.6,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-function SearchIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="9" cy="9" r="6" />
-      <path d="M13.5 13.5 L17 17" />
-    </svg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="10" cy="10" r="2.4" />
-      <path d="M10 2.5 v2 M10 15.5 v2 M2.5 10 h2 M15.5 10 h2 M4.7 4.7 l1.4 1.4 M13.9 13.9 l1.4 1.4 M15.3 4.7 l-1.4 1.4 M6.1 13.9 l-1.4 1.4" />
-    </svg>
-  );
-}
+// The search and gear glyphs left with the top bar they labelled. The pill
+// carries words, not icons, and the palette they stood for is ⌘K — which the
+// tour, the coachmark and every command's own echo all name.
 
