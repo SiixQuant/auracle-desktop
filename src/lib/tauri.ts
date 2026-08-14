@@ -257,11 +257,16 @@ export const cmd = {
    *  while this runs.
    *
    *  The bundle is NEVER swapped underneath a running IDE: `quitRunning`
-   *  is the user's consent (gathered via `ideRunning` + the Updates
-   *  card's banner) for the installer to close a live IDE right before
-   *  the swap and reopen the new bundle after. Without it, an install
-   *  that finds the IDE open at swap time rejects with a plain message
-   *  and leaves the installed app untouched. */
+   *  is the caller's explicit consent for the installer to close a live
+   *  IDE right before the swap and reopen the new bundle after. Without
+   *  it, an install that finds the IDE open at swap time rejects with a
+   *  plain message and leaves the installed app untouched — the guard is
+   *  the Rust side's, so it holds no matter who calls this.
+   *
+   *  NO UI CALLS THIS TODAY. The "Update Auracle" card that did was
+   *  retired with the rest of the manual update path (Auracle updates
+   *  itself); the binding and the Rust command stay registered, consent
+   *  contract intact, for the automatic path to grow into. */
   ideDownloadAndInstall: (
     assetUrl: string,
     expectedSize: number | null | undefined,

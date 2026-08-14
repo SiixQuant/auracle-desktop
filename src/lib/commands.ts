@@ -29,7 +29,9 @@ export interface Command {
 export interface CommandContext {
   board: BoardState;
   containers: ContainerStatus[];
-  openInspector: (key: Door | "intelligence" | "system" | "lifecycle" | "pair") => void;
+  openInspector: (
+    key: Door | "account" | "intelligence" | "system" | "lifecycle" | "pair",
+  ) => void;
   /** The home's one verb (launch / start engine / connect / …). */
   runActuator: () => void;
   restartContainer: (name: string) => void;
@@ -71,7 +73,12 @@ export function buildCommands(ctx: CommandContext): Command[] {
 
   // Destinations (status-is-the-door, also reachable by name).
   const dests: Array<
-    [Door | "intelligence" | "system" | "lifecycle" | "pair", string, string, string]
+    [
+      Door | "account" | "intelligence" | "system" | "lifecycle" | "pair",
+      string,
+      string,
+      string,
+    ]
   > = [
     [
       "status",
@@ -81,7 +88,8 @@ export function buildCommands(ctx: CommandContext): Command[] {
     ],
     ["lifecycle", "Open Strategy lifecycle", "lifecycle", "strategies belt draft paper live"],
     ["intelligence", "Open Intelligence", "intelligence", "agent model deepseek ai key"],
-    ["system", "Open Settings", "settings", "license preferences system github advanced"],
+    ["system", "Open Settings", "settings", "preferences system advanced diagnostics"],
+    ["account", "Open Account", "account", "sign in email licence license tier plan github"],
     ["pair", "Pair a phone (beta)", "pair phone", "ios iphone mobile qr pairing scan"],
   ];
   for (const [key, title, verb, keywords] of dests) {

@@ -43,24 +43,37 @@ unmistakable and calm.
 
 The resting state of the instrument — core plus two chrome dots — reproduces the
 logo. Opening the launcher on a stopped machine shows the mark, at rest. Opening
-Supervision is opening the back of the instrument — and since v0.10.0 the back
-is *black*, the brand's counter-material, behind a face made of daylight.
+Status is opening the back of the instrument — and since v0.10.0 the back is
+*black*, the brand's counter-material, behind a face made of daylight.
 
-The window is three fixed bands on one cream chamber:
+The window is one cream chamber with four things in it — a stage, an
+instrument, a sentence and a verb — plus the capsule that is the whole
+navigation:
 
 ```
 ┌──────────────────────────────────────────────┐
-│ topbar: glyph·Auracle            ⌘K · System │  hairline below, 44px
-│                                              │
-│                THE INSTRUMENT                │  orbit stage, minmax(0,55%)
-│           (orrery: core + bodies)            │  ambient dot-field behind
-│                                              │
-│            Everything's ready.               │  THE VERDICT (display)
-│              [ Open workspace ]              │  one orange verb
-│                                              │
-│ engine Healthy · v0.8.37 · What's new · Help │  THE LEDGER (mono meta row)
+│        ◐  ENGINE  SETTINGS       ggonzalez   │  THE PILL (black capsule,
+│                                              │  dotted hairline, floating)
+│                          ╭────────────╮      │
+│                          │            │      │  THE INSTRUMENT, key-art
+│                          │   orrery   │      │  scale, right of centre
+│                          ╰────────────╯      │
+│  Everything's ready.                         │  THE VERDICT (display)
+│  [ OPEN WORKSPACE ]                          │  one orange verb, mono caps
+│  (one quiet mono line, only when needed)     │
 └──────────────────────────────────────────────┘
 ```
+
+The ascii field (the mark itself, rasterised into characters) runs full-bleed
+behind all of it. **The mono ledger that used to sit on the floor — the engine
+vital, the version ladder, What's new, Help — moved whole into the Status
+tray.** Nothing was dropped; it is one door away instead of always on screen,
+and that is what buys the instrument its size and the verb its silence.
+
+The window itself carries macOS's **overlay title bar**: no bar of ours, the
+OS's traffic lights floating over our top-left corner, and the pill's band as
+the drag region. `--chrome-lights` / `--chrome-top` are how much room every
+full-window surface keeps clear for them.
 
 Depth surfaces — the inspector tray, the ⌘K palette, the tutorial and coachmark
 — are machined parts of the same instrument: opaque planes, hairline edges. No
@@ -280,7 +293,7 @@ Every one of them is enforced somewhere you can point at.
    > arrives. That requires committing the new line from a tween's
    > `onComplete` — and this app sleeps its ticker whenever the window is
    > hidden. A slept ticker would strand the verdict on the previous sentence
-   > while the verb and the ledger beside it already read the new state: the
+   > while the verb beside it already read the new state: the
    > home contradicting itself, which this surface may never do. **The line
    > commits immediately; only its arrival is animated.** React owns the text
    > and a `key` retires the element, so the DOM holds exactly one line and it
@@ -320,7 +333,6 @@ What each surface does when the preference is on:
 | Spin-down | Snaps. The stopped state is *also* carried statically by the dashed ring, the core hue and the absence of bodies. |
 | Ambient field | One static frame, dots on their anchors, rAF never started. |
 | Verdict | Words split and land complete on the first tick; `aria-label` carries the sentence regardless. |
-| Ledger update sweep | The underline is simply there. |
 | Tray / palette / echo | Instant open and close, both directions. |
 | Tutorial / coachmark | No animation at all in any mode. |
 | Install arc | Never animated in any mode. |
@@ -334,8 +346,9 @@ delay is still a 2s stall — "instant" has to mean instant at both ends.
 state above is redundantly encoded in static ink or words: off-tempo ⟺ amber/red
 body ink; stopped mechanism ⟺ dashed ring + core hue + absent bodies; breath
 tempo ⟺ core hue + the verdict sentence; the in-button sweep ⟺ the button label,
-the disabled state, the verdict and the ledger vital. **If you add a surface
-where turning motion off loses information, the surface is wrong.**
+the disabled state, the verdict and the Status tray's own engine chip. **If you
+add a surface where turning motion off loses information, the surface is
+wrong.**
 
 ---
 
@@ -386,12 +399,16 @@ under plain `node --test` with no renderer.
 | `src/fx/commissioning.ts` | First-run staging: stage ladder, stations, arc progress, ring/core per stage. **Pure.** |
 | `src/components/CommissioningInstrument.tsx` | The first-run instrument's SVG, the arc, the ceremony. |
 | `src/components/OrreryEcho.tsx` | The still miniature at the top of Supervision. Plain SVG, zero tweens. |
-| `src/lib/aggregator.ts` | `deriveBoard()` — the single source of what the home says. Pure, and the highest-value test seam in the app. |
-| `src/lib/ledger.ts` | Band 3's cells and the update-truth ladder. |
+| `src/lib/aggregator.ts` | `deriveBoard()` — the single source of what the home says — plus `attentionLine()`, the one quiet line under the verb. Pure, and the highest-value test seam in the app. |
+| `src/lib/ledger.ts` | The version truth ladder. All that outlived the home's mono row; the readings around it went to the components that own them. |
+| `src/lib/identity.ts` | What the pill's account chip is allowed to say. **Pure.** |
 | `src/lib/signin.ts` | The pre-auth gate: whether the browser sign-in can start at all, and what the card says when it can't. **Pure.** |
-| `src/components/Shell.tsx` | The live surface: bands, hotkeys, echo line, polling. |
-| `src/components/StandbyHome.tsx` | The three bands' markup: instrument, verdict + verb, ledger. |
+| `src/components/Shell.tsx` | The live surface: composition, hotkeys, echo line, polling. |
+| `src/components/StandbyHome.tsx` | The home's markup: the figure, and the cluster (verdict + verb + the quiet line). |
+| `src/components/NavPill.tsx` | The whole navigation: mark · ENGINE · SETTINGS · account chip. Also the window's drag strip. |
 | `src/components/InspectorHost.tsx` | The tray: one at a time, Esc/scrim close, the mechanical slide. |
+| `src/components/StatusInspector.tsx` | The one information surface: Supervision's echo/stack/containers, the version ladder, What's new, Help. A re-home, not a rewrite. |
+| `src/components/AccountInspector.tsx` | Identity: the engine's shared session, the licence, the GitHub sign-in. |
 | `src/components/CommandPalette.tsx` | ⌘K. |
 | `src/views/Onboarding.tsx` | The first-run state machine (Docker probe, licence, pre-flight, `installer-progress`, health poll). |
 | `src/styles/app.css` | Every value, every token, one stylesheet. |
