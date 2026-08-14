@@ -7,66 +7,84 @@
  */
 
 /* ── Bundled type (OFL 1.1) ───────────────────────────────────────────
- * Three faces ship inside the app as woff2 — no CDN, no runtime fetch, no
+ * Two faces ship inside the app as woff2 — no CDN, no runtime fetch, no
  * system-font lottery. The files come from the @fontsource* packages in
  * package.json (Vite fingerprints and emits them into dist/assets), and we
  * declare the faces by hand rather than importing the packages' own CSS so
- * that ONLY the latin subset and ONLY the axes/weights the design system
- * uses get bundled — the package entrypoints also drag in latin-ext and
- * vietnamese, roughly tripling the on-disk cost for glyphs this UI has no
- * copy for. Licences + provenance: src/assets/fonts/OFL-NOTICES.txt.
+ * that ONLY the latin subset and ONLY the weights the design system uses get
+ * bundled — the package entrypoints also drag in latin-ext and vietnamese,
+ * roughly tripling the on-disk cost for glyphs this UI has no copy for.
+ * Licences + provenance: src/assets/fonts/OFL-NOTICES.txt.
+ *
+ * Geist Sans and Geist Mono are the brand's two faces (auracle-marketing's
+ * DESIGN.md — "The Ledger"): no serif, no third family. The retired trio
+ * (Fraunces / Inter / JetBrains Mono) left with the charcoal ground.
+ *
+ * Static cuts, not variable: only three sans weights and two mono weights
+ * are ever set, and five static latin files (~123 KB) come in under the one
+ * variable pair.
  *
  * font-display: block — the files are local, so "loading" is a sub-frame
- * event; blocking avoids a flash of the fallback serif on the verdict line.
+ * event; blocking avoids a flash of the fallback face on the verdict line.
  * CSP: default-src 'self' covers font-src, and these resolve to app-local
  * asset URLs, so nothing leaves the machine.
  * ──────────────────────────────────────────────────────────────────── */
 
-/* Display — Fraunces (wght + opsz axes; SOFT/WONK fixed at their 0 default). */
+/* UI sans + display — Geist Sans. Regular (body), Medium (the verdict, the
+ * station titles, every control label), SemiBold (the few 600 registers). */
 @font-face {
-  font-family: "Fraunces Variable";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: block;
-  src: url("@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2")
-    format("woff2-variations");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
-    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* UI sans — Inter (wght axis only; ss01/cv01 are set on html,body). */
-@font-face {
-  font-family: "Inter Variable";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: block;
-  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
-    format("woff2-variations");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
-    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* Data mono — JetBrains Mono, Regular + Medium only (the two weights the
- * ledger/chip/label register actually sets). */
-@font-face {
-  font-family: "JetBrains Mono";
+  font-family: "Geist Sans";
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2")
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-400-normal.woff2")
     format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
     U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: "Geist Sans";
   font-style: normal;
   font-weight: 500;
   font-display: block;
-  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2")
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-500-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Geist Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-600-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Data mono — Geist Mono, Regular + Medium only (the two weights the
+ * ledger/chip/label register actually sets). */
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("@fontsource/geist-mono/files/geist-mono-latin-500-normal.woff2")
     format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
@@ -191,37 +209,32 @@
   --t-md: 16px;
   --t-lg: 18px;
   --t-xl: 24px;
-  /* Display steps — the two places the serif is allowed to be big. */
+  /* Display steps — the two places the display register is allowed to be big. */
   --t-verdict: clamp(22px, 3.4vw, 30px);  /* the home verdict line */
   --t-station: 20px;                      /* onboarding station titles (consumer lands with the commissioning rail) */
 
   /* Fonts — bundled OFL faces lead every role (see the @font-face block at
-     the top of this file); the system stacks are fallbacks only. Inter used
-     to lead --font-sans unbundled, which meant it silently fell through to
-     -apple-system on most machines; SF Mono used to lead --font-mono, which
-     meant the msi/deb/rpm builds got a different data face than the mac
-     build, and the Bodoni/Didot display stack simply did not exist off-mac.
-     Bundling settles all three: the launcher renders identically on macOS,
-     Windows, and Linux, offline, on first paint. tabular-nums on data. */
-  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans",
-               "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco,
+     the top of this file); the system stacks are fallbacks only, and are
+     what the launcher would render if a woff2 ever failed to emit.
+     Bundling is why the launcher renders identically on macOS, Windows and
+     Linux, offline, on first paint. tabular-nums on data. */
+  --font-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial,
+               sans-serif;
+  --font-mono: "Geist Mono", "SF Mono", ui-monospace, Menlo, Monaco,
                "Cascadia Mono", Consolas, "Courier New", monospace;
-  /* Display serif (Hermes DNA) — big dramatic headline faces for the verdict
-     line + page titles, nowhere else, never bold. Fraunces is the bundled
-     stand-in for Hermes' proprietary "Collapse": same high-contrast drama,
-     OFL-licensed, fully offline. The old system serifs stay as fallbacks. */
-  --font-display: "Fraunces Variable", "Bodoni 72", "Didot", "Didot LT STD",
-               "Playfair Display", "Times New Roman", Georgia, serif;
-  /* Fraunces' variable axes for the display role. opsz 72 is the direct
-     analogue of the face this replaces — "Bodoni 72" is named for its 72pt
-     optical size — so the drama (fine hairlines, high stroke contrast)
-     carries over instead of drifting toward a text cut. SOFT 0 keeps the
-     sharp terminal rather than the rounded one. Pair with weight 400: the
-     serif already reads heavier than the sans, and this face is never set
-     bold. Harmlessly ignored by the fallback serifs, which have no axes. */
-  --fvs-display: "opsz" 72, "SOFT" 0;
+  /* The display register is the SAME face as the body, one step up in
+     weight (500) with tight leading — the brand has two faces and no serif
+     (auracle-marketing DESIGN.md). The token stays because the ROLE stays:
+     the verdict line, the station titles and the page titles are the only
+     places allowed to set it, and pointing it somewhere else is a one-line
+     change here rather than six. */
+  --font-display: var(--font-sans);
+  /* The display weight. 500 is the brand's display cut; the body sits at
+     400, so the verdict reads as a step up in the same voice rather than as
+     a second typeface. Never bolder — 600 is a control-label register, not
+     a headline one. */
+  --fw-display: 500;
 }
 
 * { box-sizing: border-box; }
@@ -233,7 +246,6 @@ html, body {
   color: var(--fg);
   font-family: var(--font-sans);
   font-size: var(--t-base);
-  font-feature-settings: "ss01" on, "cv01" on;
   height: 100%;
   letter-spacing: -0.005em;
 }
@@ -260,12 +272,11 @@ main {
 }
 
 h1 {
-  /* Display serif (Hermes DNA) — page titles get the dramatic high-contrast
-     serif; the weight drops because serifs read heavier than the sans. */
+  /* The display register — page titles are the body face one weight up,
+     set tight. There is no second family to reach for. */
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: 28px;
-  font-weight: 400;
+  font-weight: var(--fw-display);
   letter-spacing: -0.01em;
   margin: 0 0 var(--s-4);
 }
@@ -495,9 +506,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 /* The window title area (§3.2), in the display face. */
 .commissioning__title {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-md);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   letter-spacing: -0.01em;
   color: var(--fg);
 }
@@ -664,9 +674,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 .comm-station__title {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-station);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   line-height: 1.25;
   letter-spacing: -0.01em;
   /* The base h2 is the mono-label register (uppercase, tracked, muted); a
@@ -793,7 +802,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 
 /* ── The handover (§3.2) ────────────────────────────────────────
  * The last frame of the first run and the first frame of the home: one
- * display-serif line under the assembled instrument, in the home's own
+ * display line under the assembled instrument, in the home's own
  * verdict register, while the wizard's 1.8s timer bounces the browser and
  * hands the window over. */
 .commissioning__handover {
@@ -807,9 +816,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 .commissioning__verdict {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-verdict);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   line-height: 1.2;
   color: var(--fg);
   margin: 0;
@@ -1088,8 +1096,8 @@ pre.logs.logs-compact { max-height: 200px; }
 
 
 /* ── Tutorial — the orientation card (redesign §3.6) ────────────────
- * "An orientation card bottom-center above the ledger: mono step label, [display
- * serif] title, dots become station ticks on a hairline." Machined like every
+ * "An orientation card bottom-center above the ledger: mono step label,
+ * [display] title, dots become station ticks on a hairline." Machined like every
  * other depth surface (§1): an opaque plane on the elevation ladder, ONE
  * canonical hairline, one floater shadow, no glass and no glow.
  *
@@ -1134,9 +1142,8 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .tut-title {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-station);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   line-height: 1.2;
   color: var(--fg);
   margin: var(--s-2) 0 var(--s-2);
@@ -1381,14 +1388,13 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .orrery__body:hover .orrery__flag { opacity: 1; }
 
-/* THE VERDICT (§3.3 Band 2) — the display serif, and the only sentence on the
+/* THE VERDICT (§3.3 Band 2) — the display register, and the only sentence on the
  * screen. The per-word entrance lives in fx/motion.ts (`revealWords`); nothing
  * here may hide it, so no CSS animation and no opacity of its own. */
 .standby__verdict {
   font-family: var(--font-display);
-  font-variation-settings: var(--fvs-display);
   font-size: var(--t-verdict);
-  font-weight: 400;
+  font-weight: var(--fw-display);
   color: var(--fg);
   margin: 0;
   max-width: 24ch;
@@ -1472,7 +1478,7 @@ pre.logs.logs-compact { max-height: 200px; }
  * cell a discrete control, every reading still carrying its dot, its
  * freshness and its provenance.
  *
- * Register (§2.2): JetBrains Mono; KEYS are the 10.5px/0.08em uppercase
+ * Register (§2.2): Geist Mono; KEYS are the 10.5px/0.08em uppercase
  * mono-label the type system defines and consumers were left to apply;
  * VALUES stay sentence-case at reading size, because "Healthy" and "What's
  * new" are words the user reads, not labels they scan. */

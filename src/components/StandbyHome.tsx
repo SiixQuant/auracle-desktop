@@ -5,7 +5,7 @@
 //
 //     ┌──────────────────────────────────────────────┐
 //     │                THE INSTRUMENT                │  ~55% of the stage
-//     │            Everything's ready.               │  THE VERDICT (serif)
+//     │            Everything's ready.               │  THE VERDICT (display)
 //     │              [ Open workspace ]              │  one Nous-blue verb
 //     │ engine Healthy · v0.8.37 · What's new · Help │  THE LEDGER (mono)
 //     └──────────────────────────────────────────────┘
@@ -153,7 +153,7 @@ export default function StandbyHome({
 
 // ── Band 2 — The Verdict ────────────────────────────────────────────
 
-/** The system line, in the display serif, arriving word by word (§2.4).
+/** The system line, in the display register, arriving word by word (§2.4).
  *
  *  React owns the text and the `key` retires the whole element on a change, so
  *  the split markup can never outlive the sentence it was made from: the DOM

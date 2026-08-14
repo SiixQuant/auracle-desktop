@@ -303,7 +303,7 @@ function Rail({ stations }: { stations: RailStation[] }) {
 
 // ── The handover (§3.2 — the ceremony's last frame) ─────────────
 
-/** What the chamber says at the moment it becomes the home: one display-serif
+/** What the chamber says at the moment it becomes the home: one display
  *  line and the sentence that has always followed it. The wizard's own 1.8s
  *  timer bounces the browser and calls `onDone()` from where it always did —
  *  this surface is what is on screen while that happens, and it is not a gate

@@ -95,7 +95,7 @@ export const DUR = {
 
 /** Stagger steps, in seconds. */
 export const STAGGER = {
-  /** 30ms · per-word stagger on a verdict / display-serif line change. */
+  /** 30ms · per-word stagger on a verdict / display line change. */
   word: 0.03,
 } as const;
 
