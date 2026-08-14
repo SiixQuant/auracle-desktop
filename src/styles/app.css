@@ -1924,6 +1924,14 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   display: flex;
   flex-direction: column;
   background: var(--surface);
+  /* LOAD-BEARING. Re-pointing --fg only changes the rules that READ it, and
+     `color` is inherited: without this line every element in the tray that
+     has no colour rule of its own — `<div>Engine</div>`, the pairing steps,
+     the account rows — would inherit the BODY's ink and render #232323 on
+     black, i.e. invisible. The cream side gets its default the same way, from
+     `html, body`. A scoped ground must set its own ink, not just its own
+     tokens. */
+  color: var(--fg);
   border-left: 1px solid var(--line-strong);
   /* Square on the window edge, --r-lg on the inner corner only (§2.3): the
      tray is flush with the chassis on three sides and finished on the one
@@ -2074,8 +2082,9 @@ button.ledger__cell:hover .ledger__value { color: var(--fg); }
   position: fixed;
   inset: 0;
   z-index: 60;
-  /* §2.3: a scrim is a plain alpha fill at α.55. No backdrop-filter, here or
-     anywhere — WKWebView paints it black over the home's canvas. */
+  /* §2.3: a scrim is a plain alpha fill, and --scrim is the only one. No
+     backdrop-filter, here or anywhere — WKWebView paints it black over the
+     home's canvas. */
   background: var(--scrim);
   display: flex;
   justify-content: center;
