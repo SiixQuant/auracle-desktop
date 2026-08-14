@@ -14,26 +14,13 @@ import Coachmark, { coachSeen } from "@/components/Coachmark";
 import CommandPalette from "@/components/CommandPalette";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
 import StandbyHome from "@/components/StandbyHome";
-import DotField from "@/fx/DotField";
+import AsciiField from "@/fx/AsciiField";
 import { DUR, enter, useGSAP } from "@/fx/motion";
 import { frameFor } from "@/fx/orrery";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
 import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/tauri";
 import { useEngineState } from "@/lib/useEngineState";
-
-/** Where the instrument's core sits down the window, as a fraction of its
- *  height — the focus point of the ambient field's brightness ramp. The field
- *  is there to seat the orrery, so it points at it rather than at the
- *  geometric centre of the window.
- *
- *  Re-measured against slice 5's three bands, where the instrument is centred
- *  in the top 55% of the stage under the 46px topbar rather than heading a
- *  centred column: (46 + 0.55·stage/2) / height — 0.342 at the 600×500
- *  minimum, 0.323 in the default 900×700, 0.312 at 1200×900. One constant
- *  covers the range: the ramp is 240px wide and 15px of error is invisible
- *  inside it. */
-const INSTRUMENT_FOCUS_Y = 0.33;
 
 export default function Shell({
   onOpenTutorial,
@@ -190,10 +177,11 @@ export default function Shell({
 
   return (
     <div className="shell-standby">
-      {/* The ambient stage. Its brightened core sits on the instrument rather
-          than on the geometric centre of the window — the field is there to
-          seat the orrery, so it points at it. */}
-      <DotField focusY={INSTRUMENT_FOCUS_Y} />
+      {/* The ambient stage: the mark itself, rasterised into a field of
+          characters, composed large and running off the right edge. Texture
+          first, image second — it seats the instrument by standing behind it,
+          not by pointing at it. */}
+      <AsciiField />
       <header className="topbar">
         <div className="topbar__brand">
           <AuracleGlyph className="topbar__mark" />
