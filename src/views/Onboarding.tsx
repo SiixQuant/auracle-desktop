@@ -169,7 +169,9 @@ export default function Onboarding({
           first run is the third room in one chamber, not a different app. */}
       <DotField focusY={INSTRUMENT_FOCUS_Y} />
 
-      <header className="topbar">
+      {/* The window carries no title bar of its own, so this strip is what you
+          drag it by — on first run as much as on the home. */}
+      <header className="topbar" data-tauri-drag-region>
         <div className="topbar__brand">
           <AuracleGlyph className="topbar__mark" />
           <span className="commissioning__title">Commissioning your desk</span>

@@ -285,6 +285,20 @@
   --s-5: 24px;
   --s-6: 32px;
 
+  /* The window's own chrome. The main window runs with macOS's OVERLAY title
+     bar (tauri.conf.json → app.windows[0].titleBarStyle): the bar itself is
+     gone, the traffic lights are not — they float over the top-left of our
+     own content, and nothing of ours may sit under them.
+
+     --chrome-lights is how wide that reserved corner is (three 12px buttons
+     on a 20px pitch from a 20px inset ≈ 78px, rounded up to a round number
+     with air). --chrome-top is the strip we keep clear at the top of the
+     window: tall enough to contain the buttons, and the thing you drag the
+     window by (`data-tauri-drag-region`). Windows and Linux draw their own
+     decorations, so both values only ever cost a little air there. */
+  --chrome-lights: 86px;
+  --chrome-top: 40px;
+
   /* Type scale */
   --t-xs: 11px;
   --t-sm: 13px;
@@ -591,6 +605,11 @@ input[type="text"]:focus, input[type="password"]:focus {
 .commissioning .topbar {
   background: transparent;
   border-bottom: 1px solid var(--line);
+  /* Same reserved corner as the home's: the overlay title bar applies to the
+     window, not to one screen, so every full-window surface keeps clear of
+     the traffic lights. */
+  min-height: var(--chrome-top);
+  padding-left: var(--chrome-lights);
 }
 /* The window title area (§3.2), in the display face. */
 .commissioning__title {
@@ -2605,10 +2624,15 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
      the canvas with it. Invisible in Chromium; required in WKWebView. */
   transform: translateZ(0);
 }
-/* Transparent chrome so the shader reads through the whole surface. */
+/* Transparent chrome so the shader reads through the whole surface.
+   It is also the window's drag strip now (the overlay title bar leaves the
+   traffic lights floating over our own top-left corner), so it reserves that
+   corner and stands at least as tall as the buttons in it. */
 .shell-standby .topbar {
   background: transparent;
   border-bottom: 1px solid var(--line);
+  min-height: var(--chrome-top);
+  padding-left: var(--chrome-lights);
 }
 .shell-standby .topbar__btn:hover {
   background: var(--surface-2);

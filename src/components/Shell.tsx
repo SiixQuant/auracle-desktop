@@ -182,7 +182,12 @@ export default function Shell({
           first, image second — it seats the instrument by standing behind it,
           not by pointing at it. */}
       <AsciiField />
-      <header className="topbar">
+      {/* The window has no title bar of its own (tauri.conf.json:
+          titleBarStyle "Overlay" — decorations stay, so the traffic lights
+          are still the OS's). The top strip of the UI therefore has to be
+          the thing you drag the window by; children without the attribute
+          (the buttons) keep their own clicks. */}
+      <header className="topbar" data-tauri-drag-region>
         <div className="topbar__brand">
           <AuracleGlyph className="topbar__mark" />
           <strong>Auracle</strong>
