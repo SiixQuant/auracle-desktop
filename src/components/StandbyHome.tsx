@@ -1,52 +1,48 @@
-// StandbyHome — the launcher home, as three bands on one cream chamber.
+// StandbyHome — the launcher home: a stage, an instrument, a sentence, a verb.
 //
 // Design authority: launcher-redesign-direction.md §1 (the chamber sketch) and
-// §3.3 ("Home — The Orrery"). Slice 5 of the redesign.
+// §3.3 ("Home — The Orrery"), as the premium-launcher slice recomposed them.
 //
 //     ┌──────────────────────────────────────────────┐
-//     │                THE INSTRUMENT                │  ~55% of the stage
-//     │            Everything's ready.               │  THE VERDICT (display)
-//     │              [ Open workspace ]              │  one accent verb
-//     │ engine Healthy · v0.8.37 · What's new · Help │  THE LEDGER (mono)
+//     │                       ·  ENGINE · SETTINGS  ·│  the pill (the Shell's)
+//     │                                              │
+//     │                      ╭──────────╮            │  THE INSTRUMENT,
+//     │                      │  orrery  │            │  key-art scale,
+//     │                      ╰──────────╯            │  right of centre
+//     │  Everything's ready.                         │  THE VERDICT (display)
+//     │  [ Open workspace ]                          │  one accent verb
 //     └──────────────────────────────────────────────┘
 //
-// What changed in this slice: the stacked rows under the verb — a footer of
-// links, a re-run escape, and a separate vitals row — became ONE mono ledger
-// pinned to the bottom band. Nothing was dropped in the merge: the engine
-// vital kept its dot, its value, its freshness, its provenance and its door,
-// and the update cell kept the exact truth ladder (it still refuses to say
-// "Up to date" until the probe has answered). The three rows the merge
-// reclaimed are what let the instrument reach the ~55% band §3.9 asks for.
+// What changed: the mono ledger along the floor — the engine vital, the version
+// ladder, What's new, Help — moved WHOLE into the Status inspector. Nothing was
+// dropped; it is one door away instead of always on screen, which is what buys
+// the instrument its size and the verb its silence. The home now carries
+// exactly what a gaming launcher carries: art, one line, one button.
 //
-// The composition is still a pure derivation of one engine snapshot: the
-// verdict, the verb and the instrument come from `deriveBoard`, and the row
-// from `buildLedger`. This file holds the ink and the three tweens; the
-// decisions live in `lib/aggregator.ts` (untouched) and `lib/ledger.ts`.
+// The composition is still a pure derivation of one engine snapshot — the
+// verdict, the verb and the instrument all come from `deriveBoard`. This file
+// holds the ink and the tweens; the decisions live in `lib/aggregator.ts`
+// (untouched by this slice, and untouchable by it: it is the seam).
 
-import { Fragment, useRef } from "react";
+import { useRef } from "react";
 
-import IncidentCard from "@/components/IncidentCard";
 import Orrery from "@/components/Orrery";
-import { DUR, EASE, gsap, mech, revealWords, useGSAP } from "@/fx/motion";
+import { revealWords, useGSAP } from "@/fx/motion";
 import { frameFor } from "@/fx/orrery";
-import { deriveBoard, type ActuatorState, type Door } from "@/lib/aggregator";
 import {
-  buildLedger,
-  type LinkCell,
-  type VersionCell,
-  type VitalCell,
-} from "@/lib/ledger";
+  attentionLine,
+  deriveBoard,
+  type ActuatorState,
+  type Door,
+} from "@/lib/aggregator";
 import type { ContainerStatus } from "@/lib/tauri";
 import type { EngineStateHook } from "@/lib/useEngineState";
-import type { InspectorKey } from "@/components/InspectorHost";
 
 export default function StandbyHome({
   eng,
   containers,
   onActuator,
   onDoor,
-  onCard,
-  onRerunSetup,
 }: {
   /** Shared live engine read (owned by the Shell, so the home keeps
    *  polling behind an open inspector). */
@@ -60,98 +56,37 @@ export default function StandbyHome({
   onActuator: () => void;
   /** Open an inspector for a pressed status (status-is-the-door). */
   onDoor?: (door: Exclude<Door, null>) => void;
-  /** Open one of the ledger's destinations (Updates / Changelog / Help). */
-  onCard?: (key: InspectorKey) => void;
-  /** Re-run the first-run stack setup (Docker + engine + IDE). */
-  onRerunSetup?: () => void;
-  /** Retained so the Shell/palette can still reach the agent inspector even
-   *  though the home no longer shows an agent chip. */
-  onAgent?: () => void;
 }) {
   const board = deriveBoard(eng.state);
   const { actuator } = board;
-  const ledger = buildLedger(board, eng.update, eng.version);
-
-  // The row, in the sketch's order, with the separators woven in below. Built
-  // as one list so a cell can never be dropped by an edit to the markup.
-  const cells: { key: string; node: React.ReactNode }[] = [
-    ...ledger.vitals.map((cell) => {
-      const door = cell.target;
-      return {
-        key: `vital-${cell.key}`,
-        node: (
-          <LedgerVital cell={cell} onOpen={door ? () => onDoor?.(door) : undefined} />
-        ),
-      };
-    }),
-    {
-      key: "version",
-      node: <LedgerVersion cell={ledger.version} onOpen={() => onCard?.("updates")} />,
-    },
-    ...ledger.links.map((link) => ({
-      key: link.target,
-      node: <LedgerLink link={link} onOpen={() => onCard?.(link.target)} />,
-    })),
-  ];
+  const attention = attentionLine(board, {
+    engineErr: eng.engineErr,
+    ideError: eng.ideError,
+  });
 
   return (
     <div className="standby">
-      {/* ── Band 1 — the instrument ───────────────────────────────── */}
-      <div className="standby__instrument">
+      {/* ── The key art — the instrument, seated right of centre ─────
+          Its own cell, so the cluster below can never be pushed under it: at
+          any window this product opens in, the words have their own room. */}
+      <div className="standby__figure">
         <Orrery
           frame={frameFor(board, containers ?? [])}
-          onOpen={() => onDoor?.("supervision")}
+          onOpen={() => onDoor?.("status")}
         />
       </div>
 
-      {/* ── Band 2 — the verdict, and the one verb ────────────────── */}
-      <div className="standby__verdict-band">
+      {/* ── The cluster — one sentence, one verb, one quiet line ───── */}
+      <div className="standby__cluster">
         <Verdict line={board.systemLine} />
-
         <Actuator actuator={actuator} onClick={onActuator} />
-
-        {(eng.engineErr || eng.ideError) && (
-          <div className="standby__err">{eng.engineErr || eng.ideError}</div>
-        )}
-
-        {board.lamp === "err" && (
-          <div className="standby__incident">
-            <IncidentCard
-              severity="err"
-              cause="The local engine isn't running."
-              detail="Start it to continue, or open Supervision to see the stack."
-              action={{ label: "Open Supervision", onClick: () => onDoor?.("supervision") }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* ── Band 3 — the ledger ───────────────────────────────────── */}
-      <div className="standby__ledger-band">
-        <div className="ledger" role="group" aria-label="System ledger">
-          {cells.map((cell, i) => (
-            <Fragment key={cell.key}>
-              {i > 0 && (
-                <span className="ledger__sep" aria-hidden="true">
-                  ·
-                </span>
-              )}
-              {cell.node}
-            </Fragment>
-          ))}
-        </div>
-
-        {onRerunSetup && (
-          <button type="button" className="standby__rerun" onClick={onRerunSetup}>
-            Re-run setup
-          </button>
-        )}
+        {attention && <div className="standby__attention">{attention}</div>}
       </div>
     </div>
   );
 }
 
-// ── Band 2 — The Verdict ────────────────────────────────────────────
+// ── The Verdict ─────────────────────────────────────────────────────
 
 /** The system line, in the display register, arriving word by word (§2.4).
  *
@@ -190,8 +125,17 @@ function Verdict({ line }: { line: string }) {
   );
 }
 
-// ── Band 2 — the one verb ───────────────────────────────────────────
+// ── The one verb ────────────────────────────────────────────────────
 
+/** The actuator: the only accent on the screen and the only thing to press.
+ *
+ *  Its reason line is NOT rendered here any more. There is one quiet line on
+ *  this home and the cluster owns it (`attentionLine`), so a disabled verb's
+ *  reason arrives there — below the verb, in the same place a failure would —
+ *  instead of the two of them stacking a second explanatory row between the
+ *  button and the floor. The `title` stays: the reason is still on the control
+ *  itself for a pointer, which is what makes it a legible disabled button
+ *  rather than a dead one. */
 function Actuator({
   actuator,
   onClick,
@@ -200,97 +144,14 @@ function Actuator({
   onClick: () => void;
 }) {
   return (
-    <div className="standby__actuator-wrap">
-      <button
-        type="button"
-        className={`standby__actuator${actuator.action === "starting" ? " is-progress" : ""}`}
-        onClick={onClick}
-        disabled={actuator.disabled}
-        title={actuator.reason}
-      >
-        <span>{actuator.label}</span>
-      </button>
-      {actuator.reason && actuator.disabled && (
-        <div className="standby__act-reason">{actuator.reason}</div>
-      )}
-    </div>
-  );
-}
-
-// ── Band 3 — The Ledger ─────────────────────────────────────────────
-
-/** The engine vital, as the row's first cell: status dot, mono key, the
- *  engine's own word, and the provenance behind both (hover or focus it — the
- *  green dot stays auditable, which is what made it worth trusting). */
-function LedgerVital({ cell, onOpen }: { cell: VitalCell; onOpen?: () => void }) {
-  const body = (
-    <>
-      <span className={`ledger__dot ${cell.dot}`} aria-hidden="true" />
-      <span className="ledger__key">{cell.label}</span>
-      <span className="ledger__value">{cell.value}</span>
-      {cell.provenance && <span className="ledger__prov">{cell.provenance}</span>}
-    </>
-  );
-
-  // A vital with no door is not a control. Rendering it as a button that does
-  // nothing would be a dead control, which this surface does not have.
-  if (!onOpen) {
-    return (
-      <span className={`ledger__cell is-static${cell.stale ? " is-stale" : ""}`} title={cell.provenance}>
-        {body}
-      </span>
-    );
-  }
-  return (
     <button
       type="button"
-      className={`ledger__cell${cell.stale ? " is-stale" : ""}`}
-      onClick={onOpen}
-      title={cell.provenance}
+      className={`standby__actuator${actuator.action === "starting" ? " is-progress" : ""}`}
+      onClick={onClick}
+      disabled={actuator.disabled}
+      title={actuator.reason}
     >
-      {body}
-    </button>
-  );
-}
-
-/** The version / update cell — the truth ladder (`lib/ledger.ts`), inked.
- *
- *  On the one rung where an update is genuinely waiting, the cell goes bright
- *  and an accent underline sweeps out from the left. Once. It is a fact arriving,
- *  not an animation running: §2.4 allows the sweep exactly because it happens
- *  when the machine learns something, and forbids it from ever looping. */
-function LedgerVersion({ cell, onOpen }: { cell: VersionCell; onOpen: () => void }) {
-  const ref = useRef<HTMLButtonElement>(null);
-
-  useGSAP(
-    () => {
-      if (!cell.waiting) return;
-      const rule = ref.current?.querySelector<HTMLElement>(".ledger__sweep");
-      if (!rule) return;
-      gsap.set(rule, { scaleX: 0, transformOrigin: "left center" });
-      mech(rule, { scaleX: 1, duration: DUR.sweep, ease: EASE.enter });
-    },
-    { dependencies: [cell.waiting], scope: ref },
-  );
-
-  return (
-    <button
-      type="button"
-      ref={ref}
-      className={`ledger__cell${cell.waiting ? " is-waiting" : ""}`}
-      onClick={onOpen}
-    >
-      <span className="ledger__value">{cell.label}</span>
-      {cell.waiting && <span className="ledger__sweep" aria-hidden="true" />}
-    </button>
-  );
-}
-
-/** A plain destination — What's new, Help. */
-function LedgerLink({ link, onOpen }: { link: LinkCell; onOpen: () => void }) {
-  return (
-    <button type="button" className="ledger__cell" onClick={onOpen}>
-      <span className="ledger__value">{link.label}</span>
+      <span>{actuator.label}</span>
     </button>
   );
 }

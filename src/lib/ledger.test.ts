@@ -1,69 +1,43 @@
-// Tests for the ledger's contract — §3.3's "Band 3" and the update truth
-// ladder it inherited from the footer it replaces.
+// Tests for the version truth ladder — the one piece of real logic the home's
+// retired mono ledger held, and the reason `ledger.ts` outlived the band.
 //
 // Run: `npm test` (node --test with type-stripping; no extra deps).
 //
 // There is no DOM in the test runner, which is exactly why `ledger.ts` holds
-// the decisions and the component holds only the ink. Two statements are worth
-// a test and both are statements about pure values:
+// the decision and the component holds only the ink. The statement worth a
+// test is a statement about a pure value: "never claims current before the
+// check returns".
 //
-//   · "never claims current before the check returns" (§3.3) — the ladder;
-//   · "all six aggregator states keep an honest ledger" — the merge of the
-//     vitals row into the band may not lose a state, so the row is driven
-//     through the REAL aggregator here, never through hand-written cells.
+// The band-level assertions that used to live here — every aggregator state
+// keeps a full row, and the six states stay distinguishable — moved to
+// `aggregator.test.ts` with the readings themselves. They were always
+// statements about the BOARD; the row was just where they were read.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { deriveBoard, type EngineState } from "./aggregator.ts";
-import {
-  LEDGER_LINKS,
-  UNKNOWN_VERSION_LABEL,
-  buildLedger,
-  versionCell,
-  vitalCell,
-  type VersionRung,
-} from "./ledger.ts";
-
-// ── The six aggregator states, as the aggregator itself derives them ──
-
-const ENGINE: Record<string, EngineState> = {
-  checking: { health: null },
-  starting: { health: null, starting: true },
-  down: { health: { state: "down" } },
-  degraded: { health: { state: "degraded" } },
-  needsSetup: { health: { state: "healthy" }, needsSetup: true },
-  ready: { health: { state: "healthy" } },
-};
-
-const STATES = Object.keys(ENGINE);
-
-// ── The truth ladder (§3.3) ───────────────────────────────────────
+import { UNKNOWN_VERSION_LABEL, versionCell, type VersionRung } from "./ledger.ts";
 
 test("the ladder's four rungs read exactly as the doc spells them", () => {
   assert.deepEqual(versionCell({ available: true, current: "0.8.37", version: "0.9.0" }, "0.8.37"), {
     rung: "update",
     label: "Update available · v0.9.0",
     waiting: true,
-    target: "updates",
   });
   assert.deepEqual(versionCell({ available: false, current: "0.8.37" }, "0.8.37"), {
     rung: "current",
     label: "Up to date · v0.8.37",
     waiting: false,
-    target: "updates",
   });
   assert.deepEqual(versionCell(null, "0.8.37"), {
     rung: "version",
     label: "v0.8.37",
     waiting: false,
-    target: "updates",
   });
   assert.deepEqual(versionCell(null, null), {
     rung: "unknown",
     label: UNKNOWN_VERSION_LABEL,
     waiting: false,
-    target: "updates",
   });
 });
 
@@ -96,7 +70,7 @@ test("the rungs are ordered — an available update outranks everything", () => 
   assert.ok(!bare.label.includes("undefined"));
 });
 
-test("only the update rung sweeps", () => {
+test("exactly one rung reports a waiting update", () => {
   const rungs = new Map<VersionRung, boolean>();
   rungs.set(versionCell({ available: true, current: "1", version: "2" }, "1").rung, true);
   for (const cell of [
@@ -104,7 +78,7 @@ test("only the update rung sweeps", () => {
     versionCell(null, "1"),
     versionCell(null, null),
   ]) {
-    assert.equal(cell.waiting, false, `${cell.rung} must not sweep`);
+    assert.equal(cell.waiting, false, `${cell.rung} must not report a waiting update`);
     rungs.set(cell.rung, cell.waiting);
   }
   // Four rungs, exactly one of which is a waiting update.
@@ -112,114 +86,16 @@ test("only the update rung sweeps", () => {
   assert.equal([...rungs.values()].filter(Boolean).length, 1);
 });
 
-// ── The vitals fold INTO the row, they don't disappear ────────────
-
-test("every aggregator state keeps a full, honest ledger", () => {
-  for (const state of STATES) {
-    const board = deriveBoard(ENGINE[state]);
-    const ledger = buildLedger(board, null, "0.8.37");
-
-    // A cell per vital the board reports — the merge drops nothing.
-    assert.equal(ledger.vitals.length, board.vitals.length, state);
-    assert.ok(ledger.vitals.length >= 1, `${state}: the row lost the engine vital`);
-
-    const engine = ledger.vitals[0];
-    assert.equal(engine.key, "engine");
-    assert.equal(engine.label, "engine");
-    assert.ok(engine.value.trim() !== "", `${state}: the engine cell says nothing`);
-    assert.equal(engine.target, "supervision", `${state}: the vital lost its door`);
-    assert.ok(engine.provenance, `${state}: the vital lost its provenance`);
-
-    // …and the rest of the row is always there.
-    assert.equal(ledger.version.target, "updates");
-    assert.deepEqual(
-      ledger.links.map((l) => l.target),
-      ["changelog", "help"],
-    );
+test("the ladder is a reading, not a door", () => {
+  // Auracle installs its own updates, so no rung carries an action or a target
+  // for one. A field named `target` reappearing here would be a manual update
+  // control growing back through the pure layer.
+  for (const cell of [
+    versionCell({ available: true, current: "1", version: "2" }, "1"),
+    versionCell({ available: false, current: "1" }, "1"),
+    versionCell(null, "1"),
+    versionCell(null, null),
+  ]) {
+    assert.deepEqual(Object.keys(cell).sort(), ["label", "rung", "waiting"]);
   }
-});
-
-test("every aggregator state keeps a verdict and a verb beside the row", () => {
-  // The band composition's contract: three things, always all three. A state
-  // that renders a ledger but no verdict (or an unlabelled verb) would leave
-  // the home saying less than the engine knows.
-  for (const state of STATES) {
-    const board = deriveBoard(ENGINE[state]);
-    assert.ok(board.systemLine.trim() !== "", `${state}: no verdict`);
-    assert.ok(board.actuator.label.trim() !== "", `${state}: no verb`);
-    // A disabled verb always says WHY. The two in-flight states say it in the
-    // label itself ("Checking engine…", "Starting engine…" — the verb IS the
-    // reason); anything else disabled owes the user a reason line.
-    const inFlight = board.actuator.action === "checking" || board.actuator.action === "starting";
-    if (board.actuator.disabled && !inFlight) {
-      assert.ok(board.actuator.reason, `${state}: a disabled verb with no reason`);
-    }
-    if (board.actuator.disabled && inFlight) {
-      assert.match(board.actuator.label, /…$/, `${state}: an in-flight verb must read as in-flight`);
-    }
-  }
-});
-
-test("the six states produce six DISTINCT bands", () => {
-  // Distinctness is a property of the WHOLE band, not of the engine cell: the
-  // engine really is `Healthy` in both `ready` and `needsSetup`, and a row that
-  // claimed otherwise would be lying to look informative. What separates those
-  // two is the verdict and the verb, which is exactly where the difference
-  // lives in the machine.
-  const seen = new Map<string, string>();
-  for (const state of STATES) {
-    const board = deriveBoard(ENGINE[state]);
-    const cell = buildLedger(board, null, "0.8.37").vitals[0];
-    const shape = [cell.value, cell.dot, board.systemLine, board.actuator.label].join("/");
-    const clash = seen.get(shape);
-    if (clash) assert.fail(`${state} is indistinguishable from ${clash} ("${shape}")`);
-    seen.set(shape, state);
-  }
-  assert.equal(seen.size, 6);
-
-  // And the engine cell alone separates the four states that ARE distinct
-  // engine states (ready and needsSetup share one, honestly).
-  const words = STATES.map(
-    (s) => buildLedger(deriveBoard(ENGINE[s]), null, "0.8.37").vitals[0].value,
-  );
-  assert.equal(new Set(words).size, 5);
-});
-
-test("a stale reading refuses to quote its value", () => {
-  const fresh = vitalCell({
-    key: "engine",
-    label: "engine",
-    value: "Healthy",
-    dot: "ok",
-    freshness: "fresh",
-    door: "supervision",
-    provenance: "last ok 2026-08-13T00:00:00Z",
-  });
-  assert.equal(fresh.value, "Healthy");
-  assert.equal(fresh.stale, false);
-
-  const stale = vitalCell({
-    key: "engine",
-    label: "engine",
-    value: "Healthy",
-    dot: "ok",
-    freshness: "stale",
-    door: "supervision",
-    provenance: "last ok 2026-08-13T00:00:00Z",
-  });
-  assert.equal(stale.value, "stale", "a stale cell may not repeat a reading it can't stand behind");
-  assert.equal(stale.stale, true);
-  assert.equal(stale.provenance, "last ok 2026-08-13T00:00:00Z", "provenance survives staleness");
-  assert.equal(stale.target, "supervision", "…and so does the door");
-});
-
-test("the row's tail is fixed and both halves are doors", () => {
-  assert.equal(LEDGER_LINKS.length, 2);
-  for (const link of LEDGER_LINKS) {
-    assert.ok(link.label.trim() !== "");
-    assert.ok(link.target === "changelog" || link.target === "help");
-  }
-  // Copy check: the sketch's row is `… · What's new · Help`.
-  assert.match(LEDGER_LINKS[0].label, /^What.s new$/);
-  assert.equal(LEDGER_LINKS[1].label, "Help");
 });

@@ -76,7 +76,7 @@ export default function Shell({
         void openEngineSetup();
         break;
       case "degraded":
-        setInspector("supervision");
+        setInspector("status");
         break;
       default:
         break;
@@ -97,8 +97,17 @@ export default function Shell({
         openIdePanel: (p) => void openIdePanel(p),
         openTutorial: onOpenTutorial,
         showTips,
+        rerunSetup: onRerunSetup,
       }),
-    [board, containers, runActuator, eng.refresh, onOpenTutorial, showTips],
+    [
+      board,
+      containers,
+      runActuator,
+      eng.refresh,
+      onOpenTutorial,
+      showTips,
+      onRerunSetup,
+    ],
   );
 
   const runCommand = useCallback(
@@ -147,15 +156,10 @@ export default function Shell({
                 : "launch",
           );
           break;
-        case "u":
-          e.preventDefault();
-          setInspector("updates");
-          emit("updates");
-          break;
         case "s":
           e.preventDefault();
-          setInspector("supervision");
-          emit("supervision");
+          setInspector("status");
+          emit("status");
           break;
         case "a":
           e.preventDefault();
@@ -217,16 +221,17 @@ export default function Shell({
           containers={containers}
           onActuator={runActuator}
           onDoor={(d) => setInspector(d)}
-          onCard={(k) => setInspector(k)}
-          onRerunSetup={onRerunSetup}
-          onAgent={() => setInspector("intelligence")}
         />
         {/* The tray's Supervision echo draws the SAME instrument as the home
             (§3.4). Derived once here and handed down rather than rebuilt
-            inside the tray, so the miniature and the board cannot disagree. */}
+            inside the tray, so the miniature and the board cannot disagree —
+            and the same reason the version ladder rides down with it: the
+            Shell already holds one reading of the update probe. */}
         <InspectorHost
           open={inspector}
           instrument={frameFor(board, containers)}
+          update={eng.update}
+          version={eng.version}
           onClose={() => setInspector(null)}
         />
         {echo && <EchoLine key={echo} verb={echo} />}

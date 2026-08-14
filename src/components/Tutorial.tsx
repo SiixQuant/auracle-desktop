@@ -43,7 +43,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Your hub, at a glance",
-    body: "The instrument at the top is the stack itself — one body on the ring for each container that really reported, and pressing it opens Supervision. The mono row on the floor is the ledger: the engine reading, your version, What's new and Help, each of them a door. Brokers and data sources connect inside the workspace itself.",
+    body: "The instrument is the stack itself — one body on the ring for each container that really reported. Pressing it, or ENGINE in the pill at the top, opens Status: the engine reading, every container, your version, What's new and Help, all on one panel. Brokers and data sources connect inside the workspace itself.",
   },
   {
     title: "Connect GitHub",
@@ -51,8 +51,8 @@ const STEPS: Step[] = [
     render: () => <GithubConnect />,
   },
   {
-    title: "System & help",
-    body: "Manage your license and the engine's preferences in System, from the top bar or ⌘K, and choose your agent in Intelligence. Help answers the common questions and copies your diagnostics for support. You can replay this tour any time from ⌘K, or from System → Advanced / Diagnostics.",
+    title: "Settings & help",
+    body: "Manage your license and the engine's preferences in Settings, from the pill or ⌘K, and choose your agent in Intelligence (⌘K). Status ends with Help: the common questions, and a one-press copy of your diagnostics for support. You can replay this tour any time from ⌘K, or from Settings → Advanced / Diagnostics.",
   },
 ];
 

@@ -48,7 +48,7 @@ export interface FaqEntry {
 export const FAQ: FaqEntry[] = [
   {
     q: "How do I set up the trading stack?",
-    a: "The first time you open the launcher it walks you through setup: install or start Docker, pull the engine's images, and install the Auracle IDE. You can re-run that any time from the home screen's “Re-run setup”.",
+    a: "The first time you open the launcher it walks you through setup: install or start Docker, pull the engine's images, and install the Auracle IDE. You can re-run that any time from ⌘K → “Re-run setup”.",
   },
   {
     q: "Where did broker connections go?",
@@ -60,7 +60,7 @@ export const FAQ: FaqEntry[] = [
   },
   {
     q: "The engine won't start — what do I check?",
-    a: "Open Supervision from the home screen. It shows Docker's state and each container's health, with a Restart per service and Start / Stop / Pull-update for the whole stack. Most “won't start” cases are Docker not running yet.",
+    a: "Open Status — press the instrument on the home, or ENGINE in the pill. It shows Docker's state and each container's health, with a Restart per service and Start / Stop / Pull-update for the whole stack. Most “won't start” cases are Docker not running yet.",
   },
   {
     q: "Where do I get help?",

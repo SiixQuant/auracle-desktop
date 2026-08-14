@@ -10,20 +10,18 @@
 // replayable from the palette ("Show home tips"). Dismiss persists; replay does
 // not re-arm the auto-show. Those semantics are untouched by this slice.
 //
-// The anchoring: this overlay repeats `.standby`'s own three-row grid, so each
-// callout sits in the band it is talking about without measuring anything —
-// which is the deterministic anchoring §3.6 is describing. It renders INSIDE
-// the standby stage (the Shell) for the same reason the tray does: the bands it
+// The anchoring: this overlay repeats `.standby`'s own layout, so each callout
+// sits over the thing it is talking about without measuring anything — which
+// is the deterministic anchoring §3.6 is describing. It renders INSIDE the
+// standby stage (the Shell) for the same reason the tray does: the parts it
 // annotates are in there, and a window-level overlay would have to subtract the
-// top bar by hand to line up with them.
+// chrome by hand to line up with them.
 //
-// THE COPY. The three beats were written for the old home — a lamp, a status
-// line under the button, and a vitals row — and every one of those parts has
-// since been replaced. Slice 7 rewrites them against the screen that is
-// actually there, and against `fx/orrery.ts`'s real state map: the instrument
-// turns, goes off-tempo and stands still on a dashed ring, and it has no green
-// at all (health-green lives on the ledger's dot). A tour that describes a part
-// that no longer exists is worse than no tour.
+// THE COPY. A tour that describes a part that no longer exists is worse than no
+// tour, so the beats are rewritten every time the home is. The ledger beat went
+// with the ledger: there are two things on this home now — the instrument and
+// the verb — and everything the third beat used to point at is one door away,
+// which is what the verb's beat says instead.
 
 const COACH_KEY = "auracle_standby_coach_seen";
 
@@ -37,28 +35,21 @@ export function coachSeen(): boolean {
   }
 }
 
-/** The three beats, in the bands' own order. `band` names the row each one is
+/** The beats, in the home's own order. `band` names the region each one is
  *  anchored in; `link` is which way its connecting hairline runs to reach the
- *  thing it is pointing at (the ledger sits on the floor, so its callout points
- *  down at it rather than across). */
+ *  thing it is pointing at. */
 const BEATS = [
   {
     band: "instrument",
     label: "01 · the instrument",
     link: "across",
-    body: "Your one status, drawn as the mark: a body on the ring for each container that really reported. It turns while the stack is healthy, goes off-tempo when a service degrades, and stands still on a dashed ring when the engine is down. Press it for Supervision.",
+    body: "Your one status, drawn as the mark: a body on the ring for each container that really reported. It turns while the stack is healthy, goes off-tempo when a service degrades, and stands still on a dashed ring when the engine is down. Press it for Status.",
   },
   {
     band: "verb",
     label: "02 · the verb",
     link: "across",
-    body: "One button, and it is always your next move — start the engine, then open your workspace. The line above it says the same state in words.",
-  },
-  {
-    band: "ledger",
-    label: "03 · the ledger",
-    link: "down",
-    body: "Every reading, and every door. Press the engine cell for Supervision or the version for Updates; ⌘K reaches the rest. Brokers and data sources live in the workspace.",
+    body: "One button, and it is always your next move — start the engine, then open your workspace. The line above it says the same state in words, and a line below it appears only when something needs you. Everything else — containers, versions, what's new, help — is behind Status; ⌘K reaches the rest.",
   },
 ] as const;
 
