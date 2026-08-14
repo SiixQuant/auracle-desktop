@@ -141,6 +141,25 @@
   --stage-dot:      rgba(35, 35, 35, 0.04);
   --stage-dot-near: rgba(35, 35, 35, 0.075);
 
+  /* Ambient stage, the character field (src/fx/AsciiField.tsx) — the same
+     stage on the signed-in home, drawn as the mark rasterised into a grid of
+     monospaced characters. Same ink, same discipline, three steps instead of
+     two: the faintest character at rest, the densest character at rest, and
+     the ceiling a character reaches directly under the pointer.
+
+     The site's field is white on black and runs .14 → .30, lifting to .85.
+     This one is ink on cream and sits BEHIND live UI rather than under a
+     heading, so the whole ramp comes down by more than half. The rest alpha
+     is the one that governs loudness — it is what the sparse floor is drawn
+     at across the whole box — and at α.05 on a fifth of the cells the field
+     lays down less ink per pixel than the dot lattice it replaces. The top of
+     the ramp is brighter than --stage-dot-near, but it is spent only where
+     the mark actually is. (Fallbacks: ASCII_INK_FALLBACK in
+     src/fx/ascii.ts, for the one frame before the tokens resolve.) */
+  --stage-ascii:      rgba(35, 35, 35, 0.05);
+  --stage-ascii-near: rgba(35, 35, 35, 0.12);
+  --stage-ascii-lift: rgba(35, 35, 35, 0.35);
+
   /* The Orrery — the home instrument. Derived, no new hue, and deliberately
      achromatic: the ring is CHROME (it is the mechanism, not a reading) and a
      body is neutral INK until its own container reports otherwise. Only the
@@ -2537,6 +2556,22 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   pointer-events: none;
 }
 .dot-field__canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+/* The ascii field (src/fx/AsciiField.tsx) — the same stage, drawn as
+   characters, behind the signed-in home. Same contract in every respect:
+   full-bleed, never interactive, bottom layer, no CSS animation (the cadence
+   is src/fx/ambient.ts's, shared with the dot field). Its ink is
+   --stage-ascii / -near / -lift. */
+.ascii-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ascii-field__canvas {
   display: block;
   position: absolute;
   inset: 0;
