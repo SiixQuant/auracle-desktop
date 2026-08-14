@@ -164,10 +164,13 @@ export type Rgba = { r: number; g: number; b: number; a: number };
 
 /** The `--stage-dot` / `--stage-dot-near` values, hard-coded as the fallback
  *  for when the tokens can't be read (a detached canvas, a node test). CSS
- *  stays the source of truth; this is the parachute. */
+ *  stays the source of truth; this is the parachute. Ink on cream, and
+ *  quieter than the white-on-charcoal pair it replaces — dark dots on a
+ *  bright ground carry further at the same alpha. Keep these two in step
+ *  with app.css or the first frame after a resume paints the wrong field. */
 export const STAGE_INK_FALLBACK = {
-  base: { r: 230, g: 237, b: 243, a: 0.05 },
-  near: { r: 230, g: 237, b: 243, a: 0.09 },
+  base: { r: 35, g: 35, b: 35, a: 0.04 },
+  near: { r: 35, g: 35, b: 35, a: 0.075 },
 } as const;
 
 const RGBA = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/i;

@@ -51,8 +51,10 @@ export type OrreryPhase =
 
 /** Which hue the CORE carries. The core is the only part of the instrument
  *  that is ever chromatic — the ring is chrome and the bodies are ink (§2.1
- *  accent discipline). `ready` is the calm 70%-blue (`--accent-text`); `accent`
- *  is full Nous-blue for "alive, but not a health verdict". */
+ *  accent discipline). `ready` is the calm burnt tier (`--accent-text`);
+ *  `accent` is the full brand accent for "alive, but not a health verdict".
+ *  Which hues those two resolve to is the stylesheet's business, not this
+ *  file's — the tones are named for what they MEAN. */
 export type CoreTone = "checking" | "accent" | "ready" | "warn" | "err";
 
 /** How the ring draws. `seam` is the needsSetup tell (one dashed arc segment —

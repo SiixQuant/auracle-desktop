@@ -1,7 +1,7 @@
 // CommandPalette — ⌘K over the Standby home. The instrument's voice tube.
 //
 // Design authority: launcher-redesign-direction.md §1 (depth surfaces are
-// "machined parts of the same instrument: opaque charcoal planes, hairline
+// "machined parts of the same instrument: opaque planes, hairline
 // edges, no glass, no glow"), §2.2 (the mono-label register), §2.4 (the motion
 // vocabulary) and §3.5 ("Command palette"). Slice 7 of the redesign.
 //

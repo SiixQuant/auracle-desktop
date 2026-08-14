@@ -1,4 +1,4 @@
-// StandbyHome — the launcher home, as three bands on one charcoal chamber.
+// StandbyHome — the launcher home, as three bands on one cream chamber.
 //
 // Design authority: launcher-redesign-direction.md §1 (the chamber sketch) and
 // §3.3 ("Home — The Orrery"). Slice 5 of the redesign.
@@ -6,7 +6,7 @@
 //     ┌──────────────────────────────────────────────┐
 //     │                THE INSTRUMENT                │  ~55% of the stage
 //     │            Everything's ready.               │  THE VERDICT (display)
-//     │              [ Open workspace ]              │  one Nous-blue verb
+//     │              [ Open workspace ]              │  one accent verb
 //     │ engine Healthy · v0.8.37 · What's new · Help │  THE LEDGER (mono)
 //     └──────────────────────────────────────────────┘
 //
@@ -256,7 +256,7 @@ function LedgerVital({ cell, onOpen }: { cell: VitalCell; onOpen?: () => void })
 /** The version / update cell — the truth ladder (`lib/ledger.ts`), inked.
  *
  *  On the one rung where an update is genuinely waiting, the cell goes bright
- *  and a blue underline sweeps out from the left. Once. It is a fact arriving,
+ *  and an accent underline sweeps out from the left. Once. It is a fact arriving,
  *  not an animation running: §2.4 allows the sweep exactly because it happens
  *  when the machine learns something, and forbids it from ever looping. */
 function LedgerVersion({ cell, onOpen }: { cell: VersionCell; onOpen: () => void }) {

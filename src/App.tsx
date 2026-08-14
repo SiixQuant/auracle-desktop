@@ -192,7 +192,7 @@ export default function App() {
   if (!signedIn) {
     return (
       <Suspense
-        fallback={<div style={{ minHeight: "100vh", background: "#000" }} />}
+        fallback={<div style={{ minHeight: "100vh", background: "var(--bg)" }} />}
       >
         <SignInScreen
           onGoogleSignIn={startGoogleSignIn}
