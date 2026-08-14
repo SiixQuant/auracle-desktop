@@ -1369,10 +1369,10 @@ pre.logs.logs-compact { max-height: 200px; }
   grid-template-rows: minmax(0, 1fr) auto;
   column-gap: var(--s-6);
   row-gap: var(--s-5);
-  /* Top clears the overlay title bar's traffic lights AND the pill that
-     floats under them; the sides and floor are the composition's air. */
-  padding: calc(var(--chrome-top) + var(--s-5)) clamp(var(--s-5), 5vw, 64px)
-    clamp(var(--s-5), 6vh, 56px);
+  /* The pill's band sits above this in the shell's column and already clears
+     the overlay title bar's traffic lights, so the top here is just air under
+     the capsule; the sides and floor are the composition's own. */
+  padding: var(--s-5) clamp(var(--s-5), 5vw, 64px) clamp(var(--s-5), 6vh, 56px);
 }
 
 /* The key art — the instrument. A COLUMN flex box, so the orrery's size is
@@ -1445,7 +1445,7 @@ pre.logs.logs-compact { max-height: 200px; }
 @media (max-height: 620px) {
   .standby {
     row-gap: var(--s-4);
-    padding-top: calc(var(--chrome-top) + var(--s-2));
+    padding-top: var(--s-3);
   }
   .standby__cluster { gap: var(--s-3); }
 }
@@ -1738,14 +1738,104 @@ pre.logs.logs-compact { max-height: 200px; }
 .linklike:hover { color: var(--fg); }
 .linklike:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ── Single-surface shell (replaces the rail) ──────────────────────
- * A thin top bar + the Standby stage. No left rail: Connections /
- * Supervision / Account are reached by pressing a vital (status-is-the-
- * door); Intelligence + System live in the top bar. */
+/* ── Single-surface shell ──────────────────────────────────────────
+ * The nav pill + the Standby stage. No left rail and no top bar: Status and
+ * Settings are the pill's two words, the instrument is a door to Status
+ * (status-is-the-door), and everything else is ⌘K. */
 .shell-standby {
   display: flex;
   flex-direction: column;
   height: 100vh;
+}
+
+/* ── THE NAV PILL ──────────────────────────────────────────────────
+ * The site's menu grammar, launcher-sized: one black capsule floating
+ * top-centre on the cream ground. It carries the mark, two words and an
+ * account chip, and that is the launcher's entire navigation.
+ *
+ * The BAND around it is the window's drag strip (the overlay title bar leaves
+ * the traffic lights floating over our own top-left corner), so it stands at
+ * least as tall as those buttons and keeps their corner clear. The band draws
+ * nothing itself — no fill, no hairline — so the capsule reads as floating over
+ * the ascii stage rather than sitting on a bar. */
+.pill-bar {
+  position: relative;
+  z-index: 1;
+  /* Promote to its own compositing layer so WebKit paints it ABOVE the ambient
+     canvas — the same rule the stage below it needs. Invisible in Chromium. */
+  transform: translateZ(0);
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: var(--chrome-top);
+  padding: var(--s-2) var(--chrome-lights) 0;
+}
+
+/* The capsule. It re-points the tokens for its own subtree exactly the way the
+ * tray does (§4.1: a scoped token re-point, never a private colour map), so the
+ * items inside it name --fg / --fg-muted / --line and get the black
+ * counter-material's values for free. */
+.pill {
+  /* On black, white at opacity steps — the brand's own ramp, and the tray's. */
+  --fg:       rgba(255, 255, 255, 0.9);
+  --fg-muted: rgba(255, 255, 255, 0.45);
+  color-scheme: dark;
+
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  width: min(520px, 100%);
+  padding: 5px 6px 5px 12px;
+  background: #000;
+  /* DOTTED, not solid: the site's own nav edge. On black a solid hairline is a
+     stripe; a dotted one is a seam, which is what a capsule wants. */
+  border: 1px dotted rgba(255, 255, 255, 0.35);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+}
+/* The mark, small and white — the launcher saying its own name. */
+.pill__mark {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--fg);
+  margin-right: var(--s-2);
+}
+.pill__item,
+.pill__account {
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+.pill__item { color: var(--fg); }
+.pill__item:hover { background: rgba(255, 255, 255, 0.1); }
+/* The account chip: right-aligned, and one register quieter than the two
+   destinations beside it — it names who you are, not where to go. Never
+   uppercased: an email's local part is a string the machine was given, and
+   this product does not restyle other people's strings. */
+.pill__account {
+  margin-left: auto;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.pill__account:hover { color: var(--fg); background: rgba(255, 255, 255, 0.1); }
+.pill__item:focus-visible,
+.pill__account:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .topbar {
   display: flex;
@@ -1775,21 +1865,9 @@ pre.logs.logs-compact { max-height: 200px; }
   flex-shrink: 0;
   color: var(--fg);
 }
-.topbar__actions { display: flex; align-items: center; gap: 4px; }
-.topbar__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: transparent;
-  border: 0;
-  border-radius: 7px;
-  padding: 7px 10px;
-  color: var(--fg-muted);
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: background-color 0.15s ease-out, color 0.15s ease-out;
-}
-.topbar__btn:hover { background: var(--surface); color: var(--fg); }
+/* `.topbar` survives for the commissioning screen, which still wants a titled
+   strip while it walks you through a first run. Its ACTIONS do not: the search
+   and gear buttons were the signed-in home's, and the pill replaced them. */
 
 .standby-stage {
   position: relative;
@@ -2055,14 +2133,8 @@ pre.logs.logs-compact { max-height: 200px; }
 }
 .orrery-echo .orrery__svg { width: auto; height: auto; }
 
-.kbd-hint {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg-muted);
-}
-
 /* Transient command echo (echo-to-teach) — names the verb you just ran.
- * Floats just above the ledger, which owns the floor of the chamber now.
+ * Floats at the foot of the chamber.
  *
  * Its arrival is a GSAP entrance (Shell.tsx), not a keyframe: §2.4 lists the
  * echo line among the things that animate, and this app has ONE engine. The
@@ -2335,9 +2407,10 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   position: absolute;
   inset: 0;
   display: grid;
+  /* The home's own template, so the callouts land on the home's own parts. */
   grid-template-rows: minmax(0, 1fr) auto;
-  row-gap: var(--s-6);
-  padding: var(--s-5) var(--s-5) var(--s-6);
+  row-gap: var(--s-5);
+  padding: var(--s-5) clamp(var(--s-5), 5vw, 64px) clamp(var(--s-5), 6vh, 56px);
   /* Only the cards take the pointer: a click on the dimmed board around them
      still reaches the scrim and completes, exactly as it did before. */
   pointer-events: none;
@@ -2545,39 +2618,26 @@ body:has(.tut-overlay) .coach-scrim { display: none; }
   background: var(--bg);
   isolation: isolate;
 }
-.shell-standby > .topbar,
+.shell-standby > .pill-bar,
 .shell-standby > .standby-stage {
   position: relative;
   z-index: 1;
   /* Promote each to its own compositing layer so WebKit (the macOS WKWebView)
      paints it ABOVE the ambient canvas. Without this, the canvas composites
-     over the instrument, the verdict, the verb and the ledger and washes them
-     out. Every band sits INSIDE this promoted stage, so they all ride above
-     the canvas with it. Invisible in Chromium; required in WKWebView. */
+     over the pill, the instrument, the verdict and the verb and washes them
+     out. Every part sits INSIDE one of these two, so they all ride above the
+     canvas with them. Invisible in Chromium; required in WKWebView. */
   transform: translateZ(0);
-}
-/* Transparent chrome so the shader reads through the whole surface.
-   It is also the window's drag strip now (the overlay title bar leaves the
-   traffic lights floating over our own top-left corner), so it reserves that
-   corner and stands at least as tall as the buttons in it. */
-.shell-standby .topbar {
-  background: transparent;
-  border-bottom: 1px solid var(--line);
-  min-height: var(--chrome-top);
-  padding-left: var(--chrome-lights);
-}
-.shell-standby .topbar__btn:hover {
-  background: var(--surface-2);
 }
 .shell-standby .standby-stage {
   background: transparent;
   /* The stage is a <main>, and the app's generic main rule (a centred 900px
-     column with 24/24/32 padding) is the wrong shape for a chamber: the home's
-     three bands are full-bleed and own their own margins. Its `margin: 0 auto`
-     also made the stage shrink-to-fit inside the shell's column flex, which is
-     why the chamber used to be as wide as its widest row instead of as wide as
-     the window. Neutralised here rather than on `main` itself, which every
-     other view still wants. */
+     column with 24/24/32 padding) is the wrong shape for a chamber: the home
+     is full-bleed and owns its own margins. Its `margin: 0 auto` also made the
+     stage shrink-to-fit inside the shell's column flex, which is why the
+     chamber used to be as wide as its widest row instead of as wide as the
+     window. Neutralised here rather than on `main` itself, which every other
+     view still wants. */
   padding: 0;
   max-width: none;
   margin: 0;

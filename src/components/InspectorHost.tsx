@@ -37,6 +37,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import AccountInspector from "@/components/AccountInspector";
 import LifecycleInspector from "@/components/LifecycleInspector";
 import PairPhoneInspector from "@/components/PairPhoneInspector";
 import StatusInspector from "@/components/StatusInspector";
@@ -46,13 +47,12 @@ import type { UpdateInfo } from "@/lib/tauri";
 import {
   AdvancedDrawer,
   GeneralCard,
-  GithubCard,
   IntelligenceCard,
-  LicenseCard,
 } from "@/views/Settings";
 
 export type InspectorKey =
   | "status"
+  | "account"
   | "intelligence"
   | "system"
   | "lifecycle"
@@ -60,6 +60,7 @@ export type InspectorKey =
 
 const TITLES: Record<InspectorKey, string> = {
   status: "Status",
+  account: "Account",
   intelligence: "Intelligence",
   system: "Settings",
   lifecycle: "Strategy lifecycle",
@@ -197,6 +198,10 @@ function InspectorBody({
       return (
         <StatusInspector instrument={instrument} update={update} version={version} />
       );
+    case "account":
+      // Identity, and the two things that belong to it: the licence and the
+      // GitHub sign-in, re-homed here from the settings tray.
+      return <AccountInspector />;
     case "lifecycle":
       return <LifecycleInspector />;
     case "pair":
@@ -206,13 +211,11 @@ function InspectorBody({
     case "intelligence":
       return <IntelligenceCard />;
     case "system":
-      // The settings surface. No update control lives here (or anywhere):
-      // Auracle installs its own updates.
+      // The settings surface: engine preferences, and the diagnostics drawer.
+      // No update control lives here (or anywhere): Auracle updates itself.
       return (
         <>
-          <LicenseCard />
           <GeneralCard />
-          <GithubCard />
           <AdvancedDrawer />
         </>
       );

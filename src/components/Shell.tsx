@@ -9,17 +9,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { AuracleGlyph } from "@/components/AuracleGlyph";
 import Coachmark, { coachSeen } from "@/components/Coachmark";
 import CommandPalette from "@/components/CommandPalette";
 import InspectorHost, { type InspectorKey } from "@/components/InspectorHost";
+import NavPill from "@/components/NavPill";
 import StandbyHome from "@/components/StandbyHome";
 import AsciiField from "@/fx/AsciiField";
 import { DUR, enter, useGSAP } from "@/fx/motion";
 import { frameFor } from "@/fx/orrery";
 import { deriveBoard } from "@/lib/aggregator";
 import { buildCommands, type Command } from "@/lib/commands";
-import { cmd, openEngineSetup, openIdePanel, type ContainerStatus } from "@/lib/tauri";
+import {
+  cmd,
+  openEngineSetup,
+  openIdePanel,
+  type AccountSession,
+  type ContainerStatus,
+} from "@/lib/tauri";
 import { useEngineState } from "@/lib/useEngineState";
 
 export default function Shell({
@@ -39,6 +45,22 @@ export default function Shell({
   const [showCoach, setShowCoach] = useState(() => !coachSeen());
   const echoTimer = useRef<number | null>(null);
   const showTips = useCallback(() => setShowCoach(true), []);
+
+  // Who is signed in, for the pill's account chip. Read once: the session is
+  // the engine's and it does not change under a running launcher — and a chip
+  // that polled would be one more clock for one word. A failed probe leaves it
+  // null, which the chip renders as the name of its own door, never as a guess.
+  const [account, setAccount] = useState<AccountSession | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    cmd
+      .clerkSession()
+      .then((s) => !cancelled && setAccount(s))
+      .catch(() => !cancelled && setAccount(null));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The live stack: the palette's restart commands AND the instrument's
   // bodies. Re-read on every health poll rather than on a timer of its own —
@@ -186,34 +208,11 @@ export default function Shell({
           first, image second — it seats the instrument by standing behind it,
           not by pointing at it. */}
       <AsciiField />
-      {/* The window has no title bar of its own (tauri.conf.json:
-          titleBarStyle "Overlay" — decorations stay, so the traffic lights
-          are still the OS's). The top strip of the UI therefore has to be
-          the thing you drag the window by; children without the attribute
-          (the buttons) keep their own clicks. */}
-      <header className="topbar" data-tauri-drag-region>
-        <div className="topbar__brand">
-          <AuracleGlyph className="topbar__mark" />
-          <strong>Auracle</strong>
-        </div>
-        <div className="topbar__actions">
-          <button
-            type="button"
-            className="topbar__btn"
-            onClick={() => {
-              loadContainers();
-              setPaletteOpen(true);
-            }}
-          >
-            <SearchIcon />
-            <span className="kbd-hint">⌘K</span>
-          </button>
-          <button type="button" className="topbar__btn" onClick={() => setInspector("system")}>
-            <GearIcon />
-            System
-          </button>
-        </div>
-      </header>
+      {/* The launcher's whole navigation, and the window's drag strip. The
+          window has no title bar of its own (tauri.conf.json: titleBarStyle
+          "Overlay" — decorations stay, so the traffic lights are still the
+          OS's), so this band is what you drag it by. */}
+      <NavPill account={account} onOpen={(k) => setInspector(k)} />
 
       <main className="standby-stage">
         <StandbyHome
@@ -235,9 +234,9 @@ export default function Shell({
           onClose={() => setInspector(null)}
         />
         {echo && <EchoLine key={echo} verb={echo} />}
-        {/* The coachmark annotates the three bands, so it lives in the stage
-            that holds them (§3.6's deterministic anchoring) rather than over
-            the whole window — the same reason the tray is mounted here. */}
+        {/* The coachmark annotates the home's own parts, so it lives in the
+            stage that holds them (§3.6's deterministic anchoring) rather than
+            over the whole window — the same reason the tray is mounted here. */}
         {showCoach && <Coachmark onClose={() => setShowCoach(false)} />}
       </main>
 
@@ -277,35 +276,7 @@ function EchoLine({ verb }: { verb: string }) {
   );
 }
 
-// ── Top-bar icons (inline, no icon-font dependency) ─────────────────
-
-const iconProps = {
-  width: 15,
-  height: 15,
-  viewBox: "0 0 20 20",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.6,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-function SearchIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="9" cy="9" r="6" />
-      <path d="M13.5 13.5 L17 17" />
-    </svg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="10" cy="10" r="2.4" />
-      <path d="M10 2.5 v2 M10 15.5 v2 M2.5 10 h2 M15.5 10 h2 M4.7 4.7 l1.4 1.4 M13.9 13.9 l1.4 1.4 M15.3 4.7 l-1.4 1.4 M6.1 13.9 l-1.4 1.4" />
-    </svg>
-  );
-}
+// The search and gear glyphs left with the top bar they labelled. The pill
+// carries words, not icons, and the palette they stood for is ⌘K — which the
+// tour, the coachmark and every command's own echo all name.
 
