@@ -20,7 +20,19 @@ interface SignInPageProps {
   engineDown?: boolean;
 }
 
-/** Minimal Auracle wordmark — the orbital mark from the design, no nav chrome.
+/** The threshold's chrome: the Auracle wordmark, and the band the window is
+ *  dragged by. No nav — there is nothing to navigate to yet.
+ *
+ *  The band is not decoration. The window runs macOS's overlay title bar
+ *  (tauri.conf.json → titleBarStyle "Overlay"), so there is no bar of ours and
+ *  no bar of the OS's to grab: every full-window surface has to carry its own
+ *  drag region, and this is the sign-in's — the home's is the pill's band and
+ *  the first run's is its title strip. Without it the FIRST screen of the
+ *  launcher is the one screen whose window cannot be moved.
+ *
+ *  `--chrome-top` is its height and `--chrome-lights` the room it keeps at each
+ *  end, which is the same pair every other full-window surface reserves for the
+ *  traffic lights floating over our top-left corner.
  *
  *  The utilities here name TOKENS rather than colours (`text-[var(--fg)]`), so
  *  this screen turns with the rest of the product instead of holding a private
@@ -28,7 +40,10 @@ interface SignInPageProps {
  *  only how this one component spells it. */
 function AuracleMark() {
   return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5">
+    <div
+      data-tauri-drag-region="deep"
+      className="fixed inset-x-0 top-0 z-20 flex h-[var(--chrome-top)] items-center justify-center gap-2.5 px-[var(--chrome-lights)]"
+    >
       <AuracleGlyph className="w-6 h-6 text-[var(--fg)]" />
       <span className="text-sm font-semibold tracking-wide text-[var(--fg)]">
         Auracle

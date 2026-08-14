@@ -19,9 +19,15 @@
 // There is no manual update control here, or anywhere — Auracle updates itself.
 //
 // It is also the window's drag strip. The window runs with macOS's overlay
-// title bar, so this band is what you drag it by; the capsule's own buttons sit
-// inside the band and keep their clicks, because only the element carrying
-// `data-tauri-drag-region` starts a drag.
+// title bar, so this band — capsule included — is what you drag it by.
+//
+// The region is `deep`, which is Tauri's own word for "anything in this subtree
+// drags". With the bare attribute only a direct hit on the band itself counted,
+// which made the capsule — the one thing up here you would actually reach for —
+// a dead zone, and at the 600px minimum width left almost nothing to grab but
+// the corner the traffic lights already own. The buttons keep their clicks
+// either way: Tauri stops walking the moment it meets a clickable element, so a
+// button never starts a drag.
 
 import { AuracleGlyph } from "@/components/AuracleGlyph";
 import type { InspectorKey } from "@/components/InspectorHost";
@@ -41,7 +47,7 @@ export default function NavPill({
   const chip = accountChipLabel(account);
 
   return (
-    <header className="pill-bar" data-tauri-drag-region>
+    <header className="pill-bar" data-tauri-drag-region="deep">
       <nav className="pill" aria-label="Main">
         <AuracleGlyph className="pill__mark" />
         <button type="button" className="pill__item" onClick={() => onOpen("status")}>
