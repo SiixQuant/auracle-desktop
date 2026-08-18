@@ -4,6 +4,14 @@ Notable changes per release. The format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [0.12.0]
+
+The word at the centre.
+
+### Changed
+- **The home leads with the mark, not the mechanism.** The orbital instrument gives its seat to the brand word itself — "Auracle" drawn as a field of particles that gathers as the home arrives and re-forms when you pass over it. It reads the same as the word on the website, set in the launcher's own ink on cream.
+- **The engine's health is in the words.** With the instrument gone from the home, the one sentence carries the reading, and the stack itself is still one press away — on the pill, the command palette, or the `s` key.
+
 ## [0.11.0]
 
 The premium launcher.
