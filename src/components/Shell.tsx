@@ -215,12 +215,7 @@ export default function Shell({
       <NavPill account={account} onOpen={(k) => setInspector(k)} />
 
       <main className="standby-stage">
-        <StandbyHome
-          eng={eng}
-          containers={containers}
-          onActuator={runActuator}
-          onDoor={(d) => setInspector(d)}
-        />
+        <StandbyHome eng={eng} onActuator={runActuator} />
         {/* The tray's Supervision echo draws the SAME instrument as the home
             (§3.4). Derived once here and handed down rather than rebuilt
             inside the tray, so the miniature and the board cannot disagree —

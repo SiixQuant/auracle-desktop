@@ -26,36 +26,25 @@
 
 import { useRef } from "react";
 
-import Orrery from "@/components/Orrery";
+import ParticleWordmark from "@/fx/ParticleWordmark";
 import { revealWords, useGSAP } from "@/fx/motion";
-import { frameFor } from "@/fx/orrery";
 import {
   attentionLine,
   deriveBoard,
   type ActuatorState,
-  type Door,
 } from "@/lib/aggregator";
-import type { ContainerStatus } from "@/lib/tauri";
 import type { EngineStateHook } from "@/lib/useEngineState";
 
 export default function StandbyHome({
   eng,
-  containers,
   onActuator,
-  onDoor,
 }: {
   /** Shared live engine read (owned by the Shell, so the home keeps
    *  polling behind an open inspector). */
   eng: EngineStateHook;
-  /** The stack as `stackStatus()` last reported it — the ONLY source of the
-   *  instrument's bodies. Undefined means "we haven't been told", which the
-   *  instrument renders as the mark at rest rather than as an empty machine. */
-  containers?: ContainerStatus[];
   /** Run the home's one verb — owned by the Shell so the palette and the
    *  button trigger the same action. */
   onActuator: () => void;
-  /** Open an inspector for a pressed status (status-is-the-door). */
-  onDoor?: (door: Exclude<Door, null>) => void;
 }) {
   const board = deriveBoard(eng.state);
   const { actuator } = board;
@@ -66,14 +55,14 @@ export default function StandbyHome({
 
   return (
     <div className="standby">
-      {/* ── The key art — the instrument, seated right of centre ─────
+      {/* ── The key art — the brand word, seated right of centre ─────
           Its own cell, so the cluster below can never be pushed under it: at
-          any window this product opens in, the words have their own room. */}
+          any window this product opens in, the words have their own room. The
+          word gathers on arrival and re-forms on hover; engine health is read
+          from the verdict beside it, and Status stays a press away (the pill,
+          ⌘K, or the `s` key). */}
       <div className="standby__figure">
-        <Orrery
-          frame={frameFor(board, containers ?? [])}
-          onOpen={() => onDoor?.("status")}
-        />
+        <ParticleWordmark text="Auracle" />
       </div>
 
       {/* ── The cluster — one sentence, one verb, one quiet line ───── */}
